@@ -2,7 +2,7 @@
 A versatile tool to perform pile-up analysis on Hi-C data in .cool format. And who doesn't like cool pupppies?
 
 ```
-Usage: 03_pileups.py [-h] [--pad PAD] [--minshift MINSHIFT]
+Usage: pileups.py [-h] [--pad PAD] [--minshift MINSHIFT]
                      [--maxshift MAXSHIFT] [--nshifts NSHIFTS]
                      [--mindist MINDIST] [--maxdist MAXDIST]
                      [--excl_chrs EXCL_CHRS] [--incl_chrs INCL_CHRS]
