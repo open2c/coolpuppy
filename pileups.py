@@ -244,31 +244,50 @@ def prepare_single(item):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("coolfile", type=str)
-    parser.add_argument("baselist", type=str)
-    parser.add_argument("--pad", default=7, type=int, required=False)
-    parser.add_argument("--minshift", default=10**5, type=int, required=False)
-    parser.add_argument("--maxshift", default=10**6, type=int, required=False)
-    parser.add_argument("--nshifts", default=10, type=int, required=False)
-    parser.add_argument("--mindist", type=int, required=False)
-    parser.add_argument("--maxdist", type=int, required=False)
+    parser.add_argument("coolfile", type=str,
+                        help="Cooler file with your Hi-C data")
+    parser.add_argument("baselist", type=str,
+                        help="A 3-column tab-delimited bed file with coordinates which intersections to pile-up.\
+                        Alternatively, a 6-column double-bed file (i.e. chr1,start1,end1,chr2,start2,end2) with coordinates of centers of windows that will be piled-up")
+    parser.add_argument("--pad", default=7, type=int, required=False,
+                        help="Padding of the windows (i.e. final size of the matrix is 2×pad+1)")
+    parser.add_argument("--minshift", default=10**5, type=int, required=False,
+                        help="Shortest distance for randomly shifting coordinates when creating controls")
+    parser.add_argument("--maxshift", default=10**6, type=int, required=False,
+                        help="Longest distance for randomly shifting coordinates when creating controls")
+    parser.add_argument("--nshifts", default=10, type=int, required=False,
+                        help="Number of control regions per averaged window")
+    parser.add_argument("--mindist", type=int, required=False,
+                        help="Minimal distance of intersections to use")
+    parser.add_argument("--maxdist", type=int, required=False,
+                        help="Maximal distance of intersections to use")
     parser.add_argument("--excl_chrs", default='chrY,chrM', type=str,
-                        required=False)
-    parser.add_argument("--incl_chrs", default='all', type=str, required=False)
-    parser.add_argument("--anchor", default=None, type=str, required=False) #UCSC-style
+                        required=False,
+                        help="Exclude these chromosomes form analysis")
+    parser.add_argument("--incl_chrs", default='all', type=str, required=False,
+                        help="Include these chromosomes; default is all. excl_chrs overrides this.")
+    parser.add_argument("--anchor", default=None, type=str, required=False,
+                        help="A UCSC-style coordinate to use as an anchor to create intersections with coordinates in the baselist") #UCSC-style
 # Use each bed entry as an anchor, save all pileups as separate files
     parser.add_argument("--by_window", action='store_true', default=False,
-                        required=False)
+                        required=False,
+                        help="Create a pile-up for each coordinate in the baselist")
 # If by_window and save_all, save all individual pileups; if not save_all,
 # only save a master-table with window coordinates and enrichments.
 # Can save a very large number of files, so use cautiosly!
     parser.add_argument("--save_all", action='store_true', default=False,
-                        required=False)
+                        required=False,
+                        help="If by-window, save all individual pile-ups as separate text files. Can create a very large number of files, so use cautiosly!\
+                        If not used, will save a master-table with coordinates, their enrichments and cornerCV, which is reflective of noisiness")
     parser.add_argument("--local", action='store_true', default=False,
-                        required=False)
-    parser.add_argument("--n_proc", default=1, type=int, required=False)
-    parser.add_argument("--outdir", default='.', type=str, required=False)
-    parser.add_argument("--outname", default='auto', type=str, required=False)
+                        required=False,
+                        help="Create local pileups, i.e. along the diagonal")
+    parser.add_argument("--n_proc", default=1, type=int, required=False,
+                        help="Number of processes to use. Each process works on a separate chromosome, so might require quite a bit more memory, although the data are always stored as sparse matrices")
+    parser.add_argument("--outdir", default='.', type=str, required=False,
+                        help="Directory to save the data in")
+    parser.add_argument("--outname", default='auto', type=str, required=False,
+                        help="Name of the output file. If not set, is generated automatically to include important information.")
     args = parser.parse_args()
     print(args)
     if args.n_proc==0:
