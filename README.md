@@ -1,5 +1,5 @@
 # CoolPUp
-A versatile tool to perform pile-up analysis on Hi-C data in .cool format. And who doesn't like cool pupppies?
+A versatile tool to perform pile-up analysis on Hi-C data in .cool format (https://github.com/mirnylab/cooler). And who doesn't like cool pupppies?
 
 ```
 Usage: pileups.py [-h] [--pad PAD] [--minshift MINSHIFT]
