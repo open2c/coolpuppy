@@ -1,4 +1,6 @@
-# CoolPUp
+# coolpuppy
+.**cool** file **p**ile-**up**s with **py**thon.
+
 A versatile tool to perform pile-up analysis on Hi-C data in .cool format (https://github.com/mirnylab/cooler). And who doesn't like cool pupppies?
 
 ```
@@ -44,7 +46,7 @@ optional arguments:
                         table with coordinates, their enrichments and
                         cornerCV, which is reflective of noisiness
   --local               Create local pileups, i.e. along the diagonal
-  --subset SUBSET       Take a random sample of the bed file - useful for
+  --subset SUBSET       Take a random sample of the bed file - useful for 
                         files with too many featuers to run as is, i..e some
                         repetitive elements.
   --unbalanced          Do not use balanced data - useful for single-cell Hi-C
