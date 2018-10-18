@@ -82,10 +82,9 @@ def controlLoops(midcombs, res, minshift=10**5, maxshift=10**6, nshifts=1):
 def averageLoops(chrom, c, mids, pad=7, ctrl=False, local=False,
                  minshift=10**5, maxshift=10**6, nshifts=1,
                  mindist=0, maxdist=10**9, combinations=True, anchor=None,
-                 individual=False):
-    print(chrom)
+                 individual=False, unbalanced=False):
 
-    data = sparse.triu(c.matrix(sparse=True, balance=True).fetch(chrom)).tocsr()
+    data = sparse.triu(c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom)).tocsr()
 
     if anchor:
         assert chrom==anchor[0]
@@ -119,7 +118,7 @@ def averageLoops(chrom, c, mids, pad=7, ctrl=False, local=False,
             current = get_positions_pairs(current, c.binsize)
     n = 0
     for stBin, endBin in current:
-#        if not local and abs(endBin - stBin) < pad*2:
+#        if not local and abs(endBin - stBin) < pad*2 or :
 #            continue
         if mindist <= abs(endBin - stBin)*c.binsize < maxdist or local:
             try:
@@ -128,7 +127,7 @@ def averageLoops(chrom, c, mids, pad=7, ctrl=False, local=False,
                 n += 1
             except (IndexError, ValueError) as e:
                 continue
-    print(n)
+    print(chrom, n)
     if n > 0:
         return mymap/n, n
     else: #Don't want to get infs and nans
@@ -136,13 +135,13 @@ def averageLoops(chrom, c, mids, pad=7, ctrl=False, local=False,
 
 def averageLoopsByWindow(chrom, mids, c, pad=7, ctrl=False,
                          minshift=10**5, maxshift=10**6, nshifts=1,
-                         mindist=0, maxdist=10**9):
+                         mindist=0, maxdist=10**9, unbalanced=False):
     print(chrom)
     if c is None:
         assert isinstance(chrom, np.ndarray)
         data = chrom
     else:
-        data = sparse.triu(c.matrix(sparse=True, balance=True).fetch(chrom)).tocsr()
+        data = sparse.triu(c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom)).tocsr()
 
     curmids = mids[mids["Chromosome"] == chrom]
     mymaps = {}
@@ -150,7 +149,6 @@ def averageLoopsByWindow(chrom, mids, c, pad=7, ctrl=False,
 #        mymap.fill(np.nan)
         return mymaps
     for m in curmids['Mids'].values:
-        print(m)
         if ctrl:
             current = controlLoops(get_combinations(curmids, c.binsize,
                                                     anchor=(chrom, m, m)),
@@ -179,39 +177,40 @@ def averageLoopsByWindow(chrom, mids, c, pad=7, ctrl=False,
 
 def averageLoopsWithControl(mids, filename, pad, nproc, chroms, local,
                             minshift, maxshift, nshifts, mindist, maxdist,
-                            combinations, anchor):
+                            combinations, anchor, unbalanced):
     p = Pool(nproc)
     c = cooler.Cooler(filename)
     #Loops
     f = partial(averageLoops, mids=mids, c=c, pad=pad, ctrl=False, local=local,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                 mindist=mindist, maxdist=maxdist, combinations=combinations,
-                anchor=anchor)
+                anchor=anchor, unbalanced=unbalanced)
     loops, ns = list(zip(*p.map(f, chroms)))
     loop = np.average(loops, axis=0, weights=ns) #Weights from how many windows we actually used
     #Controls
     f = partial(averageLoops, mids=mids, c=c, pad=pad, ctrl=True, local=local,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                 mindist=mindist, maxdist=maxdist, combinations=combinations,
-                anchor=anchor)
+                anchor=anchor, unbalanced=unbalanced)
     ctrls, ns = list(zip(*p.map(f, chroms)))
     ctrl = np.average(ctrls, axis=0, weights=ns)
     p.close()
     return loop/ctrl
 
 def averageLoopsByWindowWithControl(mids, filename, pad, nproc, chroms,
-                            minshift, maxshift, nshifts, mindist, maxdist):
+                            minshift, maxshift, nshifts, mindist, maxdist,
+                            unbalanced):
     p = Pool(nproc)
     c = cooler.Cooler(filename)
     #Loops
     f = partial(averageLoopsByWindow, c=c, mids=mids, pad=pad, ctrl=False,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
-                mindist=mindist, maxdist=maxdist)
+                mindist=mindist, maxdist=maxdist, unbalanced=unbalanced)
     loops = {chrom:lps for chrom, lps in zip(fchroms, p.map(f, chroms))}
     #Controls
     f = partial(averageLoopsByWindow, c=c, mids=mids, pad=pad, ctrl=True,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
-                mindist=mindist, maxdist=maxdist)
+                mindist=mindist, maxdist=maxdist, unbalanced=unbalanced)
     ctrls = {chrom:lps for chrom, lps in zip(fchroms, p.map(f, chroms))}
     p.close()
 
@@ -282,6 +281,11 @@ if __name__ == "__main__":
     parser.add_argument("--local", action='store_true', default=False,
                         required=False,
                         help="Create local pileups, i.e. along the diagonal")
+    parser.add_argument("--subset", default=0, type=int, required=False,
+                        help="Take a random sample of the bed file - useful for files with too many featuers to run as is, i..e some repetitive elements.")
+    parser.add_argument("--unbalanced", action='store_true',
+                        required=False,
+                        help="Do not use balanced data - useful for single-cell Hi-C data, not recommended otherwise.")
     parser.add_argument("--n_proc", default=1, type=int, required=False,
                         help="Number of processes to use. Each process works on a separate chromosome, so might require quite a bit more memory, although the data are always stored as sparse matrices")
     parser.add_argument("--outdir", default='.', type=str, required=False,
@@ -298,7 +302,7 @@ if __name__ == "__main__":
     c = cooler.Cooler(args.coolfile)
 
     coolname = args.coolfile.split('/')[-1].split('.')[0]
-    bedname = args.baselist.split('/')[-1].split('.')[0].split('_mm9')[0]
+    bedname = args.baselist.split('/')[-1].split('.')[0].split('_mm9')[0].split('_mm10')[0]
 
     if args.mindist is None:
         mindist=0
@@ -352,7 +356,8 @@ if __name__ == "__main__":
             raise ValueError("Can't make local with both sides of loops defined")
         mids = get_mids(bases, combinations=False)
         combinations = False
-
+    if args.subset > 0 and args.subset < len(mids):
+        mids = mids.sample(args.subset)
     if args.by_window:
         if not combinations:
             raise ValueError("Can't make by-window pileups without making combinations")
@@ -373,7 +378,8 @@ if __name__ == "__main__":
                                                    maxshift=args.maxshift,
                                                    nshifts=args.nshifts,
                                                    mindist=mindist,
-                                                   maxdist=maxdist)
+                                                   maxdist=maxdist,
+                                                   unbalanced=args.unbalanced)
         data = []
         baseoutname = '%s-%sK_over_%s' % (coolname, c.binsize/1000, bedname)
         if args.mindist is not None or args.maxdist is not None:
@@ -406,7 +412,8 @@ if __name__ == "__main__":
                                        mindist=mindist,
                                        maxdist=maxdist,
                                        combinations=combinations,
-                                       anchor=anchor)
+                                       anchor=anchor,
+                                       unbalanced=args.unbalanced)
         if args.outname=='auto':
             outname = '%s-%sK_over_%s' % (coolname, c.binsize/1000, bedname)
             if anchor:
