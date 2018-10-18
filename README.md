@@ -2,12 +2,13 @@
 A versatile tool to perform pile-up analysis on Hi-C data in .cool format (https://github.com/mirnylab/cooler). And who doesn't like cool pupppies?
 
 ```
-Usage: pileups.py [-h] [--pad PAD] [--minshift MINSHIFT]
+Usage: 03_pileups.py [-h] [--pad PAD] [--minshift MINSHIFT]
                      [--maxshift MAXSHIFT] [--nshifts NSHIFTS]
                      [--mindist MINDIST] [--maxdist MAXDIST]
                      [--excl_chrs EXCL_CHRS] [--incl_chrs INCL_CHRS]
                      [--anchor ANCHOR] [--by_window] [--save_all] [--local]
-                     [--n_proc N_PROC] [--outdir OUTDIR] [--outname OUTNAME]
+                     [--subset SUBSET] [--unbalanced] [--n_proc N_PROC]
+                     [--outdir OUTDIR] [--outname OUTNAME]
                      coolfile baselist
 
 positional arguments:
@@ -21,7 +22,7 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   --pad PAD             Padding of the windows (i.e. final size of the matrix
-                        is (2×pad+1, 2×pad+1))
+                        is 2×pad+1)
   --minshift MINSHIFT   Shortest distance for randomly shifting coordinates
                         when creating controls
   --maxshift MAXSHIFT   Longest distance for randomly shifting coordinates
@@ -30,7 +31,7 @@ optional arguments:
   --mindist MINDIST     Minimal distance of intersections to use
   --maxdist MAXDIST     Maximal distance of intersections to use
   --excl_chrs EXCL_CHRS
-                        Exclude these chromosomes from the analysis
+                        Exclude these chromosomes form analysis
   --incl_chrs INCL_CHRS
                         Include these chromosomes; default is all. excl_chrs
                         overrides this.
@@ -43,6 +44,11 @@ optional arguments:
                         table with coordinates, their enrichments and
                         cornerCV, which is reflective of noisiness
   --local               Create local pileups, i.e. along the diagonal
+  --subset SUBSET       Take a random sample of the bed file - useful for
+                        files with too many featuers to run as is, i..e some
+                        repetitive elements.
+  --unbalanced          Do not use balanced data - useful for single-cell Hi-C
+                        data, not recommended otherwise.
   --n_proc N_PROC       Number of processes to use. Each process works on a
                         separate chromosome, so might require quite a bit more
                         memory, although the data are always stored as sparse
@@ -50,4 +56,5 @@ optional arguments:
   --outdir OUTDIR       Directory to save the data in
   --outname OUTNAME     Name of the output file. If not set, is generated
                         automatically to include important information.
+
 ```
