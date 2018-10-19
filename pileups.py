@@ -82,17 +82,22 @@ def controlLoops(midcombs, res, minshift=10**5, maxshift=10**6, nshifts=1):
 def averageLoops(chrom, c, mids, pad=7, ctrl=False, local=False,
                  minshift=10**5, maxshift=10**6, nshifts=1,
                  mindist=0, maxdist=10**9, combinations=True, anchor=None,
-                 individual=False, unbalanced=False):
+                 unbalanced=False, cov_norm=False):
 
     data = sparse.triu(c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom)).tocsr()
-
+    if unbalanced and cov_norm:
+        coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0)))
     if anchor:
         assert chrom==anchor[0]
 #        anchor_bin = (anchor[1]+anchor[2])/2//c.binsize
         print(anchor)
     else:
         anchor = None
+
     mymap = np.zeros((2*pad + 1, 2*pad + 1), np.float64)
+    if unbalanced and cov_norm:
+        cov_start = np.zeros(2*pad+1)
+        cov_end = np.zeros(2*pad+1)
 
     if combinations:
         current = mids[mids["Chromosome"] == chrom]
@@ -127,7 +132,15 @@ def averageLoops(chrom, c, mids, pad=7, ctrl=False, local=False,
                 n += 1
             except (IndexError, ValueError) as e:
                 continue
+            if unbalanced and cov_norm:
+                cov_start += coverage[stBin - pad:stBin + pad + 1]
+                cov_end += coverage[endBin - pad:endBin + pad + 1]
     print(chrom, n)
+    if unbalanced and cov_norm:
+        coverage = np.outer(cov_start, cov_end)
+        coverage /= coverage.mean()
+        mymap /= coverage
+        mymap[mymap!=mymap]=0
     if n > 0:
         return mymap/n, n
     else: #Don't want to get infs and nans
@@ -135,14 +148,16 @@ def averageLoops(chrom, c, mids, pad=7, ctrl=False, local=False,
 
 def averageLoopsByWindow(chrom, mids, c, pad=7, ctrl=False,
                          minshift=10**5, maxshift=10**6, nshifts=1,
-                         mindist=0, maxdist=10**9, unbalanced=False):
+                         mindist=0, maxdist=10**9, unbalanced=False,
+                         cov_norm=False):
     print(chrom)
     if c is None:
         assert isinstance(chrom, np.ndarray)
         data = chrom
     else:
         data = sparse.triu(c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom)).tocsr()
-
+    if unbalanced and cov_norm:
+        coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0)))
     curmids = mids[mids["Chromosome"] == chrom]
     mymaps = {}
     if not len(curmids) > 1:
@@ -156,6 +171,9 @@ def averageLoopsByWindow(chrom, mids, c, pad=7, ctrl=False,
         else:
              current = get_combinations(curmids, c.binsize, anchor=(chrom, m, m))
         mymap = np.zeros((2*pad + 1, 2*pad + 1), np.float64)
+        if unbalanced and cov_norm:
+            cov_start = np.zeros(2*pad+1)
+            cov_end = np.zeros(2*pad+1)
         n = 0
         for stBin, endBin in current:
 #            if abs(endBin - stBin) < pad*2:
@@ -167,9 +185,17 @@ def averageLoopsByWindow(chrom, mids, c, pad=7, ctrl=False,
                     n += 1
                 except (IndexError, ValueError) as e:
                     continue
+                if unbalanced and cov_norm:
+                    cov_start += coverage[stBin - pad:stBin + pad + 1]
+                    cov_end += coverage[endBin - pad:endBin + pad + 1]
             else:
                 continue
         print('n=%s' % n)
+        if unbalanced and cov_norm:
+            coverage = np.outer(cov_start, cov_end)
+            coverage /= coverage.mean()
+            mymap /= coverage
+            mymap[mymap!=mymap]=0
         if n > 0:
             mymap = mymap/n
         mymaps[m] = mymap
@@ -177,21 +203,21 @@ def averageLoopsByWindow(chrom, mids, c, pad=7, ctrl=False,
 
 def averageLoopsWithControl(mids, filename, pad, nproc, chroms, local,
                             minshift, maxshift, nshifts, mindist, maxdist,
-                            combinations, anchor, unbalanced):
+                            combinations, anchor, unbalanced, cov_norm):
     p = Pool(nproc)
     c = cooler.Cooler(filename)
     #Loops
     f = partial(averageLoops, mids=mids, c=c, pad=pad, ctrl=False, local=local,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                 mindist=mindist, maxdist=maxdist, combinations=combinations,
-                anchor=anchor, unbalanced=unbalanced)
+                anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm)
     loops, ns = list(zip(*p.map(f, chroms)))
     loop = np.average(loops, axis=0, weights=ns) #Weights from how many windows we actually used
     #Controls
     f = partial(averageLoops, mids=mids, c=c, pad=pad, ctrl=True, local=local,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                 mindist=mindist, maxdist=maxdist, combinations=combinations,
-                anchor=anchor, unbalanced=unbalanced)
+                anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm)
     ctrls, ns = list(zip(*p.map(f, chroms)))
     ctrl = np.average(ctrls, axis=0, weights=ns)
     p.close()
@@ -199,18 +225,20 @@ def averageLoopsWithControl(mids, filename, pad, nproc, chroms, local,
 
 def averageLoopsByWindowWithControl(mids, filename, pad, nproc, chroms,
                             minshift, maxshift, nshifts, mindist, maxdist,
-                            unbalanced):
+                            unbalanced, cov_norm):
     p = Pool(nproc)
     c = cooler.Cooler(filename)
     #Loops
     f = partial(averageLoopsByWindow, c=c, mids=mids, pad=pad, ctrl=False,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
-                mindist=mindist, maxdist=maxdist, unbalanced=unbalanced)
+                mindist=mindist, maxdist=maxdist, unbalanced=unbalanced,
+                cov_norm=cov_norm)
     loops = {chrom:lps for chrom, lps in zip(fchroms, p.map(f, chroms))}
     #Controls
     f = partial(averageLoopsByWindow, c=c, mids=mids, pad=pad, ctrl=True,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
-                mindist=mindist, maxdist=maxdist, unbalanced=unbalanced)
+                mindist=mindist, maxdist=maxdist, unbalanced=unbalanced,
+                cov_norm=cov_norm)
     ctrls = {chrom:lps for chrom, lps in zip(fchroms, p.map(f, chroms))}
     p.close()
 
@@ -246,14 +274,20 @@ if __name__ == "__main__":
     parser.add_argument("coolfile", type=str,
                         help="Cooler file with your Hi-C data")
     parser.add_argument("baselist", type=str,
-                        help="A 3-column tab-delimited bed file with coordinates which intersections to pile-up.\
-                        Alternatively, a 6-column double-bed file (i.e. chr1,start1,end1,chr2,start2,end2) with coordinates of centers of windows that will be piled-up")
+                        help="A 3-column tab-delimited bed file with\
+                        coordinates which intersections to pile-up.\
+                        Alternatively, a 6-column double-bed file (i.e.\
+                        chr1,start1,end1,chr2,start2,end2) with coordinates of\
+                        centers of windows that will be piled-up")
     parser.add_argument("--pad", default=7, type=int, required=False,
-                        help="Padding of the windows (i.e. final size of the matrix is 2×pad+1)")
+                        help="Padding of the windows (i.e. final size of the\
+                        matrix is 2×pad+1)")
     parser.add_argument("--minshift", default=10**5, type=int, required=False,
-                        help="Shortest distance for randomly shifting coordinates when creating controls")
+                        help="Shortest distance for randomly shifting\
+                        coordinates when creating controls")
     parser.add_argument("--maxshift", default=10**6, type=int, required=False,
-                        help="Longest distance for randomly shifting coordinates when creating controls")
+                        help="Longest distance for randomly shifting\
+                        coordinates when creating controls")
     parser.add_argument("--nshifts", default=10, type=int, required=False,
                         help="Number of control regions per averaged window")
     parser.add_argument("--mindist", type=int, required=False,
@@ -264,34 +298,50 @@ if __name__ == "__main__":
                         required=False,
                         help="Exclude these chromosomes form analysis")
     parser.add_argument("--incl_chrs", default='all', type=str, required=False,
-                        help="Include these chromosomes; default is all. excl_chrs overrides this.")
+                        help="Include these chromosomes; default is all.\
+                        excl_chrs overrides this.")
     parser.add_argument("--anchor", default=None, type=str, required=False,
-                        help="A UCSC-style coordinate to use as an anchor to create intersections with coordinates in the baselist") #UCSC-style
-# Use each bed entry as an anchor, save all pileups as separate files
+                        help="A UCSC-style coordinate to use as an anchor to\
+                        create intersections with coordinates in the baselist")
     parser.add_argument("--by_window", action='store_true', default=False,
                         required=False,
-                        help="Create a pile-up for each coordinate in the baselist")
-# If by_window and save_all, save all individual pileups; if not save_all,
-# only save a master-table with window coordinates and enrichments.
-# Can save a very large number of files, so use cautiosly!
+                        help="Create a pile-up for each coordinate in the\
+                        baselist")
     parser.add_argument("--save_all", action='store_true', default=False,
                         required=False,
-                        help="If by-window, save all individual pile-ups as separate text files. Can create a very large number of files, so use cautiosly!\
-                        If not used, will save a master-table with coordinates, their enrichments and cornerCV, which is reflective of noisiness")
+                        help="If by-window, save all individual pile-ups as\
+                        separate text files. Can create a very large number of\
+                        files, so use cautiosly!\
+                        If not used, will save a master-table with coordinates,\
+                        their enrichments and cornerCV, which is reflective of\
+                        noisiness")
     parser.add_argument("--local", action='store_true', default=False,
                         required=False,
                         help="Create local pileups, i.e. along the diagonal")
     parser.add_argument("--subset", default=0, type=int, required=False,
-                        help="Take a random sample of the bed file - useful for files with too many featuers to run as is, i..e some repetitive elements.")
+                        help="Take a random sample of the bed file - useful for\
+                        files with too many featuers to run as is, i..e some\
+                        repetitive elements. Set to 0 or lower to keep all data.")
     parser.add_argument("--unbalanced", action='store_true',
                         required=False,
-                        help="Do not use balanced data - useful for single-cell Hi-C data, not recommended otherwise.")
+                        help="Do not use balanced data - rather average cis\
+                        coverage of all regions, and use it to normalize the\
+                        final pileups. Useful for single-cell Hi-C data,\
+                        not recommended otherwise.")
+    parser.add_argument("--coverage_norm", action='store_true',
+                        required=False,
+                        help="If --unbalanced, also add coverage normalization\
+                        based on chromosome marginals")
     parser.add_argument("--n_proc", default=1, type=int, required=False,
-                        help="Number of processes to use. Each process works on a separate chromosome, so might require quite a bit more memory, although the data are always stored as sparse matrices")
+                        help="Number of processes to use. Each process works\
+                        on a separate chromosome, so might require quite a bit\
+                        more memory, although the data are always stored as\
+                        sparse matrices")
     parser.add_argument("--outdir", default='.', type=str, required=False,
                         help="Directory to save the data in")
     parser.add_argument("--outname", default='auto', type=str, required=False,
-                        help="Name of the output file. If not set, is generated automatically to include important information.")
+                        help="Name of the output file. If not set, is generated\
+                        automatically to include important information.")
     args = parser.parse_args()
     print(args)
     if args.n_proc==0:
@@ -301,7 +351,7 @@ if __name__ == "__main__":
 
     c = cooler.Cooler(args.coolfile)
 
-    coolname = args.coolfile.split('/')[-1].split('.')[0]
+    coolname = args.coolfile.split('::')[0].split('/')[-1].split('.')[0]
     bedname = args.baselist.split('/')[-1].split('.')[0].split('_mm9')[0].split('_mm10')[0]
 
     if args.mindist is None:
@@ -379,7 +429,8 @@ if __name__ == "__main__":
                                                    nshifts=args.nshifts,
                                                    mindist=mindist,
                                                    maxdist=maxdist,
-                                                   unbalanced=args.unbalanced)
+                                                   unbalanced=args.unbalanced,
+                                                   cov_norm=args.coverage_norm)
         data = []
         baseoutname = '%s-%sK_over_%s' % (coolname, c.binsize/1000, bedname)
         if args.mindist is not None or args.maxdist is not None:
@@ -413,7 +464,8 @@ if __name__ == "__main__":
                                        maxdist=maxdist,
                                        combinations=combinations,
                                        anchor=anchor,
-                                       unbalanced=args.unbalanced)
+                                       unbalanced=args.unbalanced,
+                                       cov_norm=args.coverage_norm)
         if args.outname=='auto':
             outname = '%s-%sK_over_%s' % (coolname, c.binsize/1000, bedname)
             if anchor:
@@ -422,6 +474,10 @@ if __name__ == "__main__":
                 outname += '_dist_%s-%s' % (mindist, maxdist)
             if args.local:
                 outname += '_local'
+            if args.unbalanced:
+                outname += '_unbalanced'
+            if args.coverage_norm:
+                outname += '_covnorm'
             outname += '.np.txt'
 
         else:
