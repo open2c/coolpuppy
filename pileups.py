@@ -84,7 +84,7 @@ def averageLoops(chrom, c, mids, pad=7, ctrl=False, local=False,
                  mindist=0, maxdist=10**9, combinations=True, anchor=None,
                  unbalanced=False, cov_norm=False):
 
-    data = sparse.triu(c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom)).tocsr()
+    data = sparse.triu(c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom), 2).tocsr()
     if unbalanced and cov_norm:
         coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0)))
     if anchor:
@@ -155,7 +155,7 @@ def averageLoopsByWindow(chrom, mids, c, pad=7, ctrl=False,
         assert isinstance(chrom, np.ndarray)
         data = chrom
     else:
-        data = sparse.triu(c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom)).tocsr()
+        data = sparse.triu(c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom), 2).tocsr()
     if unbalanced and cov_norm:
         coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0)))
     curmids = mids[mids["Chromosome"] == chrom]
@@ -352,7 +352,7 @@ if __name__ == "__main__":
     c = cooler.Cooler(args.coolfile)
 
     coolname = args.coolfile.split('::')[0].split('/')[-1].split('.')[0]
-    bedname = args.baselist.split('/')[-1].split('.')[0].split('_mm9')[0].split('_mm10')[0]
+    bedname = args.baselist.split('/')[-1].split('.bed')[0].split('_mm9')[0].split('_mm10')[0]
 
     if args.mindist is None:
         mindist=0
