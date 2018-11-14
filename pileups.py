@@ -279,7 +279,7 @@ if __name__ == "__main__":
                         Alternatively, a 6-column double-bed file (i.e.\
                         chr1,start1,end1,chr2,start2,end2) with coordinates of\
                         centers of windows that will be piled-up")
-    parser.add_argument("--pad", default=200, type=int, required=False,
+    parser.add_argument("--pad", default=100, type=int, required=False,
                         help="Padding of the windows (i.e. final size of the\
                         matrix is 2×pad+res), in kb")
     parser.add_argument("--minshift", default=10**5, type=int, required=False,
