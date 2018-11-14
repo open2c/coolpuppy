@@ -279,9 +279,9 @@ if __name__ == "__main__":
                         Alternatively, a 6-column double-bed file (i.e.\
                         chr1,start1,end1,chr2,start2,end2) with coordinates of\
                         centers of windows that will be piled-up")
-    parser.add_argument("--pad", default=7, type=int, required=False,
+    parser.add_argument("--pad", default=200, type=int, required=False,
                         help="Padding of the windows (i.e. final size of the\
-                        matrix is 2×pad+1)")
+                        matrix is 2×pad+res), in kb")
     parser.add_argument("--minshift", default=10**5, type=int, required=False,
                         help="Shortest distance for randomly shifting\
                         coordinates when creating controls")
@@ -354,6 +354,8 @@ if __name__ == "__main__":
     coolname = args.coolfile.split('::')[0].split('/')[-1].split('.')[0]
     bedname = args.baselist.split('/')[-1].split('.bed')[0].split('_mm9')[0].split('_mm10')[0]
 
+    pad = args.pad*1000//c.binsize
+
     if args.mindist is None:
         mindist=0
     else:
@@ -421,7 +423,7 @@ if __name__ == "__main__":
 
         finloops = averageLoopsByWindowWithControl(mids=mids,
                                                    filename=args.coolfile,
-                                                   pad=args.pad,
+                                                   pad=pad,
                                                    nproc=nproc,
                                                    chroms=fchroms,
                                                    minshift=args.minshift,
@@ -455,7 +457,7 @@ if __name__ == "__main__":
                         sep='\t', index=False)
     else:
         loop = averageLoopsWithControl(mids=mids, filename=args.coolfile,
-                                       pad=args.pad, nproc=nproc,
+                                       pad=pad, nproc=nproc,
                                        chroms=fchroms, local=args.local,
                                        minshift=args.minshift,
                                        maxshift=args.maxshift,
