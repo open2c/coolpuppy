@@ -1,3 +1,5 @@
+#! python
+
 # -*- coding: utf-8 -*-
 
 # Takes a cooler file and a bed file with coordinates of features, i.e. ChIP-seq
