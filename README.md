@@ -1,17 +1,17 @@
-# coolpuppy
+# coolpup.py
 .**cool** file **p**ile-**up**s with **py**thon.
 
 A versatile tool to perform pile-up analysis on Hi-C data in .cool format (https://github.com/mirnylab/cooler). And who doesn't like cool pupppies?
+`pip install coolpuppy` will make coolpup.py callable in your terminal.
 
 ```
-Usage:    pileups.py [-h] [--pad PAD] [--minshift MINSHIFT]
-                     [--maxshift MAXSHIFT] [--nshifts NSHIFTS]
-                     [--mindist MINDIST] [--maxdist MAXDIST]
-                     [--excl_chrs EXCL_CHRS] [--incl_chrs INCL_CHRS]
-                     [--anchor ANCHOR] [--by_window] [--save_all] [--local]
-                     [--subset SUBSET] [--unbalanced] [--coverage_norm]
-                     [--n_proc N_PROC] [--outdir OUTDIR] [--outname OUTNAME]
-                     coolfile baselist
+Usage: coolpup.py [-h] [--pad PAD] [--minshift MINSHIFT] [--maxshift MAXSHIFT]
+                  [--nshifts NSHIFTS] [--mindist MINDIST] [--maxdist MAXDIST]
+                  [--excl_chrs EXCL_CHRS] [--incl_chrs INCL_CHRS]
+                  [--anchor ANCHOR] [--by_window] [--save_all] [--local]
+                  [--subset SUBSET] [--unbalanced] [--coverage_norm]
+                  [--n_proc N_PROC] [--outdir OUTDIR] [--outname OUTNAME]
+                  coolfile baselist
 
 positional arguments:
   coolfile              Cooler file with your Hi-C data
@@ -24,7 +24,7 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   --pad PAD             Padding of the windows (i.e. final size of the matrix
-                        is 2×pad+1)
+                        is 2×pad+res), in kb
   --minshift MINSHIFT   Shortest distance for randomly shifting coordinates
                         when creating controls
   --maxshift MAXSHIFT   Longest distance for randomly shifting coordinates
