@@ -29,9 +29,9 @@ def cornerCV(amap, i=4):
 def normCis(amap, i=3):
     return amap/np.nanmean((amap[0:i, 0:i]+amap[-i:, -i:]))*2
 
-def get_enrichment_3(amap):
+def get_enrichment(amap, n):
     c = int(np.floor(amap.shape[0]/2))
-    return np.nanmean(amap[c-1:c+2, c-1:c+2])
+    return np.nanmean(amap[c-n//2:c+n//2+1, c-n//2:c+n//2+1])
 
 def get_mids(intervals, combinations=True):
     if combinations:
@@ -257,8 +257,10 @@ def prepare_single(item):
         amap = np.zeros_like(amap)
     coords = (key[0], int(key[1]//c.binsize*c.binsize),
                       int(key[1]//c.binsize*c.binsize + c.binsize))
-    enr = get_enrichment_3(normCis(amap))
-    cv = cornerCV(amap)
+    enr1 = get_enrichment(normCis(amap), 1)
+    enr3 = get_enrichment(normCis(amap), 3)
+    cv3 = cornerCV(amap, 3)
+    cv5 = cornerCV(amap, 5)
     if args.save_all:
         outname = baseoutname + '_%s:%s-%s.np.txt' % coords
         try:
@@ -268,7 +270,7 @@ def prepare_single(item):
             os.mkdir(os.path.join(args.outdir, 'individual'))
             np.savetxt(os.path.join(args.outdir, 'individual', outname),
                        amap)
-    return list(coords)+[enr, cv]
+    return list(coords)+[enr1, enr3, cv3, cv5]
 
 if __name__ == "__main__":
     import argparse
@@ -444,7 +446,7 @@ if __name__ == "__main__":
         data = p.map(prepare_single, finloops.items())
         p.close()
         data = pd.DataFrame(data, columns=['Chromosome', 'Start', 'End',
-                                           'Enrichment', 'CV'])
+                                           'Enrichment1', 'Enrichment3', 'CV3', 'CV5'])
         data = data.reindex(index=order_by_index(data.index,
                                         index_natsorted(zip(data['Chromosome'],
                                                               data['Start']))))
