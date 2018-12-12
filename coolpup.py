@@ -356,6 +356,8 @@ if __name__ == "__main__":
     c = cooler.Cooler(args.coolfile)
 
     coolname = args.coolfile.split('::')[0].split('/')[-1].split('.')[0]
+    if 'mapq30' in args.coolfile:
+        coolname += '_mapq30'
     bedname = args.baselist.split('/')[-1].split('.bed')[0].split('_mm9')[0].split('_mm10')[0]
 
     pad = args.pad*1000//c.binsize
