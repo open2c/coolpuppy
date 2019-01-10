@@ -7,6 +7,11 @@ A versatile tool to perform pile-up analysis on Hi-C data in .cool format (https
 
 `pip install coolpuppy` will make coolpup.py callable in your terminal.
 
+This is the idea of how pileups work, in case you are checking whether certain regions tend to interacts with each other:
+
+<img src="https://github.com/Phlya/coolpuppy/blob/master/loop_quant.svg" width="400">
+
+What's not shown here is normalization to the expected values, done here by dividing the pileups by randomly shifted control regions. In the future dividing by expected values from whole-chromosome by-diagonal average will be possible.
 
 ```
 Usage: coolpup.py [-h] [--pad PAD] [--minshift MINSHIFT] [--maxshift MAXSHIFT]
