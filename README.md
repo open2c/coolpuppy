@@ -3,11 +3,10 @@
 
 .**cool** file **p**ile-**up**s with **py**thon.
 
-
-
-
 A versatile tool to perform pile-up analysis on Hi-C data in .cool format (https://github.com/mirnylab/cooler). And who doesn't like cool pupppies?
+
 `pip install coolpuppy` will make coolpup.py callable in your terminal.
+
 
 ```
 Usage: coolpup.py [-h] [--pad PAD] [--minshift MINSHIFT] [--maxshift MAXSHIFT]
