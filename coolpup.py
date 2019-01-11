@@ -20,14 +20,15 @@ from functools import partial
 import os
 from natsort import index_natsorted, order_by_index
 from scipy import sparse
+from mirnylib import numutils
 
 def cornerCV(amap, i=4):
     corners = np.concatenate((amap[0:i, 0:i], amap[-i:, -i:]))
     corners[~np.isfinite(corners)]=0
     return np.std(corners)/np.mean(corners)
 
-def normCis(amap, i=3):
-    return amap/np.nanmean((amap[0:i, 0:i]+amap[-i:, -i:]))*2
+#def normCis(amap, i=3):
+#    return amap/np.nanmean((amap[0:i, 0:i]+amap[-i:, -i:]))*2
 
 def get_enrichment(amap, n):
     c = int(np.floor(amap.shape[0]/2))
@@ -37,41 +38,51 @@ def get_mids(intervals, combinations=True):
     if combinations:
         intervals = intervals.sort_values(['Chromosome', 'Start'])
         mids = np.round((intervals['End']+intervals['Start'])/2).astype(int)
+        widths = np.round((intervals['End']-intervals['Start'])).astype(int)
         mids = pd.DataFrame({'Chromosome':intervals['Chromosome'],
-                             'Mids':mids}).drop_duplicates()
+                             'Mids':mids,
+                             'Pad':widths/2}).drop_duplicates()
     else:
         intervals = intervals.sort_values(['Chromosome1', 'Chromosome2',
                                            'Start1', 'Start2'])
         mids1 = np.round((intervals['End1']+intervals['Start1'])/2).astype(int)
+        widths1 = np.round((intervals['End1']-intervals['Start1'])).astype(int)
         mids2 = np.round((intervals['End2']+intervals['Start2'])/2).astype(int)
+        widths2 = np.round((intervals['End2']-intervals['Start2'])).astype(int)
         mids = pd.DataFrame({'Chromosome1':intervals['Chromosome1'],
                              'Mids1':mids1,
+                             'Pad1':widths1/2,
                              'Chromosome2':intervals['Chromosome2'],
-                             'Mids2':mids2}).drop_duplicates()
+                             'Mids2':mids2,
+                             'Pad2':widths2/2}).drop_duplicates()
     return mids
 
 def get_combinations(mids, res, local=False, anchor=None):
     if local and anchor:
         raise ValueError("Can't have a local pileup with an anchor")
     m = (mids['Mids']//res).values.astype(int)
+    p = (mids['Pad']//res).values.astype(int)
     if local:
-        for i in m:
-            yield i, i
+        for i, pi in zip(m, p):
+            yield (i, i), (pi, pi)
     elif anchor:
         anchor_bin = int((anchor[1]+anchor[2])/2//res)
-        for i in m:
-            yield anchor_bin, i
+        anchor_pad = (anchor[2] - anchor[1])/2
+        for i, pi in zip(m, p):
+            yield (anchor_bin, i), (anchor_pad, pi)
     else:
-        for i in itertools.combinations(m, 2):
-                yield i
+        for i in zip(itertools.combinations(m, 2), itertools.combinations(p, 2)):
+            yield i
 
 def get_positions_pairs(mids, res):
     m1 = (mids['Mids1']//res).astype(int).values
     m2 = (mids['Mids2']//res).astype(int).values
-    for a, b in zip(m1, m2):
-        yield a, b
+    p1 = (mids['Pad1']//res).astype(int).values
+    p2 = (mids['Pad2']//res).astype(int).values
+    for a, b in zip(m1, m2, p1, p2):
+        yield a, b, p1, p2
 
-def controlLoops(midcombs, res, minshift=10**5, maxshift=10**6, nshifts=1):
+def controlRegions(midcombs, res, minshift=10**5, maxshift=10**6, nshifts=1):
     minbin = minshift//res
     maxbin = maxshift//res
     for start, end in midcombs:
@@ -81,11 +92,13 @@ def controlLoops(midcombs, res, minshift=10**5, maxshift=10**6, nshifts=1):
             shift *= sign
             yield start+shift, end+shift
 
-def averageLoops(chrom, c, mids, pad=7, ctrl=False, local=False,
-                 minshift=10**5, maxshift=10**6, nshifts=1,
-                 mindist=0, maxdist=10**9, combinations=True, anchor=None,
-                 unbalanced=False, cov_norm=False):
-
+def pileups(chrom, c, mids, pad=7, ctrl=False, local=False,
+             minshift=10**5, maxshift=10**6, nshifts=1,
+             mindist=0, maxdist=10**9, combinations=True, anchor=None,
+             unbalanced=False, cov_norm=False,
+             rescale=False, rescale_pad=50, size=41):
+    if local:
+        data = c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom).tocsr()
     data = sparse.triu(c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom), 2).tocsr()
     if unbalanced and cov_norm:
         coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0)))
@@ -95,11 +108,13 @@ def averageLoops(chrom, c, mids, pad=7, ctrl=False, local=False,
         print(anchor)
     else:
         anchor = None
-
-    mymap = np.zeros((2*pad + 1, 2*pad + 1), np.float64)
+    if rescale:
+        mymap = np.zeros((size, size), np.float64)
+    else:
+        mymap = np.zeros((2*pad + 1, 2*pad + 1), np.float64)
     if unbalanced and cov_norm:
-        cov_start = np.zeros(2*pad+1)
-        cov_end = np.zeros(2*pad+1)
+        cov_start = np.zeros(mymap.shape[0])
+        cov_end = np.zeros(mymap.shape[1])
 
     if combinations:
         current = mids[mids["Chromosome"] == chrom]
@@ -112,11 +127,11 @@ def averageLoops(chrom, c, mids, pad=7, ctrl=False, local=False,
 
     if ctrl:
         if combinations:
-            current = controlLoops(get_combinations(current, c.binsize, local,
+            current = controlRegions(get_combinations(current, c.binsize, local,
                                                     anchor),
                                    c.binsize, minshift, maxshift, nshifts)
         else:
-            current = controlLoops(get_positions_pairs(current, c.binsize),
+            current = controlRegions(get_positions_pairs(current, c.binsize),
                                    c.binsize, minshift, maxshift, nshifts)
     else:
         if combinations:
@@ -124,19 +139,26 @@ def averageLoops(chrom, c, mids, pad=7, ctrl=False, local=False,
         else:
             current = get_positions_pairs(current, c.binsize)
     n = 0
-    for stBin, endBin in current:
-#        if not local and abs(endBin - stBin) < pad*2 or :
-#            continue
+    for (stBin, endBin), (stPad, endPad) in current:
+        if rescale:
+            stPad = stPad + int(round(rescale_pad*2*stPad))
+            endPad = endPad + int(round(rescale_pad*2*endPad))
+        else:
+            stPad = pad
+            endPad = pad
         if mindist <= abs(endBin - stBin)*c.binsize < maxdist or local:
             try:
-                mymap += np.nan_to_num(data[stBin - pad:stBin + pad + 1,
-                                           endBin - pad:endBin + pad + 1].toarray())
+                newmap = np.nan_to_num(data[stBin - stPad:stBin + stPad + 1,
+                                           endBin - endPad:endBin + endPad + 1].toarray())
+                if rescale:
+                    newmap = numutils.zoomArray(newmap, (size, size))
+                mymap += newmap
                 n += 1
             except (IndexError, ValueError) as e:
                 continue
             if unbalanced and cov_norm:
-                cov_start += coverage[stBin - pad:stBin + pad + 1]
-                cov_end += coverage[endBin - pad:endBin + pad + 1]
+                cov_start += coverage[stBin - stPad:stBin + stPad + 1]
+                cov_end += coverage[endBin - endPad:endBin + endPad + 1]
     print(chrom, n)
     if unbalanced and cov_norm:
         coverage = np.outer(cov_start, cov_end)
@@ -148,7 +170,34 @@ def averageLoops(chrom, c, mids, pad=7, ctrl=False, local=False,
     else: #Don't want to get infs and nans
         return mymap, n
 
-def averageLoopsByWindow(chrom, mids, c, pad=7, ctrl=False,
+def pileupsWithControl(mids, filename, pad, nproc, chroms, local,
+                            minshift, maxshift, nshifts, mindist, maxdist,
+                            combinations, anchor, unbalanced, cov_norm,
+                            rescale, rescale_pad, size):
+    c = cooler.Cooler(filename)
+    p = Pool(nproc)
+    #Loops
+    f = partial(pileups, mids=mids, c=c, pad=pad, ctrl=False, local=local,
+                minshift=minshift, maxshift=maxshift, nshifts=nshifts,
+                mindist=mindist, maxdist=maxdist, combinations=combinations,
+                anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm,
+                rescale=rescale, rescale_pad=rescale_pad, size=size)
+    loops, ns = list(zip(*p.map(f, chroms)))
+    loop = np.average(loops, axis=0, weights=ns) #Weights from how many windows we actually used
+    #Controls
+    if nshifts>0:
+        f = partial(pileups, mids=mids, c=c, pad=pad, ctrl=True, local=local,
+                    minshift=minshift, maxshift=maxshift, nshifts=nshifts,
+                    mindist=mindist, maxdist=maxdist, combinations=combinations,
+                    anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm,
+                    rescale=rescale, rescale_pad=rescale_pad, size=size)
+        ctrls, ns = list(zip(*p.map(f, chroms)))
+        ctrl = np.average(ctrls, axis=0, weights=ns)
+        loop /= ctrl
+    p.close()
+    return loop
+
+def pileupsByWindow(chrom, mids, c, pad=7, ctrl=False,
                          minshift=10**5, maxshift=10**6, nshifts=1,
                          mindist=0, maxdist=10**9, unbalanced=False,
                          cov_norm=False):
@@ -167,7 +216,7 @@ def averageLoopsByWindow(chrom, mids, c, pad=7, ctrl=False,
         return mymaps
     for m in curmids['Mids'].values:
         if ctrl:
-            current = controlLoops(get_combinations(curmids, c.binsize,
+            current = controlRegions(get_combinations(curmids, c.binsize,
                                                     anchor=(chrom, m, m)),
                                        c.binsize, minshift, maxshift, nshifts)
         else:
@@ -178,8 +227,6 @@ def averageLoopsByWindow(chrom, mids, c, pad=7, ctrl=False,
             cov_end = np.zeros(2*pad+1)
         n = 0
         for stBin, endBin in current:
-#            if abs(endBin - stBin) < pad*2:
-#                continue
             if mindist <= abs(endBin - stBin)*c.binsize < maxdist:
                 try:
                     mymap += np.nan_to_num(data[stBin - pad:stBin + pad + 1,
@@ -203,41 +250,19 @@ def averageLoopsByWindow(chrom, mids, c, pad=7, ctrl=False,
         mymaps[m] = mymap
     return mymaps
 
-def averageLoopsWithControl(mids, filename, pad, nproc, chroms, local,
-                            minshift, maxshift, nshifts, mindist, maxdist,
-                            combinations, anchor, unbalanced, cov_norm):
-    p = Pool(nproc)
-    c = cooler.Cooler(filename)
-    #Loops
-    f = partial(averageLoops, mids=mids, c=c, pad=pad, ctrl=False, local=local,
-                minshift=minshift, maxshift=maxshift, nshifts=nshifts,
-                mindist=mindist, maxdist=maxdist, combinations=combinations,
-                anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm)
-    loops, ns = list(zip(*p.map(f, chroms)))
-    loop = np.average(loops, axis=0, weights=ns) #Weights from how many windows we actually used
-    #Controls
-    f = partial(averageLoops, mids=mids, c=c, pad=pad, ctrl=True, local=local,
-                minshift=minshift, maxshift=maxshift, nshifts=nshifts,
-                mindist=mindist, maxdist=maxdist, combinations=combinations,
-                anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm)
-    ctrls, ns = list(zip(*p.map(f, chroms)))
-    ctrl = np.average(ctrls, axis=0, weights=ns)
-    p.close()
-    return loop/ctrl
-
-def averageLoopsByWindowWithControl(mids, filename, pad, nproc, chroms,
+def pileupsByWindowWithControl(mids, filename, pad, nproc, chroms,
                             minshift, maxshift, nshifts, mindist, maxdist,
                             unbalanced, cov_norm):
     p = Pool(nproc)
     c = cooler.Cooler(filename)
     #Loops
-    f = partial(averageLoopsByWindow, c=c, mids=mids, pad=pad, ctrl=False,
+    f = partial(pileupsByWindow, c=c, mids=mids, pad=pad, ctrl=False,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                 mindist=mindist, maxdist=maxdist, unbalanced=unbalanced,
                 cov_norm=cov_norm)
     loops = {chrom:lps for chrom, lps in zip(fchroms, p.map(f, chroms))}
     #Controls
-    f = partial(averageLoopsByWindow, c=c, mids=mids, pad=pad, ctrl=True,
+    f = partial(pileupsByWindow, c=c, mids=mids, pad=pad, ctrl=True,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                 mindist=mindist, maxdist=maxdist, unbalanced=unbalanced,
                 cov_norm=cov_norm)
@@ -257,8 +282,8 @@ def prepare_single(item):
         amap = np.zeros_like(amap)
     coords = (key[0], int(key[1]//c.binsize*c.binsize),
                       int(key[1]//c.binsize*c.binsize + c.binsize))
-    enr1 = get_enrichment(normCis(amap), 1)
-    enr3 = get_enrichment(normCis(amap), 3)
+    enr1 = get_enrichment(amap, 1)
+    enr3 = get_enrichment(amap, 3)
     cv3 = cornerCV(amap, 3)
     cv5 = cornerCV(amap, 5)
     if args.save_all:
@@ -322,9 +347,19 @@ if __name__ == "__main__":
     parser.add_argument("--local", action='store_true', default=False,
                         required=False,
                         help="Create local pileups, i.e. along the diagonal")
+    parser.add_argument("--rescale", action='store_true', default=False,
+                        required=False,
+                        help="Do not use pad, and rather use the actual feature\
+                        sizes and rescale pileups to the same shape")
+    parser.add_argument("--rescale_pad", default=1.0, required=False, type=float,
+                        help="If --rescale, padding in fraction of feature length")
+    parser.add_argument("--size", type=int,
+                        default=100, required=False,
+                        help="If --rescale, this is used to determine the final\
+                        size of the pileup, i.e. it ill be size×size")
     parser.add_argument("--subset", default=0, type=int, required=False,
                         help="Take a random sample of the bed file - useful for\
-                        files with too many featuers to run as is, i..e some\
+                        files with too many featuers to run as is, i.e. some\
                         repetitive elements. Set to 0 or lower to keep all data.")
     parser.add_argument("--unbalanced", action='store_true',
                         required=False,
@@ -377,6 +412,10 @@ if __name__ == "__main__":
     else:
         incl_chrs = args.incl_chrs.split(',')
 
+    if args.by_window and args.rescale:
+        raise NotImplementedError('Rescaling with by-window pileups is not\
+                                  supported')
+
     if args.anchor is not None:
         if '_' in args.anchor:
             anchor, anchor_name = args.anchor.split('_')
@@ -427,7 +466,7 @@ if __name__ == "__main__":
             import warnings
             warnings.warn("Always using autonaming for by-window pileups")
 
-        finloops = averageLoopsByWindowWithControl(mids=mids,
+        finloops = pileupsByWindowWithControl(mids=mids,
                                                    filename=args.coolfile,
                                                    pad=pad,
                                                    nproc=nproc,
@@ -462,7 +501,7 @@ if __name__ == "__main__":
                                      'Enrichments_%s.tsv' % baseoutname),
                         sep='\t', index=False)
     else:
-        loop = averageLoopsWithControl(mids=mids, filename=args.coolfile,
+        loop = pileupsWithControl(mids=mids, filename=args.coolfile,
                                        pad=pad, nproc=nproc,
                                        chroms=fchroms, local=args.local,
                                        minshift=args.minshift,
@@ -473,7 +512,10 @@ if __name__ == "__main__":
                                        combinations=combinations,
                                        anchor=anchor,
                                        unbalanced=args.unbalanced,
-                                       cov_norm=args.coverage_norm)
+                                       cov_norm=args.coverage_norm,
+                                       rescale=args.rescale,
+                                       rescale_pad=args.rescale_pad,
+                                       size=args.size)
         if args.outname=='auto':
             outname = '%s-%sK_over_%s' % (coolname, c.binsize/1000, bedname)
             if anchor:
