@@ -64,7 +64,7 @@ def get_combinations(mids, res, local=False, anchor=None):
     p = (mids['Pad']//res).values.astype(int)
     if local:
         for i, pi in zip(m, p):
-            yield (i, i), (pi, pi)
+            yield i, i, pi, pi
     elif anchor:
         anchor_bin = int((anchor[1]+anchor[2])/2//res)
         anchor_pad = (anchor[2] - anchor[1])/2
@@ -391,8 +391,6 @@ if __name__ == "__main__":
     c = cooler.Cooler(args.coolfile)
 
     coolname = args.coolfile.split('::')[0].split('/')[-1].split('.')[0]
-    if 'mapq30' in args.coolfile:
-        coolname += '_mapq30'
     bedname = args.baselist.split('/')[-1].split('.bed')[0].split('_mm9')[0].split('_mm10')[0]
 
     pad = args.pad*1000//c.binsize
