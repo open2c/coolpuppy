@@ -79,7 +79,7 @@ def get_positions_pairs(mids, res):
     m2 = (mids['Mids2']//res).astype(int).values
     p1 = (mids['Pad1']//res).astype(int).values
     p2 = (mids['Pad2']//res).astype(int).values
-    for a, b in zip(m1, m2, p1, p2):
+    for a, b, p1, p2 in zip(m1, m2, p1, p2):
         yield a, b, p1, p2
 
 def controlRegions(midcombs, res, minshift=10**5, maxshift=10**6, nshifts=1):
@@ -354,7 +354,7 @@ if __name__ == "__main__":
     parser.add_argument("--rescale_pad", default=1.0, required=False, type=float,
                         help="If --rescale, padding in fraction of feature length")
     parser.add_argument("--size", type=int,
-                        default=100, required=False,
+                        default=90, required=False,
                         help="If --rescale, this is used to determine the final\
                         size of the pileup, i.e. it ill be size×size")
     parser.add_argument("--subset", default=0, type=int, required=False,
