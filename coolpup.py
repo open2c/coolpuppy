@@ -85,12 +85,12 @@ def get_positions_pairs(mids, res):
 def controlRegions(midcombs, res, minshift=10**5, maxshift=10**6, nshifts=1):
     minbin = minshift//res
     maxbin = maxshift//res
-    for start, end in midcombs:
+    for start, end, p1, p2 in midcombs:
         for i in range(nshifts):
             shift = np.random.randint(minbin, maxbin)
             sign = np.sign(np.random.random() - 0.5).astype(int)
             shift *= sign
-            yield start+shift, end+shift
+            yield start+shift, end+shift, p1, p2
 
 def pileups(chrom, c, mids, pad=7, ctrl=False, local=False,
              minshift=10**5, maxshift=10**6, nshifts=1,
@@ -139,7 +139,7 @@ def pileups(chrom, c, mids, pad=7, ctrl=False, local=False,
         else:
             current = get_positions_pairs(current, c.binsize)
     n = 0
-    for (stBin, endBin), (stPad, endPad) in current:
+    for stBin, endBin, stPad, endPad in current:
         if rescale:
             stPad = stPad + int(round(rescale_pad*2*stPad))
             endPad = endPad + int(round(rescale_pad*2*endPad))
