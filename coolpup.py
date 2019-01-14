@@ -79,8 +79,8 @@ def get_positions_pairs(mids, res):
     m2 = (mids['Mids2']//res).astype(int).values
     p1 = (mids['Pad1']//res).astype(int).values
     p2 = (mids['Pad2']//res).astype(int).values
-    for a, b, p1, p2 in zip(m1, m2, p1, p2):
-        yield a, b, p1, p2
+    for posdata in zip(m1, m2, p1, p2):
+        yield posdata
 
 def controlRegions(midcombs, res, minshift=10**5, maxshift=10**6, nshifts=1):
     minbin = minshift//res
