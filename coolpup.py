@@ -36,25 +36,26 @@ def get_enrichment(amap, n):
 
 def get_mids(intervals, combinations=True):
     if combinations:
-        intervals = intervals.sort_values(['Chromosome', 'Start'])
-        mids = np.round((intervals['End']+intervals['Start'])/2).astype(int)
-        widths = np.round((intervals['End']-intervals['Start'])).astype(int)
-        mids = pd.DataFrame({'Chromosome':intervals['Chromosome'],
+        intervals = intervals.sort_values(['chr', 'start'])
+        mids = np.round((intervals['end']+intervals['start'])/2).astype(int)
+        widths = np.round((intervals['end']-intervals['start'])).astype(int)
+        mids = pd.DataFrame({'chr':intervals['chr'],
                              'Mids':mids,
                              'Pad':widths/2}).drop_duplicates()
     else:
-        intervals = intervals.sort_values(['Chromosome1', 'Chromosome2',
-                                           'Start1', 'Start2'])
-        mids1 = np.round((intervals['End1']+intervals['Start1'])/2).astype(int)
-        widths1 = np.round((intervals['End1']-intervals['Start1'])).astype(int)
-        mids2 = np.round((intervals['End2']+intervals['Start2'])/2).astype(int)
-        widths2 = np.round((intervals['End2']-intervals['Start2'])).astype(int)
-        mids = pd.DataFrame({'Chromosome1':intervals['Chromosome1'],
+        intervals = intervals.sort_values(['chr1', 'chr2',
+                                           'start1', 'start2'])
+        mids1 = np.round((intervals['end1']+intervals['start1'])/2).astype(int)
+        widths1 = np.round((intervals['end1']-intervals['start1'])).astype(int)
+        mids2 = np.round((intervals['end2']+intervals['start2'])/2).astype(int)
+        widths2 = np.round((intervals['end2']-intervals['start2'])).astype(int)
+        mids = pd.DataFrame({'chr1':intervals['chr1'],
                              'Mids1':mids1,
                              'Pad1':widths1/2,
-                             'Chromosome2':intervals['Chromosome2'],
+                             'chr2':intervals['chr2'],
                              'Mids2':mids2,
-                             'Pad2':widths2/2}).drop_duplicates()
+                             'Pad2':widths2/2},
+                            ).drop_duplicates()
     return mids
 
 def get_combinations(mids, res, local=False, anchor=None):
@@ -67,12 +68,12 @@ def get_combinations(mids, res, local=False, anchor=None):
             yield i, i, pi, pi
     elif anchor:
         anchor_bin = int((anchor[1]+anchor[2])/2//res)
-        anchor_pad = (anchor[2] - anchor[1])/2
+        anchor_pad = int(round((anchor[2] - anchor[1])/2))
         for i, pi in zip(m, p):
-            yield (anchor_bin, i), (anchor_pad, pi)
+            yield anchor_bin, i, anchor_pad, pi
     else:
-        for i in zip(itertools.combinations(m, 2), itertools.combinations(p, 2)):
-            yield i
+        for i, j in zip(itertools.combinations(m, 2), itertools.combinations(p, 2)):
+            yield list(i)+list(j)
 
 def get_positions_pairs(mids, res):
     m1 = (mids['Mids1']//res).astype(int).values
@@ -92,11 +93,13 @@ def controlRegions(midcombs, res, minshift=10**5, maxshift=10**6, nshifts=1):
             shift *= sign
             yield start+shift, end+shift, p1, p2
 
-def pileups(chrom, c, mids, pad=7, ctrl=False, local=False,
+def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
              minshift=10**5, maxshift=10**6, nshifts=1,
              mindist=0, maxdist=10**9, combinations=True, anchor=None,
              unbalanced=False, cov_norm=False,
              rescale=False, rescale_pad=50, size=41):
+    chrom, mids = chrom_mids
+    print(chrom)
     if local:
         data = c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom).tocsr()
     data = sparse.triu(c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom), 2).tocsr()
@@ -117,29 +120,28 @@ def pileups(chrom, c, mids, pad=7, ctrl=False, local=False,
         cov_end = np.zeros(mymap.shape[1])
 
     if combinations:
-        current = mids[mids["Chromosome"] == chrom]
+        assert np.all(mids['chr']==chrom)
     else:
-        current = mids[(mids["Chromosome1"] == chrom) &
-                       (mids["Chromosome2"] == chrom)]
-    if not len(current) > 1:
+        assert np.all(mids['chr1']==chrom) & np.all(mids['chr1']==chrom)
+    if not len(mids) > 1:
 #        mymap.fill(np.nan)
         return mymap, 0
 
     if ctrl:
         if combinations:
-            current = controlRegions(get_combinations(current, c.binsize, local,
+            mids = controlRegions(get_combinations(mids, c.binsize, local,
                                                     anchor),
                                    c.binsize, minshift, maxshift, nshifts)
         else:
-            current = controlRegions(get_positions_pairs(current, c.binsize),
+            mids = controlRegions(get_positions_pairs(mids, c.binsize),
                                    c.binsize, minshift, maxshift, nshifts)
     else:
         if combinations:
-            current = get_combinations(current, c.binsize, local, anchor)
+            mids = get_combinations(mids, c.binsize, local, anchor)
         else:
-            current = get_positions_pairs(current, c.binsize)
+            mids = get_positions_pairs(mids, c.binsize)
     n = 0
-    for stBin, endBin, stPad, endPad in current:
+    for stBin, endBin, stPad, endPad in mids:
         if rescale:
             stPad = stPad + int(round(rescale_pad*2*stPad))
             endPad = endPad + int(round(rescale_pad*2*endPad))
@@ -170,6 +172,13 @@ def pileups(chrom, c, mids, pad=7, ctrl=False, local=False,
     else: #Don't want to get infs and nans
         return mymap, n
 
+def chrom_mids(chroms, mids):
+    for chrom in chroms:
+        if combinations:
+            yield chrom, mids[mids['chr']==chrom]
+        else:
+            yield chrom, mids[mids['chr1']==chrom]
+
 def pileupsWithControl(mids, filename, pad, nproc, chroms, local,
                             minshift, maxshift, nshifts, mindist, maxdist,
                             combinations, anchor, unbalanced, cov_norm,
@@ -177,30 +186,32 @@ def pileupsWithControl(mids, filename, pad, nproc, chroms, local,
     c = cooler.Cooler(filename)
     p = Pool(nproc)
     #Loops
-    f = partial(pileups, mids=mids, c=c, pad=pad, ctrl=False, local=local,
+    f = partial(pileups, c=c, pad=pad, ctrl=False, local=local,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                 mindist=mindist, maxdist=maxdist, combinations=combinations,
                 anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm,
                 rescale=rescale, rescale_pad=rescale_pad, size=size)
-    loops, ns = list(zip(*p.map(f, chroms)))
+    loops, ns = list(zip(*p.map(f, chrom_mids(chroms, mids))))
     loop = np.average(loops, axis=0, weights=ns) #Weights from how many windows we actually used
     #Controls
     if nshifts>0:
-        f = partial(pileups, mids=mids, c=c, pad=pad, ctrl=True, local=local,
+        f = partial(pileups, c=c, pad=pad, ctrl=True, local=local,
                     minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                     mindist=mindist, maxdist=maxdist, combinations=combinations,
                     anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm,
                     rescale=rescale, rescale_pad=rescale_pad, size=size)
-        ctrls, ns = list(zip(*p.map(f, chroms)))
+        ctrls, ns = list(zip(*p.map(f, chrom_mids(chroms, mids))))
         ctrl = np.average(ctrls, axis=0, weights=ns)
         loop /= ctrl
     p.close()
     return loop
 
-def pileupsByWindow(chrom, mids, c, pad=7, ctrl=False,
-                         minshift=10**5, maxshift=10**6, nshifts=1,
-                         mindist=0, maxdist=10**9, unbalanced=False,
-                         cov_norm=False):
+def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
+                    minshift=10**5, maxshift=10**6, nshifts=1,
+                    mindist=0, maxdist=10**9,
+                    unbalanced=False, cov_norm=False,
+                    rescale=False, rescale_pad=50, size=41):
+    chrom, mids = chrom_mids
     print(chrom)
     if c is None:
         assert isinstance(chrom, np.ndarray)
@@ -209,7 +220,7 @@ def pileupsByWindow(chrom, mids, c, pad=7, ctrl=False,
         data = sparse.triu(c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom), 2).tocsr()
     if unbalanced and cov_norm:
         coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0)))
-    curmids = mids[mids["Chromosome"] == chrom]
+    curmids = mids[mids["chr"] == chrom]
     mymaps = {}
     if not len(curmids) > 1:
 #        mymap.fill(np.nan)
@@ -226,19 +237,22 @@ def pileupsByWindow(chrom, mids, c, pad=7, ctrl=False,
             cov_start = np.zeros(2*pad+1)
             cov_end = np.zeros(2*pad+1)
         n = 0
-        for stBin, endBin in current:
+        for stBin, endBin, stPad, endPad in current:
             if mindist <= abs(endBin - stBin)*c.binsize < maxdist:
                 try:
-                    mymap += np.nan_to_num(data[stBin - pad:stBin + pad + 1,
-                                                endBin - pad:endBin + pad + 1].toarray())
+                    newmap = np.nan_to_num(data[stBin - stPad:stBin + stPad + 1,
+                                               endBin - endPad:endBin + endPad + 1].toarray())
+                    if rescale:
+                        newmap = numutils.zoomArray(newmap, (size, size))
+                    mymap += newmap
                     n += 1
                 except (IndexError, ValueError) as e:
                     continue
                 if unbalanced and cov_norm:
-                    cov_start += coverage[stBin - pad:stBin + pad + 1]
-                    cov_end += coverage[endBin - pad:endBin + pad + 1]
-            else:
-                continue
+                    cov_start += coverage[stBin - stPad:stBin + stPad + 1]
+                    cov_end += coverage[endBin - endPad:endBin + endPad + 1]
+                else:
+                    continue
         print('n=%s' % n)
         if unbalanced and cov_norm:
             coverage = np.outer(cov_start, cov_end)
@@ -252,21 +266,24 @@ def pileupsByWindow(chrom, mids, c, pad=7, ctrl=False,
 
 def pileupsByWindowWithControl(mids, filename, pad, nproc, chroms,
                             minshift, maxshift, nshifts, mindist, maxdist,
-                            unbalanced, cov_norm):
+                            unbalanced, cov_norm,
+                            rescale, rescale_pad, size):
     p = Pool(nproc)
     c = cooler.Cooler(filename)
     #Loops
-    f = partial(pileupsByWindow, c=c, mids=mids, pad=pad, ctrl=False,
+    f = partial(pileupsByWindow, c=c, pad=pad, ctrl=False,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                 mindist=mindist, maxdist=maxdist, unbalanced=unbalanced,
                 cov_norm=cov_norm)
-    loops = {chrom:lps for chrom, lps in zip(fchroms, p.map(f, chroms))}
+    loops = {chrom:lps for chrom, lps in zip(chroms,
+                                             p.map(f, chrom_mids(chroms, mids)))}
     #Controls
-    f = partial(pileupsByWindow, c=c, mids=mids, pad=pad, ctrl=True,
+    f = partial(pileupsByWindow, c=c, pad=pad, ctrl=True,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                 mindist=mindist, maxdist=maxdist, unbalanced=unbalanced,
                 cov_norm=cov_norm)
-    ctrls = {chrom:lps for chrom, lps in zip(fchroms, p.map(f, chroms))}
+    ctrls = {chrom:lps for chrom, lps in zip(chroms,
+                                             p.map(f, chrom_mids(chroms, mids)))}
     p.close()
 
     finloops = {}
@@ -435,16 +452,19 @@ if __name__ == "__main__":
 
 
     bases = pd.read_csv(args.baselist, sep='\t',
-                            names=['Chromosome1', 'Start1', 'End1',
-                                   'Chromosome2', 'Start2', 'End2'],
+                            names=['chr1', 'start1', 'end1',
+                                   'chr2', 'start2', 'end2'],
                         index_col=False)
-    if np.all(pd.isnull(bases[['Chromosome2', 'Start2', 'End2']])):
-        bases = bases[['Chromosome1', 'Start1', 'End1']]
-        bases.columns = ['Chromosome', 'Start', 'End']
+    if np.all(pd.isnull(bases[['chr2', 'start2', 'end2']])):
+        bases = bases[['chr1', 'start1', 'end1']]
+        bases.columns = ['chr', 'start', 'end']
         mids = get_mids(bases, combinations=True)
         combinations = True
     else:
-        assert np.all(bases['Chromosome1']==bases['Chromosome2'])
+        if not np.all(bases['chr1']==bases['chr2']):
+            import warnings
+            warnings.warn("Found inter-chromosomal loci pairs, discarding them")
+            bases = bases[bases['chr1']==bases['chr2']]
         if anchor:
             raise ValueError("Can't use anchor with both sides of loops defined")
         elif args.local:
@@ -465,17 +485,20 @@ if __name__ == "__main__":
             warnings.warn("Always using autonaming for by-window pileups")
 
         finloops = pileupsByWindowWithControl(mids=mids,
-                                                   filename=args.coolfile,
-                                                   pad=pad,
-                                                   nproc=nproc,
-                                                   chroms=fchroms,
-                                                   minshift=args.minshift,
-                                                   maxshift=args.maxshift,
-                                                   nshifts=args.nshifts,
-                                                   mindist=mindist,
-                                                   maxdist=maxdist,
-                                                   unbalanced=args.unbalanced,
-                                                   cov_norm=args.coverage_norm)
+                                              filename=args.coolfile,
+                                              pad=pad,
+                                              nproc=nproc,
+                                              chroms=fchroms,
+                                              minshift=args.minshift,
+                                              maxshift=args.maxshift,
+                                              nshifts=args.nshifts,
+                                              mindist=mindist,
+                                              maxdist=maxdist,
+                                              unbalanced=args.unbalanced,
+                                              cov_norm=args.coverage_norm,
+                                              rescale=args.rescale,
+                                              rescale_pad=args.rescale_pad,
+                                              size=args.size)
         data = []
         baseoutname = '%s-%sK_over_%s' % (coolname, c.binsize/1000, bedname)
         if args.mindist is not None or args.maxdist is not None:
@@ -484,11 +507,11 @@ if __name__ == "__main__":
         p = Pool(nproc)
         data = p.map(prepare_single, finloops.items())
         p.close()
-        data = pd.DataFrame(data, columns=['Chromosome', 'Start', 'End',
+        data = pd.DataFrame(data, columns=['chr', 'start', 'end',
                                            'Enrichment1', 'Enrichment3', 'CV3', 'CV5'])
         data = data.reindex(index=order_by_index(data.index,
-                                        index_natsorted(zip(data['Chromosome'],
-                                                              data['Start']))))
+                                        index_natsorted(zip(data['chr'],
+                                                              data['start']))))
         try:
             data.to_csv(os.path.join(args.outdir,
                                      'Enrichments_%s.tsv' % baseoutname),
