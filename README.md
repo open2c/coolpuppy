@@ -75,3 +75,11 @@ optional arguments:
 
 
 ```
+
+## This tool has been used in the following publications
+
+**DNA methylation directs polycomb-dependent 3D genome re- organisation in naive pluripotency**
+
+Katy A McLaughlin, Ilya M Flyamer, John P Thomson, Heidi K Mjoseng, Ruchi Shukla, Iain Williamson, Graeme R Grimes, Robert S Illingworth, Ian R Adams, Sari Pennings, Richard R Meehan, Wendy A Bickmore
+
+https://www.biorxiv.org/content/early/2019/01/22/527309
