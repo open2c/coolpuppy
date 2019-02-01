@@ -20,6 +20,7 @@ from functools import partial
 import os
 from natsort import index_natsorted, order_by_index
 from scipy import sparse
+from scipy.linalg import toeplitz
 from mirnylib import numutils
 
 def cornerCV(amap, i=4):
@@ -94,7 +95,7 @@ def controlRegions(midcombs, res, minshift=10**5, maxshift=10**6, nshifts=1):
             yield start+shift, end+shift, p1, p2
 
 def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
-             minshift=10**5, maxshift=10**6, nshifts=1,
+             minshift=10**5, maxshift=10**6, nshifts=1, expected=False,
              mindist=0, maxdist=10**9, combinations=True, anchor=None,
              unbalanced=False, cov_norm=False,
              rescale=False, rescale_pad=50, size=41):
@@ -103,14 +104,20 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
     if local:
         data = c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom).tocsr()
     data = sparse.triu(c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom), 2).tocsr()
+
+    if expected is not False:
+        expected = expected[expected['chrom']==chrom]['balanced.avg'].values
+
     if unbalanced and cov_norm:
         coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0)))
+
     if anchor:
         assert chrom==anchor[0]
 #        anchor_bin = (anchor[1]+anchor[2])/2//c.binsize
         print(anchor)
     else:
         anchor = None
+
     if rescale:
         mymap = np.zeros((size, size), np.float64)
     else:
@@ -148,19 +155,39 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
         else:
             stPad = pad
             endPad = pad
+        lo_left = stBin - stPad
+        hi_left = stBin + stPad + 1
+        lo_right = endBin - endPad
+        hi_right = endBin + endPad + 1
         if mindist <= abs(endBin - stBin)*c.binsize < maxdist or local:
             try:
-                newmap = np.nan_to_num(data[stBin - stPad:stBin + stPad + 1,
-                                           endBin - endPad:endBin + endPad + 1].toarray())
-                if rescale:
-                    newmap = numutils.zoomArray(newmap, (size, size))
-                mymap += newmap
-                n += 1
+                newmap = np.nan_to_num(data[lo_left:hi_left,
+                                       lo_right:hi_right].toarray())
             except (IndexError, ValueError) as e:
                 continue
+            if expected is not False:
+                    exp_lo = lo_right - hi_left
+                    exp_hi = hi_right - lo_left
+                    if exp_lo < 0:
+                        exp_subset = expected[0:exp_hi-1]
+                        exp_subset = np.append(np.array([0]*(-exp_lo)), exp_subset)
+                        i = len(exp_subset)//2
+                        exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
+                    else:
+                        exp_subset = expected[exp_lo:exp_hi-1]
+                        i = len(exp_subset)//2
+                        exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
+                    try:
+                        newmap /= exp_matrix
+                    except:
+                        print(exp_lo, exp_hi)
+            if rescale:
+                newmap = numutils.zoomArray(newmap, (size, size))
+            mymap += np.nan_to_num(newmap)
+            n += 1
             if unbalanced and cov_norm:
-                cov_start += coverage[stBin - stPad:stBin + stPad + 1]
-                cov_end += coverage[endBin - endPad:endBin + endPad + 1]
+                cov_start += coverage[lo_left:hi_left]
+                cov_end += coverage[lo_right:hi_right]
     print(chrom, n)
     if unbalanced and cov_norm:
         coverage = np.outer(cov_start, cov_end)
@@ -180,7 +207,9 @@ def chrom_mids(chroms, mids):
             yield chrom, mids[mids['chr1']==chrom]
 
 def pileupsWithControl(mids, filename, pad, nproc, chroms, local,
-                            minshift, maxshift, nshifts, mindist, maxdist,
+                            minshift, maxshift, nshifts,
+                            expected,
+                            mindist, maxdist,
                             combinations, anchor, unbalanced, cov_norm,
                             rescale, rescale_pad, size):
     c = cooler.Cooler(filename)
@@ -188,6 +217,7 @@ def pileupsWithControl(mids, filename, pad, nproc, chroms, local,
     #Loops
     f = partial(pileups, c=c, pad=pad, ctrl=False, local=local,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
+                expected=expected,
                 mindist=mindist, maxdist=maxdist, combinations=combinations,
                 anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm,
                 rescale=rescale, rescale_pad=rescale_pad, size=size)
@@ -196,6 +226,7 @@ def pileupsWithControl(mids, filename, pad, nproc, chroms, local,
     #Controls
     if nshifts>0:
         f = partial(pileups, c=c, pad=pad, ctrl=True, local=local,
+                    expected=expected,
                     minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                     mindist=mindist, maxdist=maxdist, combinations=combinations,
                     anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm,
@@ -208,6 +239,7 @@ def pileupsWithControl(mids, filename, pad, nproc, chroms, local,
 
 def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
                     minshift=10**5, maxshift=10**6, nshifts=1,
+                    expected=False,
                     mindist=0, maxdist=10**9,
                     unbalanced=False, cov_norm=False,
                     rescale=False, rescale_pad=50, size=41):
@@ -218,6 +250,10 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
         data = chrom
     else:
         data = sparse.triu(c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom), 2).tocsr()
+
+    if expected is not False:
+        expected = expected[expected['chrom']==chrom]['balanced.avg'].values
+
     if unbalanced and cov_norm:
         coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0)))
     curmids = mids[mids["chr"] == chrom]
@@ -238,22 +274,33 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
             cov_end = np.zeros(2*pad+1)
         n = 0
         for stBin, endBin, stPad, endPad in current:
+            lo_left = stBin - stPad
+            hi_left = stBin + stPad + 1
+            lo_right = endBin - endPad
+            hi_right = endBin + endPad + 1
             if mindist <= abs(endBin - stBin)*c.binsize < maxdist:
                 try:
-                    newmap = np.nan_to_num(data[stBin - stPad:stBin + stPad + 1,
-                                               endBin - endPad:endBin + endPad + 1].toarray())
-                    if rescale:
-                        newmap = numutils.zoomArray(newmap, (size, size))
-                    mymap += newmap
-                    n += 1
+                    newmap = np.nan_to_num(data[lo_left:hi_left,
+                                                lo_right:hi_right].toarray())
                 except (IndexError, ValueError) as e:
                     continue
+                if expected is not False:
+                    exp_lo = lo_right - lo_left
+                    exp_hi = hi_right - hi_left
+                    n = (exp_hi - exp_lo)//2
+                    exp_matrix = toeplitz(expected[n::-1], expected[n:])
+                    newmap /= exp_matrix
+
+                if rescale:
+                    newmap = numutils.zoomArray(newmap, (size, size))
+                mymap += newmap
+                n += 1
                 if unbalanced and cov_norm:
                     cov_start += coverage[stBin - stPad:stBin + stPad + 1]
                     cov_end += coverage[endBin - endPad:endBin + endPad + 1]
                 else:
                     continue
-        print('n=%s' % n)
+#        print('n=%s' % n)
         if unbalanced and cov_norm:
             coverage = np.outer(cov_start, cov_end)
             coverage /= coverage.mean()
@@ -265,7 +312,8 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
     return mymaps
 
 def pileupsByWindowWithControl(mids, filename, pad, nproc, chroms,
-                            minshift, maxshift, nshifts, mindist, maxdist,
+                            minshift, maxshift, nshifts,
+                            expected, mindist, maxdist,
                             unbalanced, cov_norm,
                             rescale, rescale_pad, size):
     p = Pool(nproc)
@@ -273,6 +321,7 @@ def pileupsByWindowWithControl(mids, filename, pad, nproc, chroms,
     #Loops
     f = partial(pileupsByWindow, c=c, pad=pad, ctrl=False,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
+                expected=expected,
                 mindist=mindist, maxdist=maxdist, unbalanced=unbalanced,
                 cov_norm=cov_norm)
     loops = {chrom:lps for chrom, lps in zip(chroms,
@@ -280,6 +329,7 @@ def pileupsByWindowWithControl(mids, filename, pad, nproc, chroms,
     #Controls
     f = partial(pileupsByWindow, c=c, pad=pad, ctrl=True,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
+                expected=expected,
                 mindist=mindist, maxdist=maxdist, unbalanced=unbalanced,
                 cov_norm=cov_norm)
     ctrls = {chrom:lps for chrom, lps in zip(chroms,
@@ -325,9 +375,11 @@ if __name__ == "__main__":
                         Alternatively, a 6-column double-bed file (i.e.\
                         chr1,start1,end1,chr2,start2,end2) with coordinates of\
                         centers of windows that will be piled-up")
+##### Extra arguments
     parser.add_argument("--pad", default=100, type=int, required=False,
                         help="Padding of the windows (i.e. final size of the\
                         matrix is 2×pad+res), in kb")
+### Control of controls
     parser.add_argument("--minshift", default=10**5, type=int, required=False,
                         help="Shortest distance for randomly shifting\
                         coordinates when creating controls")
@@ -336,6 +388,11 @@ if __name__ == "__main__":
                         coordinates when creating controls")
     parser.add_argument("--nshifts", default=10, type=int, required=False,
                         help="Number of control regions per averaged window")
+    parser.add_argument("--expected", default=None, type=str, required=False,
+                        help="File with expected (output of\
+                        cooltools compute-expected. If None, don't use expected\
+                        and use random shift controls")
+### Filtering
     parser.add_argument("--mindist", type=int, required=False,
                         help="Minimal distance of intersections to use")
     parser.add_argument("--maxdist", type=int, required=False,
@@ -346,6 +403,11 @@ if __name__ == "__main__":
     parser.add_argument("--incl_chrs", default='all', type=str, required=False,
                         help="Include these chromosomes; default is all.\
                         excl_chrs overrides this.")
+    parser.add_argument("--subset", default=0, type=int, required=False,
+                        help="Take a random sample of the bed file - useful for\
+                        files with too many featuers to run as is, i.e. some\
+                        repetitive elements. Set to 0 or lower to keep all data.")
+### Modes of action
     parser.add_argument("--anchor", default=None, type=str, required=False,
                         help="A UCSC-style coordinate to use as an anchor to\
                         create intersections with coordinates in the baselist")
@@ -364,20 +426,6 @@ if __name__ == "__main__":
     parser.add_argument("--local", action='store_true', default=False,
                         required=False,
                         help="Create local pileups, i.e. along the diagonal")
-    parser.add_argument("--rescale", action='store_true', default=False,
-                        required=False,
-                        help="Do not use pad, and rather use the actual feature\
-                        sizes and rescale pileups to the same shape")
-    parser.add_argument("--rescale_pad", default=1.0, required=False, type=float,
-                        help="If --rescale, padding in fraction of feature length")
-    parser.add_argument("--size", type=int,
-                        default=90, required=False,
-                        help="If --rescale, this is used to determine the final\
-                        size of the pileup, i.e. it ill be size×size")
-    parser.add_argument("--subset", default=0, type=int, required=False,
-                        help="Take a random sample of the bed file - useful for\
-                        files with too many featuers to run as is, i.e. some\
-                        repetitive elements. Set to 0 or lower to keep all data.")
     parser.add_argument("--unbalanced", action='store_true',
                         required=False,
                         help="Do not use balanced data - rather average cis\
@@ -388,11 +436,25 @@ if __name__ == "__main__":
                         required=False,
                         help="If --unbalanced, also add coverage normalization\
                         based on chromosome marginals")
+### Rescaling
+    parser.add_argument("--rescale", action='store_true', default=False,
+                        required=False,
+                        help="Do not use pad, and rather use the actual feature\
+                        sizes and rescale pileups to the same shape")
+    parser.add_argument("--rescale_pad", default=1.0, required=False, type=float,
+                        help="If --rescale, padding in fraction of feature length")
+    parser.add_argument("--size", type=int,
+                        default=90, required=False,
+                        help="If --rescale, this is used to determine the final\
+                        size of the pileup, i.e. it ill be size×size")
+
+
     parser.add_argument("--n_proc", default=1, type=int, required=False,
                         help="Number of processes to use. Each process works\
                         on a separate chromosome, so might require quite a bit\
                         more memory, although the data are always stored as\
                         sparse matrices")
+### Output
     parser.add_argument("--outdir", default='.', type=str, required=False,
                         help="Directory to save the data in")
     parser.add_argument("--outname", default='auto', type=str, required=False,
@@ -407,8 +469,17 @@ if __name__ == "__main__":
 
     c = cooler.Cooler(args.coolfile)
 
+    if not os.path.isfile(args.baselist):
+        raise FileExistsError("Loop(base) coordinate file doesn't exist")
+
     coolname = args.coolfile.split('::')[0].split('/')[-1].split('.')[0]
     bedname = args.baselist.split('/')[-1].split('.bed')[0].split('_mm9')[0].split('_mm10')[0]
+    if args.expected is not None:
+        if not os.path.isfile(args.expected):
+            raise FileExistsError("Expected file doesn't exist")
+        expected = pd.read_csv(args.expected, sep='\t', header=0)
+    else:
+        expected = False
 
     pad = args.pad*1000//c.binsize
 
@@ -492,6 +563,7 @@ if __name__ == "__main__":
                                               minshift=args.minshift,
                                               maxshift=args.maxshift,
                                               nshifts=args.nshifts,
+                                              expected=expected,
                                               mindist=mindist,
                                               maxdist=maxdist,
                                               unbalanced=args.unbalanced,
@@ -528,6 +600,7 @@ if __name__ == "__main__":
                                        minshift=args.minshift,
                                        maxshift=args.maxshift,
                                        nshifts=args.nshifts,
+                                       expected=expected,
                                        mindist=mindist,
                                        maxdist=maxdist,
                                        combinations=combinations,
