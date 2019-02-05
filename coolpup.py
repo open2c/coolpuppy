@@ -162,29 +162,29 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
         if mindist <= abs(endBin - stBin)*c.binsize < maxdist or local:
             try:
                 newmap = np.nan_to_num(data[lo_left:hi_left,
-                                       lo_right:hi_right].toarray())
+                                            lo_right:hi_right].toarray())
+                if expected is not False:
+                        exp_lo = lo_right - hi_left
+                        exp_hi = hi_right - lo_left
+                        if exp_lo < 0:
+                            exp_subset = expected[0:exp_hi-1]
+                            exp_subset = np.append(np.array([0]*(-exp_lo)), exp_subset)
+                            i = len(exp_subset)//2
+                            exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
+                        else:
+                            exp_subset = expected[exp_lo:exp_hi-1]
+                            i = len(exp_subset)//2
+                            exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
+                        try:
+                            newmap /= exp_matrix
+                        except:
+                            print(exp_lo, exp_hi)
+                if rescale:
+                    newmap = numutils.zoomArray(newmap, (size, size))
+                mymap += np.nan_to_num(newmap)
+                n += 1
             except (IndexError, ValueError) as e:
                 continue
-            if expected is not False:
-                    exp_lo = lo_right - hi_left
-                    exp_hi = hi_right - lo_left
-                    if exp_lo < 0:
-                        exp_subset = expected[0:exp_hi-1]
-                        exp_subset = np.append(np.array([0]*(-exp_lo)), exp_subset)
-                        i = len(exp_subset)//2
-                        exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
-                    else:
-                        exp_subset = expected[exp_lo:exp_hi-1]
-                        i = len(exp_subset)//2
-                        exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
-                    try:
-                        newmap /= exp_matrix
-                    except:
-                        print(exp_lo, exp_hi)
-            if rescale:
-                newmap = numutils.zoomArray(newmap, (size, size))
-            mymap += np.nan_to_num(newmap)
-            n += 1
             if unbalanced and cov_norm:
                 cov_start += coverage[lo_left:hi_left]
                 cov_end += coverage[lo_right:hi_right]
@@ -282,23 +282,23 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
                 try:
                     newmap = np.nan_to_num(data[lo_left:hi_left,
                                                 lo_right:hi_right].toarray())
-                except (IndexError, ValueError) as e:
-                    continue
-                if expected is not False:
-                    exp_lo = lo_right - lo_left
-                    exp_hi = hi_right - hi_left
-                    n = (exp_hi - exp_lo)//2
-                    exp_matrix = toeplitz(expected[n::-1], expected[n:])
-                    newmap /= exp_matrix
+                    if expected is not False:
+                        exp_lo = lo_right - lo_left
+                        exp_hi = hi_right - hi_left
+                        n = (exp_hi - exp_lo)//2
+                        exp_matrix = toeplitz(expected[n::-1], expected[n:])
+                        newmap /= exp_matrix
 
-                if rescale:
-                    newmap = numutils.zoomArray(newmap, (size, size))
-                mymap += newmap
-                n += 1
-                if unbalanced and cov_norm:
-                    cov_start += coverage[stBin - stPad:stBin + stPad + 1]
-                    cov_end += coverage[endBin - endPad:endBin + endPad + 1]
-                else:
+                    if rescale:
+                        newmap = numutils.zoomArray(newmap, (size, size))
+                    mymap += newmap
+                    n += 1
+                    if unbalanced and cov_norm:
+                        cov_start += coverage[stBin - stPad:stBin + stPad + 1]
+                        cov_end += coverage[endBin - endPad:endBin + endPad + 1]
+                    else:
+                        continue
+                except (IndexError, ValueError) as e:
                     continue
 #        print('n=%s' % n)
         if unbalanced and cov_norm:
@@ -390,8 +390,8 @@ if __name__ == "__main__":
                         help="Number of control regions per averaged window")
     parser.add_argument("--expected", default=None, type=str, required=False,
                         help="File with expected (output of\
-                        cooltools compute-expected. If None, don't use expected\
-                        and use random shift controls")
+                        cooltools compute-expected). If None, don't use expected\
+                        and use randomly shifted controls")
 ### Filtering
     parser.add_argument("--mindist", type=int, required=False,
                         help="Minimal distance of intersections to use")
