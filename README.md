@@ -101,6 +101,8 @@ optional arguments:
 
 ```
 
+Currently, `coolpup.py` doesn't support inter-chromosomal pileups, but this is an addition that is planned for the future.
+
 ## This tool has been used in the following publications
 
 **DNA methylation directs polycomb-dependent 3D genome re- organisation in naive pluripotency**
