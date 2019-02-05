@@ -428,10 +428,9 @@ if __name__ == "__main__":
                         help="Create local pileups, i.e. along the diagonal")
     parser.add_argument("--unbalanced", action='store_true',
                         required=False,
-                        help="Do not use balanced data - rather average cis\
-                        coverage of all regions, and use it to normalize the\
-                        final pileups. Useful for single-cell Hi-C data,\
-                        not recommended otherwise.")
+                        help="Do not use balanced data.\
+                        Useful for single-cell Hi-C data together with\
+                        --coverage_norm, not recommended otherwise.")
     parser.add_argument("--coverage_norm", action='store_true',
                         required=False,
                         help="If --unbalanced, also add coverage normalization\
@@ -440,7 +439,7 @@ if __name__ == "__main__":
     parser.add_argument("--rescale", action='store_true', default=False,
                         required=False,
                         help="Do not use pad, and rather use the actual feature\
-                        sizes and rescale pileups to the same shape")
+                        sizes and rescale pileups to the same shape and size")
     parser.add_argument("--rescale_pad", default=1.0, required=False, type=float,
                         help="If --rescale, padding in fraction of feature length")
     parser.add_argument("--size", type=int,
@@ -622,6 +621,8 @@ if __name__ == "__main__":
                 outname += '_unbalanced'
             if args.coverage_norm:
                 outname += '_covnorm'
+            if args.subset > 0:
+                outname += '_subset-%s' % args.subset
             outname += '.np.txt'
 
         else:
