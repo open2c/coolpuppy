@@ -163,21 +163,18 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
                 newmap = np.nan_to_num(data[lo_left:hi_left,
                                             lo_right:hi_right].toarray())
                 if expected is not False:
-                        exp_lo = lo_right - hi_left
-                        exp_hi = hi_right - lo_left
-                        if exp_lo < 0:
-                            exp_subset = expected[0:exp_hi-1]
-                            exp_subset = np.append(np.array([0]*(-exp_lo)), exp_subset)
-                            i = len(exp_subset)//2
-                            exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
-                        else:
-                            exp_subset = expected[exp_lo:exp_hi-1]
-                            i = len(exp_subset)//2
-                            exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
-                        try:
-                            newmap /= exp_matrix
-                        except:
-                            print(exp_lo, exp_hi)
+                    exp_lo = lo_right - hi_left
+                    exp_hi = hi_right - lo_left
+                    if exp_lo < 0:
+                        exp_subset = expected[0:exp_hi-1]
+                        exp_subset = np.append(np.array([0]*(-exp_lo)), exp_subset)
+                        i = len(exp_subset)//2
+                        exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
+                    else:
+                        exp_subset = expected[exp_lo:exp_hi-1]
+                        i = len(exp_subset)//2
+                        exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
+                    newmap /= exp_matrix
                 if rescale:
                     newmap = numutils.zoomArray(newmap, (size, size))
                 mymap += np.nan_to_num(newmap)
@@ -283,10 +280,17 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
                     newmap = np.nan_to_num(data[lo_left:hi_left,
                                                 lo_right:hi_right].toarray())
                     if expected is not False:
-                        exp_lo = lo_right - lo_left
-                        exp_hi = hi_right - hi_left
-                        n = (exp_hi - exp_lo)//2
-                        exp_matrix = toeplitz(expected[n::-1], expected[n:])
+                        exp_lo = lo_right - hi_left
+                        exp_hi = hi_right - lo_left
+                        if exp_lo < 0:
+                            exp_subset = expected[0:exp_hi-1]
+                            exp_subset = np.append(np.array([0]*(-exp_lo)), exp_subset)
+                            i = len(exp_subset)//2
+                            exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
+                        else:
+                            exp_subset = expected[exp_lo:exp_hi-1]
+                            i = len(exp_subset)//2
+                            exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
                         newmap /= exp_matrix
 
                     if rescale:
@@ -528,6 +532,8 @@ if __name__ == "__main__":
     if np.all(pd.isnull(bases[['chr2', 'start2', 'end2']])):
         bases = bases[['chr1', 'start1', 'end1']]
         bases.columns = ['chr', 'start', 'end']
+        if not np.all(bases['end']>=bases['start']):
+            raise ValueError('Some ends in the file are smaller than starts')
         mids = get_mids(bases, combinations=True)
         combinations = True
     else:
@@ -539,6 +545,12 @@ if __name__ == "__main__":
             raise ValueError("Can't use anchor with both sides of loops defined")
         elif args.local:
             raise ValueError("Can't make local with both sides of loops defined")
+        if not np.all(bases['end1']>=bases['start1']) or\
+           not np.all(bases['end2']>=bases['start2']):
+            raise ValueError('Some interval ends in the file are smaller than starts')
+        if not np.all(bases[['start2', 'end2']].mean(axis=1)>=bases[['start1', 'end1']].mean(axis=1)):
+            raise ValueError('Some centres of right ends in the file are\
+                             smaller than centres in the left ends')
         mids = get_mids(bases, combinations=False)
         combinations = False
     if args.subset > 0 and args.subset < len(mids):
