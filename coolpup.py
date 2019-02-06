@@ -100,7 +100,6 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
              unbalanced=False, cov_norm=False,
              rescale=False, rescale_pad=50, size=41):
     chrom, mids = chrom_mids
-    print(chrom)
     if local:
         data = c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom).tocsr()
     data = sparse.triu(c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom), 2).tocsr()
@@ -222,6 +221,7 @@ def pileupsWithControl(mids, filename, pad, nproc, chroms, local,
                 anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm,
                 rescale=rescale, rescale_pad=rescale_pad, size=size)
     loops, ns = list(zip(*p.map(f, chrom_mids(chroms, mids))))
+    print('Total number of piled up windows: %s' % np.sum(ns))
     loop = np.average(loops, axis=0, weights=ns) #Weights from how many windows we actually used
     #Controls
     if nshifts>0:
