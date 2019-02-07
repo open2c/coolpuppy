@@ -22,6 +22,7 @@ from natsort import index_natsorted, order_by_index
 from scipy import sparse
 from scipy.linalg import toeplitz
 from mirnylib import numutils
+import warnings
 
 def cornerCV(amap, i=4):
     corners = np.concatenate((amap[0:i, 0:i], amap[-i:, -i:]))
@@ -94,20 +95,41 @@ def controlRegions(midcombs, res, minshift=10**5, maxshift=10**6, nshifts=1):
             shift *= sign
             yield start+shift, end+shift, p1, p2
 
+def get_expected_matrix(left_interval, right_interval, expected):
+    lo_left, hi_left = left_interval
+    lo_right, hi_right = right_interval
+    exp_lo = lo_right - hi_left + 1
+    exp_hi = hi_right - lo_left
+    if exp_lo < 0:
+        exp_subset = expected[0:exp_hi]
+        exp_subset = np.append(np.array([0]*(-exp_lo)), exp_subset)
+        i = len(exp_subset)//2
+        exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
+    else:
+        exp_subset = expected[exp_lo:exp_hi]
+        i = len(exp_subset)//2
+        exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
+    return exp_matrix
+
 def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
-             minshift=10**5, maxshift=10**6, nshifts=1, expected=False,
-             mindist=0, maxdist=10**9, combinations=True, anchor=None,
-             unbalanced=False, cov_norm=False,
-             rescale=False, rescale_pad=50, size=41):
+            minshift=10**5, maxshift=10**6, nshifts=1, expected=False,
+            mindist=0, maxdist=10**9, combinations=True, anchor=None,
+            unbalanced=False, cov_norm=False,
+            rescale=False, rescale_pad=50, size=41):
     chrom, mids = chrom_mids
-    if local:
-        data = c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom).tocsr()
-    data = sparse.triu(c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom), 2).tocsr()
 
     if expected is not False:
         expected = expected[expected['chrom']==chrom]['balanced.avg'].values
+        print('Doing expected')
+    else:
+        print('Loading data')
+        data = c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom)
+        if local:
+            data = data.tocsr()
+        else:
+            data = sparse.triu(data, 2).tocsr()
 
-    if unbalanced and cov_norm:
+    if unbalanced and cov_norm and not expected:
         coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0)))
 
     if anchor:
@@ -121,6 +143,7 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
         mymap = np.zeros((size, size), np.float64)
     else:
         mymap = np.zeros((2*pad + 1, 2*pad + 1), np.float64)
+
     if unbalanced and cov_norm:
         cov_start = np.zeros(mymap.shape[0])
         cov_end = np.zeros(mymap.shape[1])
@@ -130,7 +153,6 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
     else:
         assert np.all(mids['chr1']==chrom) & np.all(mids['chr1']==chrom)
     if not len(mids) > 1:
-#        mymap.fill(np.nan)
         return mymap, 0
 
     if ctrl:
@@ -159,48 +181,35 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
         lo_right = endBin - endPad
         hi_right = endBin + endPad + 1
         if mindist <= abs(endBin - stBin)*c.binsize < maxdist or local:
-            try:
-                newmap = np.nan_to_num(data[lo_left:hi_left,
-                                            lo_right:hi_right].toarray())
-            except (IndexError, ValueError) as e:
-                continue
-            if expected is not False:
-                exp_lo = lo_right - hi_left + 1
-                exp_hi = hi_right - lo_left
-                if exp_lo < 0:
-                    exp_subset = expected[0:exp_hi]
-                    exp_subset = np.append(np.array([0]*(-exp_lo)), exp_subset)
-                    i = len(exp_subset)//2
-                    exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
-                else:
-                    exp_subset = expected[exp_lo:exp_hi]
-                    i = len(exp_subset)//2
-                    exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
+            if expected is False:
                 try:
-                    newmap /= exp_matrix
-                except ValueError as e: #AFAIK only happens at ends of chroms
-                    width, height = newmap.shape
-                    x = 2*pad + 1 - width
-                    y = 2*pad + 1 - height
-                    newmap = np.pad(newmap, [(0, x), (0, y)], 'constant') #Padding adjust to the right shape
-                    newmap /= exp_matrix
+                    newmap = np.nan_to_num(data[lo_left:hi_left,
+                                                lo_right:hi_right].toarray())
+                except (IndexError, ValueError) as e:
+                    continue
+            if expected is not False:
+                newmap = get_expected_matrix((lo_left, hi_left),
+                                             (lo_right, hi_right),
+                                              expected)
+            if newmap.shape != mymap.shape: #AFAIK only happens at ends of chroms
+                width, height = newmap.shape
+                x = 2*pad + 1 - width
+                y = 2*pad + 1 - height
+                newmap = np.pad(newmap, [(0, x), (0, y)], 'constant') #Padding to adjust to the right shape
             if rescale:
                 newmap = numutils.zoomArray(newmap, (size, size))
             mymap += np.nan_to_num(newmap)
             n += 1
-            if unbalanced and cov_norm:
+            if unbalanced and cov_norm and expected is False:
                 cov_start += coverage[lo_left:hi_left]
                 cov_end += coverage[lo_right:hi_right]
     print(chrom, n)
-    if unbalanced and cov_norm:
+    if unbalanced and cov_norm and expected is False:
         coverage = np.outer(cov_start, cov_end)
         coverage /= coverage.mean()
         mymap /= coverage
         mymap[mymap!=mymap]=0
-    if n > 0:
-        return mymap/n, n
-    else: #Don't want to get infs and nans
-        return mymap, n
+    return mymap, n
 
 def chrom_mids(chroms, mids):
     for chrom in chroms:
@@ -210,34 +219,50 @@ def chrom_mids(chroms, mids):
             yield chrom, mids[mids['chr1']==chrom]
 
 def pileupsWithControl(mids, filename, pad, nproc, chroms, local,
-                            minshift, maxshift, nshifts,
-                            expected,
-                            mindist, maxdist,
-                            combinations, anchor, unbalanced, cov_norm,
-                            rescale, rescale_pad, size):
+                       minshift, maxshift, nshifts,
+                       expected,
+                       mindist, maxdist,
+                       combinations, anchor, unbalanced, cov_norm,
+                       rescale, rescale_pad, size):
     c = cooler.Cooler(filename)
     p = Pool(nproc)
     #Loops
     f = partial(pileups, c=c, pad=pad, ctrl=False, local=local,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
-                expected=expected,
+                expected=False,
                 mindist=mindist, maxdist=maxdist, combinations=combinations,
                 anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm,
                 rescale=rescale, rescale_pad=rescale_pad, size=size)
     loops, ns = list(zip(*p.map(f, chrom_mids(chroms, mids))))
-    print('Total number of piled up windows: %s' % np.sum(ns))
-    loop = np.average(loops, axis=0, weights=ns) #Weights from how many windows we actually used
+    loop = np.sum(loops, axis=0)
+    n = np.sum(ns)
+    loop /= n
+    print('Total number of piled up windows: %s' % n)
     #Controls
     if nshifts>0:
         f = partial(pileups, c=c, pad=pad, ctrl=True, local=local,
-                    expected=expected,
+                    expected=False,
                     minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                     mindist=mindist, maxdist=maxdist, combinations=combinations,
                     anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm,
                     rescale=rescale, rescale_pad=rescale_pad, size=size)
         ctrls, ns = list(zip(*p.map(f, chrom_mids(chroms, mids))))
-        ctrl = np.average(ctrls, axis=0, weights=ns)
+        ctrl = np.sum(ctrls, axis=0)
+        n = np.sum(ns)
+        ctrl /= n
         loop /= ctrl
+    elif expected is not False:
+        f = partial(pileups, c=c, pad=pad, ctrl=False, local=local,
+            expected=expected,
+            minshift=minshift, maxshift=maxshift, nshifts=nshifts,
+            mindist=mindist, maxdist=maxdist, combinations=combinations,
+            anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm,
+            rescale=rescale, rescale_pad=rescale_pad, size=size)
+        exps, ns = list(zip(*p.map(f, chrom_mids(chroms, mids))))
+        exp = np.sum(exps, axis=0)
+        n = np.sum(ns)
+        exp /= n
+        loop /= exp
     p.close()
     return loop
 
@@ -248,7 +273,6 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
                     unbalanced=False, cov_norm=False,
                     rescale=False, rescale_pad=50, size=41):
     chrom, mids = chrom_mids
-    print(chrom)
     if c is None:
         assert isinstance(chrom, np.ndarray)
         data = chrom
@@ -257,7 +281,6 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
 
     if expected is not False:
         expected = expected[expected['chrom']==chrom]['balanced.avg'].values
-
     if unbalanced and cov_norm:
         coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0)))
     curmids = mids[mids["chr"] == chrom]
@@ -289,24 +312,17 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
                 except (IndexError, ValueError) as e:
                     continue
                 if expected is not False:
-                    exp_lo = lo_right - hi_left + 1
-                    exp_hi = hi_right - lo_left
-                    if exp_lo < 0:
-                        exp_subset = expected[0:exp_hi]
-                        exp_subset = np.append(np.array([0]*(-exp_lo)), exp_subset)
-                        i = len(exp_subset)//2
-                        exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
-                    else:
-                        exp_subset = expected[exp_lo:exp_hi]
-                        i = len(exp_subset)//2
-                        exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
+                    exp_matrix = get_expected_matrix((lo_left, hi_left),
+                                                     (lo_right, hi_right),
+                                                      expected)
                     try:
                         newmap /= exp_matrix
                     except ValueError as e: #AFAIK only happens at ends of chroms
                         width, height = newmap.shape
                         x = 2*pad + 1 - width
                         y = 2*pad + 1 - height
-                        newmap = np.pad(newmap, [(0, x), (0, y)], 'constant') #Padding adjust to the right shape
+                        newmap = np.pad(newmap, [(0, x), (0, y)], 'constant') #Padding to adjust to the right shape
+                        newmap /= exp_matrix
                 if rescale:
                     newmap = numutils.zoomArray(newmap, (size, size))
                 mymap += newmap
@@ -490,6 +506,9 @@ if __name__ == "__main__":
     coolname = args.coolfile.split('::')[0].split('/')[-1].split('.')[0]
     bedname = args.baselist.split('/')[-1].split('.bed')[0].split('_mm9')[0].split('_mm10')[0]
     if args.expected is not None:
+        if args.nshifts > 0:
+            warnings.warn('Wtih specifie expected will not use controls')
+            args.nshifts = 0
         if not os.path.isfile(args.expected):
             raise FileExistsError("Expected file doesn't exist")
         expected = pd.read_csv(args.expected, sep='\t', header=0)
@@ -575,7 +594,6 @@ if __name__ == "__main__":
         if anchor:
             raise ValueError("Can't make by-window combinations with an anchor")
         if args.outname!='auto':
-            import warnings
             warnings.warn("Always using autonaming for by-window pileups")
 
         finloops = pileupsByWindowWithControl(mids=mids,
