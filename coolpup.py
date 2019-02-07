@@ -162,25 +162,25 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
             try:
                 newmap = np.nan_to_num(data[lo_left:hi_left,
                                             lo_right:hi_right].toarray())
-                if expected is not False:
-                    exp_lo = lo_right - hi_left
-                    exp_hi = hi_right - lo_left
-                    if exp_lo < 0:
-                        exp_subset = expected[0:exp_hi-1]
-                        exp_subset = np.append(np.array([0]*(-exp_lo)), exp_subset)
-                        i = len(exp_subset)//2
-                        exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
-                    else:
-                        exp_subset = expected[exp_lo:exp_hi-1]
-                        i = len(exp_subset)//2
-                        exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
-                    newmap /= exp_matrix
-                if rescale:
-                    newmap = numutils.zoomArray(newmap, (size, size))
-                mymap += np.nan_to_num(newmap)
-                n += 1
             except (IndexError, ValueError) as e:
                 continue
+            if expected is not False:
+                exp_lo = lo_right - hi_left + 1
+                exp_hi = hi_right - lo_left
+                if exp_lo < 0:
+                    exp_subset = expected[0:exp_hi]
+                    exp_subset = np.append(np.array([0]*(-exp_lo)), exp_subset)
+                    i = len(exp_subset)//2
+                    exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
+                else:
+                    exp_subset = expected[exp_lo:exp_hi]
+                    i = len(exp_subset)//2
+                    exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
+                newmap /= exp_matrix
+            if rescale:
+                newmap = numutils.zoomArray(newmap, (size, size))
+            mymap += np.nan_to_num(newmap)
+            n += 1
             if unbalanced and cov_norm:
                 cov_start += coverage[lo_left:hi_left]
                 cov_end += coverage[lo_right:hi_right]
@@ -279,30 +279,30 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
                 try:
                     newmap = np.nan_to_num(data[lo_left:hi_left,
                                                 lo_right:hi_right].toarray())
-                    if expected is not False:
-                        exp_lo = lo_right - hi_left
-                        exp_hi = hi_right - lo_left
-                        if exp_lo < 0:
-                            exp_subset = expected[0:exp_hi-1]
-                            exp_subset = np.append(np.array([0]*(-exp_lo)), exp_subset)
-                            i = len(exp_subset)//2
-                            exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
-                        else:
-                            exp_subset = expected[exp_lo:exp_hi-1]
-                            i = len(exp_subset)//2
-                            exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
-                        newmap /= exp_matrix
-
-                    if rescale:
-                        newmap = numutils.zoomArray(newmap, (size, size))
-                    mymap += newmap
-                    n += 1
-                    if unbalanced and cov_norm:
-                        cov_start += coverage[stBin - stPad:stBin + stPad + 1]
-                        cov_end += coverage[endBin - endPad:endBin + endPad + 1]
-                    else:
-                        continue
                 except (IndexError, ValueError) as e:
+                    continue
+                if expected is not False:
+                    exp_lo = lo_right - hi_left + 1
+                    exp_hi = hi_right - lo_left
+                    if exp_lo < 0:
+                        exp_subset = expected[0:exp_hi]
+                        exp_subset = np.append(np.array([0]*(-exp_lo)), exp_subset)
+                        i = len(exp_subset)//2
+                        exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
+                    else:
+                        exp_subset = expected[exp_lo:exp_hi]
+                        i = len(exp_subset)//2
+                        exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
+                    newmap /= exp_matrix
+
+                if rescale:
+                    newmap = numutils.zoomArray(newmap, (size, size))
+                mymap += newmap
+                n += 1
+                if unbalanced and cov_norm:
+                    cov_start += coverage[stBin - stPad:stBin + stPad + 1]
+                    cov_end += coverage[endBin - endPad:endBin + endPad + 1]
+                else:
                     continue
 #        print('n=%s' % n)
         if unbalanced and cov_norm:
@@ -627,6 +627,8 @@ if __name__ == "__main__":
                 outname += '_%s-shifts' % args.nshifts
             if args.expected is not None:
                 outname += '_expected'
+            if args.nshifts <= 0 and args.expected is None:
+                outname += '_noNorm'
             if anchor:
                 outname += '_from_%s' % anchor_name
             if args.mindist is not None or args.maxdist is not None:
