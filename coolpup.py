@@ -623,6 +623,10 @@ if __name__ == "__main__":
                                        size=args.size)
         if args.outname=='auto':
             outname = '%s-%sK_over_%s' % (coolname, c.binsize/1000, bedname)
+            if args.nshifst>0:
+                outname += '_%s-shifts' % args.nshifts
+            if args.expected is not None:
+                outname += '_expected'
             if anchor:
                 outname += '_from_%s' % anchor_name
             if args.mindist is not None or args.maxdist is not None:
