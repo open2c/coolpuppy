@@ -176,7 +176,14 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
                     exp_subset = expected[exp_lo:exp_hi]
                     i = len(exp_subset)//2
                     exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
-                newmap /= exp_matrix
+                try:
+                    newmap /= exp_matrix
+                except ValueError as e: #AFAIK only happens at ends of chroms
+                    width, height = newmap.shape
+                    x = 2*pad + 1 - width
+                    y = 2*pad + 1 - height
+                    newmap = np.pad(newmap, [(0, x), (0, y)], 'constant') #Padding adjust to the right shape
+                    newmap /= exp_matrix
             if rescale:
                 newmap = numutils.zoomArray(newmap, (size, size))
             mymap += np.nan_to_num(newmap)
@@ -293,8 +300,13 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
                         exp_subset = expected[exp_lo:exp_hi]
                         i = len(exp_subset)//2
                         exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
-                    newmap /= exp_matrix
-
+                    try:
+                        newmap /= exp_matrix
+                    except ValueError as e: #AFAIK only happens at ends of chroms
+                        width, height = newmap.shape
+                        x = 2*pad + 1 - width
+                        y = 2*pad + 1 - height
+                        newmap = np.pad(newmap, [(0, x), (0, y)], 'constant') #Padding adjust to the right shape
                 if rescale:
                     newmap = numutils.zoomArray(newmap, (size, size))
                 mymap += newmap
