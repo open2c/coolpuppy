@@ -128,7 +128,7 @@ def get_data(chrom, c, unbalanced, local):
 def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
                 rescale, rescale_pad, rescale_size, coverage):
     mymap = make_outmap(pad, rescale, rescale_size)
-    if unbalanced and cov_norm and not expected:
+    if unbalanced and cov_norm and expected is False:
         cov_start = np.zeros(mymap.shape[0])
         cov_end = np.zeros(mymap.shape[1])
     n = 0
@@ -564,12 +564,12 @@ if __name__ == "__main__":
             raise ValueError("Can't use anchor with both sides of loops defined")
         elif args.local:
             raise ValueError("Can't make local with both sides of loops defined")
-        if not np.all(bases['end1']>=bases['start1']) or\
-           not np.all(bases['end2']>=bases['start2']):
-            raise ValueError('Some interval ends in the file are smaller than starts')
-        if not np.all(bases[['start2', 'end2']].mean(axis=1)>=bases[['start1', 'end1']].mean(axis=1)):
-            raise ValueError('Some centres of right ends in the file are\
-                             smaller than centres in the left ends')
+#        if not np.all(bases['end1']>=bases['start1']) or\
+#           not np.all(bases['end2']>=bases['start2']):
+#            raise ValueError('Some interval ends in the file are smaller than starts')
+#        if not np.all(bases[['start2', 'end2']].mean(axis=1)>=bases[['start1', 'end1']].mean(axis=1)):
+#            raise ValueError('Some centres of right ends in the file are\
+#                             smaller than centres in the left ends')
         mids = get_mids(bases, combinations=False)
         combinations = False
     if args.subset > 0 and args.subset < len(mids):
