@@ -133,6 +133,8 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
         cov_end = np.zeros(mymap.shape[1])
     n = 0
     for stBin, endBin, stPad, endPad in mids:
+        if stBin > endBin:
+            stBin, stPad, endBin, endPad = endBin, endPad, stBin, stPad
         if rescale:
             stPad = stPad + int(round(rescale_pad*2*stPad))
             endPad = endPad + int(round(rescale_pad*2*endPad))
@@ -156,9 +158,9 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
                                               expected)
             if newmap.shape != mymap.shape: #AFAIK only happens at ends of chroms
                 height, width = newmap.shape
-                x = 2*pad + 1 - width
-                y = 2*pad + 1 - height
-                print(x, y)
+                h, w = mymap.shape
+                x = w - width
+                y = h - height
                 newmap = np.pad(newmap, [(y, 0), (0, x)], 'constant') #Padding to adjust to the right shape
             if rescale:
                 newmap = numutils.zoomArray(newmap, (rescale_size,
@@ -181,6 +183,10 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
             unbalanced=False, cov_norm=False,
             rescale=False, rescale_pad=50, rescale_size=41):
     chrom, mids = chrom_mids
+
+    if not len(mids) > 1:
+        return make_outmap(pad, rescale, rescale_size), 0
+
     if expected is not False:
         data = False
         expected = expected[expected['chrom']==chrom]['balanced.avg'].values
@@ -204,9 +210,6 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
         assert np.all(mids['chr']==chrom)
     else:
         assert np.all(mids['chr1']==chrom) & np.all(mids['chr1']==chrom)
-
-    if not len(mids) > 1:
-        return make_outmap(pad, rescale, rescale_size), 0
 
     if ctrl:
         if combinations:
