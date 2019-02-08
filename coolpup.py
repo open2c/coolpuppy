@@ -158,7 +158,8 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
                 height, width = newmap.shape
                 x = 2*pad + 1 - width
                 y = 2*pad + 1 - height
-                newmap = np.pad(newmap, [(0, x), (0, y)], 'constant') #Padding to adjust to the right shape
+                print(x, y)
+                newmap = np.pad(newmap, [(y, 0), (0, x)], 'constant') #Padding to adjust to the right shape
             if rescale:
                 newmap = numutils.zoomArray(newmap, (rescale_size,
                                                      rescale_size))
