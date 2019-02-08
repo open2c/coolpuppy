@@ -155,7 +155,7 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
                                              (lo_right, hi_right),
                                               expected)
             if newmap.shape != mymap.shape: #AFAIK only happens at ends of chroms
-                width, height = newmap.shape
+                height, width = newmap.shape
                 x = 2*pad + 1 - width
                 y = 2*pad + 1 - height
                 newmap = np.pad(newmap, [(0, x), (0, y)], 'constant') #Padding to adjust to the right shape
