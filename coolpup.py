@@ -95,14 +95,17 @@ def controlRegions(midcombs, res, minshift=10**5, maxshift=10**6, nshifts=1):
             shift *= sign
             yield start+shift, end+shift, p1, p2
 
-def get_expected_matrix(left_interval, right_interval, expected):
+def get_expected_matrix(left_interval, right_interval, expected, local):
     lo_left, hi_left = left_interval
     lo_right, hi_right = right_interval
     exp_lo = lo_right - hi_left + 1
     exp_hi = hi_right - lo_left
     if exp_lo < 0:
         exp_subset = expected[0:exp_hi]
-        exp_subset = np.append(np.array([0]*(-exp_lo)), exp_subset)
+        if local:
+            exp_subset = np.pad(exp_subset, (-exp_lo, 0), mode='reflect')
+        else:
+            exp_subset = np.pad(exp_subset, (-exp_lo, 0), mode='constant')
         i = len(exp_subset)//2
         exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
     else:
@@ -495,9 +498,11 @@ if __name__ == "__main__":
                         help="""If --rescale, padding in fraction of feature
                         length""")
     parser.add_argument("--rescale_size", type=int,
-                        default=90, required=False,
+                        default=99, required=False,
                         help="""If --rescale, this is used to determine the
-                        final size of the pileup, i.e. it ill be size×size""")
+                        final size of the pileup, i.e. it ill be size×size. Due
+                        to technical limitation in the current implementation,
+                        has to be an odd number""")
 
 
     parser.add_argument("--n_proc", default=1, type=int, required=False,
@@ -554,8 +559,11 @@ if __name__ == "__main__":
         incl_chrs = args.incl_chrs.split(',')
 
     if args.by_window and args.rescale:
-        raise NotImplementedError('Rescaling with by-window pileups is not\
-                                  supported')
+        raise NotImplementedError("""Rescaling with by-window pileups is not
+                                  supported""")
+
+    if args.rescale and args.rescale_size%3!=0:
+        raise ValueError("Please provide an odd rescale_size")
 
     if args.anchor is not None:
         if '_' in args.anchor:
