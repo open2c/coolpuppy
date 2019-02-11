@@ -175,19 +175,10 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
                 r = len(new_cov_end)
                 new_cov_end = np.pad(new_cov_end,
                                      (0, mymap.shape[1]-r), 'constant')
-                try:
-                    cov_start += new_cov_start
-                    cov_end += new_cov_end
-                except ValueError as e:
-                    print(l, r)
-                    print(e)
+                cov_start += new_cov_start
+                cov_end += new_cov_end
             n += 1
-    if unbalanced and cov_norm and expected is False:
-        coverage = np.outer(cov_start, cov_end)
-        coverage /= coverage.mean()
-        mymap /= coverage
-        mymap[mymap!=mymap]=0
-    return mymap, n
+    return mymap, n, cov_start, cov_end
 
 def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
             minshift=10**5, maxshift=10**6, nshifts=1, expected=False,
@@ -236,12 +227,15 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
             mids = get_combinations(mids, c.binsize, local, anchor)
         else:
             mids = get_positions_pairs(mids, c.binsize)
-    mymap, n = _do_pileups(mids=mids, data=data, pad=pad, expected=expected,
-                       local=local,
-                       unbalanced=unbalanced, cov_norm=cov_norm,
-                       coverage=coverage,
-                       rescale=rescale, rescale_pad=rescale_pad,
-                       rescale_size=rescale_size)
+    mymap, n, cov_start, cov_end = _do_pileups(mids=mids, data=data, pad=pad,
+                                               expected=expected,
+                                               local=local,
+                                               unbalanced=unbalanced,
+                                               cov_norm=cov_norm,
+                                               coverage=coverage,
+                                               rescale=rescale,
+                                               rescale_pad=rescale_pad,
+                                               rescale_size=rescale_size)
     print(chrom, n)
     return mymap, n
 
@@ -251,6 +245,13 @@ def chrom_mids(chroms, mids):
             yield chrom, mids[mids['chr']==chrom]
         else:
             yield chrom, mids[mids['chr1']==chrom]
+
+def norm_coverage(loop, cov_start, cov_end):
+    coverage = np.outer(cov_start, cov_end)
+    coverage /= coverage.mean()
+    loop /= coverage
+    loop[np.isnan(loop)]=0
+    return loop
 
 def pileupsWithControl(mids, filename, pad, nproc, chroms, local,
                        minshift, maxshift, nshifts,
@@ -268,9 +269,13 @@ def pileupsWithControl(mids, filename, pad, nproc, chroms, local,
                 anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm,
                 rescale=rescale, rescale_pad=rescale_pad,
                 rescale_size=rescale_size)
-    loops, ns = list(zip(*p.map(f, chrom_mids(chroms, mids))))
+    loops, ns, cov_starts, cov_ends = list(zip(*p.map(f, chrom_mids(chroms, mids))))
     loop = np.sum(loops, axis=0)
     n = np.sum(ns)
+    if cov_norm:
+        cov_start = np.sum(cov_starts, axis=0)
+        cov_end = np.sum(cov_starts, axis=0)
+        loop = norm_coverage(loop, cov_start, cov_end)
     loop /= n
     print('Total number of piled up windows: %s' % n)
     #Controls
@@ -282,9 +287,13 @@ def pileupsWithControl(mids, filename, pad, nproc, chroms, local,
                     anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm,
                     rescale=rescale, rescale_pad=rescale_pad,
                     rescale_size=rescale_size)
-        ctrls, ns = list(zip(*p.map(f, chrom_mids(chroms, mids))))
+        ctrls, ns, cov_starts, cov_ends = list(zip(*p.map(f, chrom_mids(chroms, mids))))
         ctrl = np.sum(ctrls, axis=0)
         n = np.sum(ns)
+        if cov_norm:
+            cov_start = np.sum(cov_starts, axis=0)
+            cov_end = np.sum(cov_starts, axis=0)
+            ctrl = norm_coverage(ctrl, cov_start, cov_end)
         ctrl /= n
         loop /= ctrl
     elif expected is not False:
@@ -295,7 +304,7 @@ def pileupsWithControl(mids, filename, pad, nproc, chroms, local,
             anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm,
             rescale=rescale, rescale_pad=rescale_pad,
             rescale_size=rescale_size)
-        exps, ns = list(zip(*p.map(f, chrom_mids(chroms, mids))))
+        exps, ns, cov_starts, cov_ends = list(zip(*p.map(f, chrom_mids(chroms, mids))))
         exp = np.sum(exps, axis=0)
         n = np.sum(ns)
         exp /= n
