@@ -197,7 +197,8 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
         data = get_data(chrom, c, unbalanced, local)
 
     if unbalanced and cov_norm:
-        coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0)))
+        coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0))) + \
+                   np.nan_to_num(np.ravel(np.sum(data, axis=1)))
     else:
         coverage=False
 
