@@ -176,22 +176,23 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
             if unbalanced and cov_norm and expected is False:
                 new_cov_start = coverage[lo_left:hi_left]
                 new_cov_end = coverage[lo_right:hi_right]
-
-                if len(new_cov_start)==0:
-                    new_cov_start = np.zeros(rescale_size)
-                if len(new_cov_end)==0:
-                    new_cov_end = np.zeros(rescale_size)
-
                 if rescale:
+                    if len(new_cov_start)==0:
+                        new_cov_start = np.zeros(rescale_size)
+                    if len(new_cov_end)==0:
+                        new_cov_end = np.zeros(rescale_size)
                     new_cov_start = numutils.zoomArray(new_cov_start, (rescale_size,))
                     new_cov_end = numutils.zoomArray(new_cov_end, (rescale_size,))
                 else:
                     l = len(new_cov_start)
                     r = len(new_cov_end)
-                    new_cov_start = np.pad(new_cov_start, (mymap.shape[0]-l, 0),
+                    try:
+                        new_cov_start = np.pad(new_cov_start, (mymap.shape[0]-l, 0),
                                                            'constant')
-                    new_cov_end = np.pad(new_cov_end,
+                        new_cov_end = np.pad(new_cov_end,
                                          (0, mymap.shape[1]-r), 'constant')
+                    except:
+                        print(l, r)
                 cov_start += np.nan_to_num(new_cov_start)
                 cov_end += +np.nan_to_num(new_cov_end)
             n += 1
