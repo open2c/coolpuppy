@@ -686,6 +686,8 @@ if __name__ == "__main__":
                 outname += '_dist_%s-%s' % (mindist, maxdist)
             if args.local:
                 outname += '_local'
+            if args.rescale:
+                outname += '_rescaled'
             if args.unbalanced:
                 outname += '_unbalanced'
             if args.coverage_norm:
