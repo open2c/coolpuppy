@@ -157,7 +157,7 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
             else:
                 newmap = get_expected_matrix((lo_left, hi_left),
                                              (lo_right, hi_right),
-                                              expected)
+                                              expected, local)
             if newmap.shape != mymap.shape and not rescale: #AFAIK only happens at ends of chroms
                 height, width = newmap.shape
                 h, w = mymap.shape
