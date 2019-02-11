@@ -116,7 +116,6 @@ def make_outmap(pad, rescale=False, rescale_size=41):
         return np.zeros((rescale_size, rescale_size), np.float64)
     else:
         return np.zeros((2*pad + 1, 2*pad + 1), np.float64)
-
 def get_data(chrom, c, unbalanced, local):
     print('Loading data')
     data = c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom)
@@ -206,7 +205,7 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
         coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0))) + \
                    np.nan_to_num(np.ravel(np.sum(data, axis=1)))
     else:
-        coverage =False
+        coverage=False
 
     if anchor:
         assert chrom==anchor[0]
@@ -254,8 +253,8 @@ def chrom_mids(chroms, mids):
 
 def norm_coverage(loop, cov_start, cov_end):
     coverage = np.outer(cov_start, cov_end)
-#    coverage /= coverage.mean()
-    loop /= np.sqrt(coverage)
+    coverage /= coverage.mean()
+    loop /= coverage
     loop[np.isnan(loop)]=0
     return loop
 
