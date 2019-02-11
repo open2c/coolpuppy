@@ -119,6 +119,7 @@ def make_outmap(pad, rescale=False, rescale_size=41):
         return np.zeros((rescale_size, rescale_size), np.float64)
     else:
         return np.zeros((2*pad + 1, 2*pad + 1), np.float64)
+
 def get_data(chrom, c, unbalanced, local):
     print('Loading data')
     data = c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom)
@@ -199,7 +200,7 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
 
     if expected is not False:
         data = False
-        expected = expected[expected['chrom']==chrom]['balanced.avg'].values
+        expected = np.nan_to_num(expected[expected['chrom']==chrom]['balanced.avg'].values)
         print('Doing expected')
     else:
         data = get_data(chrom, c, unbalanced, local)
