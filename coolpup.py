@@ -128,9 +128,8 @@ def get_data(chrom, c, unbalanced, local):
 def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
                 rescale, rescale_pad, rescale_size, coverage):
     mymap = make_outmap(pad, rescale, rescale_size)
-    if unbalanced and cov_norm and expected is False:
-        cov_start = np.zeros(mymap.shape[0])
-        cov_end = np.zeros(mymap.shape[1])
+    cov_start = np.zeros(mymap.shape[0])
+    cov_end = np.zeros(mymap.shape[1])
     n = 0
     for stBin, endBin, stPad, endPad in mids:
         if stBin > endBin:
@@ -237,7 +236,7 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
                                                rescale_pad=rescale_pad,
                                                rescale_size=rescale_size)
     print(chrom, n)
-    return mymap, n
+    return mymap, n, cov_start, cov_end
 
 def chrom_mids(chroms, mids):
     for chrom in chroms:
