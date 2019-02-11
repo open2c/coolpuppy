@@ -167,8 +167,8 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
                                                      rescale_size))
             mymap += np.nan_to_num(newmap)
             if unbalanced and cov_norm and expected is False:
-                l = hi_left - lo_left + 1
-                r = hi_right - lo_right + 1
+                l = hi_left - lo_left
+                r = hi_right - lo_right
                 try:
                     cov_start += np.pad(coverage[lo_left:hi_left],
                                         (mymap.shape[0]-l, 0), 'constant')
