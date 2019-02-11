@@ -186,8 +186,13 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
             rescale=False, rescale_pad=50, rescale_size=41):
     chrom, mids = chrom_mids
 
+    mymap = make_outmap(pad, rescale, rescale_size)
+    cov_start = np.zeros(mymap.shape[0])
+    cov_end = np.zeros(mymap.shape[1])
+
     if not len(mids) > 1:
-        return make_outmap(pad, rescale, rescale_size), 0
+        print('Nothing to sum up in chromosome %s' % chrom)
+        return make_outmap(pad, rescale, rescale_size), 0, cov_start, cov_end
 
     if expected is not False:
         data = False
@@ -196,7 +201,7 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
     else:
         data = get_data(chrom, c, unbalanced, local)
 
-    if unbalanced and cov_norm:
+    if unbalanced and cov_norm and expected is False:
         coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0))) + \
                    np.nan_to_num(np.ravel(np.sum(data, axis=1)))
     else:
