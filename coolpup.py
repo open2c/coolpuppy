@@ -155,7 +155,7 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
                 newmap = get_expected_matrix((lo_left, hi_left),
                                              (lo_right, hi_right),
                                               expected)
-            if newmap.shape != mymap.shape: #AFAIK only happens at ends of chroms
+            if newmap.shape != mymap.shape and not rescale: #AFAIK only happens at ends of chroms
                 height, width = newmap.shape
                 h, w = mymap.shape
                 x = w - width
@@ -416,95 +416,102 @@ if __name__ == "__main__":
     parser.add_argument("coolfile", type=str,
                         help="Cooler file with your Hi-C data")
     parser.add_argument("baselist", type=str,
-                        help="A 3-column tab-delimited bed file with\
-                        coordinates which intersections to pile-up.\
-                        Alternatively, a 6-column double-bed file (i.e.\
-                        chr1,start1,end1,chr2,start2,end2) with coordinates of\
-                        centers of windows that will be piled-up")
+                        help="""A 3-column tab-delimited bed file with
+                        coordinates which intersections to pile-up.
+                        Alternatively, a 6-column double-bed file (i.e.
+                        chr1,start1,end1,chr2,start2,end2) with coordinates of
+                        centers of windows that will be piled-up""")
 ##### Extra arguments
     parser.add_argument("--pad", default=100, type=int, required=False,
-                        help="Padding of the windows (i.e. final size of the\
-                        matrix is 2×pad+res), in kb")
+                        help="""Padding of the windows (i.e. final size of the
+                        matrix is 2×pad+res), in kb""")
 ### Control of controls
     parser.add_argument("--minshift", default=10**5, type=int, required=False,
-                        help="Shortest distance for randomly shifting\
-                        coordinates when creating controls")
+                        help="""Shortest distance for randomly shifting
+                        coordinates when creating controls""")
     parser.add_argument("--maxshift", default=10**6, type=int, required=False,
-                        help="Longest distance for randomly shifting\
-                        coordinates when creating controls")
+                        help="""Longest distance for randomly shifting
+                        coordinates when creating controls""")
     parser.add_argument("--nshifts", default=10, type=int, required=False,
-                        help="Number of control regions per averaged window")
+                        help="""Number of control regions per averaged
+                        window""")
     parser.add_argument("--expected", default=None, type=str, required=False,
-                        help="File with expected (output of\
-                        cooltools compute-expected). If None, don't use expected\
-                        and use randomly shifted controls")
+                        help="""File with expected (output of
+                        cooltools compute-expected). If None, don't use expected
+                        and use randomly shifted controls""")
 ### Filtering
     parser.add_argument("--mindist", type=int, required=False,
-                        help="Minimal distance of intersections to use")
+                        help="""Minimal distance of intersections to use""")
     parser.add_argument("--maxdist", type=int, required=False,
-                        help="Maximal distance of intersections to use")
+                        help="""Maximal distance of intersections to use""")
     parser.add_argument("--excl_chrs", default='chrY,chrM', type=str,
                         required=False,
-                        help="Exclude these chromosomes form analysis")
+                        help="""Exclude these chromosomes form analysis""")
     parser.add_argument("--incl_chrs", default='all', type=str, required=False,
-                        help="Include these chromosomes; default is all.\
-                        excl_chrs overrides this.")
+                        help="""Include these chromosomes; default is all.
+                        excl_chrs overrides this.""")
     parser.add_argument("--subset", default=0, type=int, required=False,
-                        help="Take a random sample of the bed file - useful for\
-                        files with too many featuers to run as is, i.e. some\
-                        repetitive elements. Set to 0 or lower to keep all data.")
+                        help="""Take a random sample of the bed file - useful
+                        for files with too many featuers to run as is, i.e.
+                        some repetitive elements. Set to 0 or lower to keep all
+                        data.""")
 ### Modes of action
     parser.add_argument("--anchor", default=None, type=str, required=False,
-                        help="A UCSC-style coordinate to use as an anchor to\
-                        create intersections with coordinates in the baselist")
+                        help="""A UCSC-style coordinate to use as an anchor to
+                        create intersections with coordinates in the baselist
+                        """)
     parser.add_argument("--by_window", action='store_true', default=False,
                         required=False,
-                        help="Create a pile-up for each coordinate in the\
-                        baselist")
+                        help="""Create a pile-up for each coordinate in the
+                        baselist""")
     parser.add_argument("--save_all", action='store_true', default=False,
                         required=False,
-                        help="If by-window, save all individual pile-ups as\
-                        separate text files. Can create a very large number of\
-                        files, so use cautiosly!\
-                        If not used, will save a master-table with coordinates,\
-                        their enrichments and cornerCV, which is reflective of\
-                        noisiness")
+                        help="""If by-window, save all individual pile-ups as
+                        separate text files. Can create a very large number of
+                        files, so use cautiosly!
+                        If not used, will save a master-table with coordinates,
+                        their enrichments and cornerCV, which is reflective of
+                        noisiness""")
     parser.add_argument("--local", action='store_true', default=False,
                         required=False,
-                        help="Create local pileups, i.e. along the diagonal")
+                        help="""Create local pileups, i.e. along the
+                        diagonal""")
     parser.add_argument("--unbalanced", action='store_true',
                         required=False,
-                        help="Do not use balanced data.\
-                        Useful for single-cell Hi-C data together with\
-                        --coverage_norm, not recommended otherwise.")
+                        help="""Do not use balanced data.
+                        Useful for single-cell Hi-C data together with
+                        --coverage_norm, not recommended otherwise.""")
     parser.add_argument("--coverage_norm", action='store_true',
                         required=False,
-                        help="If --unbalanced, also add coverage normalization\
-                        based on chromosome marginals")
+                        help="""If --unbalanced, also add coverage
+                        normalization based on chromosome marginals""")
 ### Rescaling
     parser.add_argument("--rescale", action='store_true', default=False,
                         required=False,
-                        help="Do not use pad, and rather use the actual feature\
-                        sizes and rescale pileups to the same shape and size")
+                        help="""Do not use centres of features and pad, and
+                        rather use the actual feature sizes and rescale
+                        pileups to the same shape and size""")
     parser.add_argument("--rescale_pad", default=1.0, required=False, type=float,
-                        help="If --rescale, padding in fraction of feature length")
+                        help="""If --rescale, padding in fraction of feature
+                        length""")
     parser.add_argument("--rescale_size", type=int,
                         default=90, required=False,
-                        help="If --rescale, this is used to determine the final\
-                        size of the pileup, i.e. it ill be size×size")
+                        help="""If --rescale, this is used to determine the
+                        final size of the pileup, i.e. it ill be size×size""")
 
 
     parser.add_argument("--n_proc", default=1, type=int, required=False,
-                        help="Number of processes to use. Each process works\
-                        on a separate chromosome, so might require quite a bit\
-                        more memory, although the data are always stored as\
-                        sparse matrices")
+                        help="""Number of processes to use. Each process works
+                        on a separate chromosome, so might require quite a bit
+                        more memory, although the data are always stored as
+                        sparse matrices""")
 ### Output
     parser.add_argument("--outdir", default='.', type=str, required=False,
-                        help="Directory to save the data in")
+                        help="""Directory to save the data in""")
     parser.add_argument("--outname", default='auto', type=str, required=False,
-                        help="Name of the output file. If not set, is generated\
-                        automatically to include important information.")
+                        help="""Name of the output file. If not set, is
+                        generated automatically to include important
+                        information.""")
     args = parser.parse_args()
     print(args)
     if args.n_proc==0:
