@@ -725,13 +725,11 @@ if __name__ == "__main__":
                                         index_natsorted(zip(data['chr'],
                                                               data['start']))))
         try:
-            data.to_csv(os.path.join(args.outdir,
-                                     'Enrichments_%s.tsv' % baseoutname),
+            data.to_csv(os.path.join(args.outdir, outname),
                         sep='\t', index=False)
         except FileNotFoundError:
             os.mkdir(args.outdir)
-            data.to_csv(os.path.join(args.outdir,
-                                     'Enrichments_%s.tsv' % baseoutname),
+            data.to_csv(os.path.join(args.outdir, outname),
                         sep='\t', index=False)
     else:
         loop = pileupsWithControl(mids=mids, filename=args.coolfile,
