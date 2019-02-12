@@ -26,7 +26,7 @@ import warnings
 
 def cornerCV(amap, i=4):
     corners = np.concatenate((amap[0:i, 0:i], amap[-i:, -i:]))
-    corners[~np.isfinite(corners)]=0
+    corners = corners[np.isfinite(corners)]
     return np.std(corners)/np.mean(corners)
 
 #def normCis(amap, i=3):
