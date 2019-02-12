@@ -345,13 +345,18 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
     chrom, mids = chrom_mids
 
     if expected is not False:
-        expected = expected[expected['chrom']==chrom]['balanced.avg'].values
+        data = False
+        expected = np.nan_to_num(expected[expected['chrom']==chrom]['balanced.avg'].values)
+        print('Doing expected')
     else:
         data = get_data(chrom, c, unbalanced, local=False)
-    if unbalanced and cov_norm:
-        coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0)))
+
+    if unbalanced and cov_norm and expected is False:
+        coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0))) + \
+                   np.nan_to_num(np.ravel(np.sum(data, axis=1)))
     else:
-        coverage = False
+        coverage=False
+
     curmids = mids[mids["chr"] == chrom]
     mymaps = {}
     if not len(curmids) > 1:
@@ -364,11 +369,16 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
                                        c.binsize, minshift, maxshift, nshifts)
         else:
              current = get_combinations(curmids, c.binsize, anchor=(chrom, m, m))
-        mymap, n = _do_pileups(mids=current, data=data, pad=pad,
-                               expected=expected, local=False,
-                               unbalanced=unbalanced, cov_norm=cov_norm,
-                               rescale=rescale, rescale_pad=rescale_pad,
-                               rescale_size=rescale_size, coverage=coverage)
+        mymap, n, cov_starts, cov_ends = _do_pileups(mids=current, data=data,
+                                                     pad=pad,
+                                                     expected=expected,
+                                                     local=False,
+                                                     unbalanced=unbalanced,
+                                                     cov_norm=cov_norm,
+                                                     rescale=rescale,
+                                                     rescale_pad=rescale_pad,
+                                                     rescale_size=rescale_size,
+                                                     coverage=coverage)
         if n > 0:
             mymap = mymap/n
         else:
@@ -380,7 +390,7 @@ def pileupsByWindowWithControl(mids, filename, pad, nproc, chroms,
                             minshift, maxshift, nshifts,
                             expected, mindist, maxdist,
                             unbalanced, cov_norm,
-                            rescale, rescale_pad, size):
+                            rescale, rescale_pad, rescale_size):
     p = Pool(nproc)
     c = cooler.Cooler(filename)
     #Loops
@@ -388,16 +398,27 @@ def pileupsByWindowWithControl(mids, filename, pad, nproc, chroms,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                 expected=expected,
                 mindist=mindist, maxdist=maxdist, unbalanced=unbalanced,
-                cov_norm=cov_norm)
+                cov_norm=False)
     loops = {chrom:lps for chrom, lps in zip(chroms,
                                              p.map(f, chrom_mids(chroms, mids)))}
     #Controls
-    f = partial(pileupsByWindow, c=c, pad=pad, ctrl=True,
-                minshift=minshift, maxshift=maxshift, nshifts=nshifts,
-                expected=expected,
-                mindist=mindist, maxdist=maxdist, unbalanced=unbalanced,
-                cov_norm=cov_norm)
-    ctrls = {chrom:lps for chrom, lps in zip(chroms,
+    if nshifts>0:
+        f = partial(pileupsByWindow, c=c, pad=pad, ctrl=True,
+                    minshift=minshift, maxshift=maxshift, nshifts=nshifts,
+                    expected=expected,
+                    mindist=mindist, maxdist=maxdist, unbalanced=unbalanced,
+                    cov_norm=cov_norm)
+        ctrls = {chrom:lps for chrom, lps in zip(chroms,
+                                             p.map(f, chrom_mids(chroms, mids)))}
+    elif expected is not False:
+        f = partial(pileupsByWindow, c=c, pad=pad, ctrl=False, local=False,
+            expected=expected,
+            minshift=minshift, maxshift=maxshift, nshifts=nshifts,
+            mindist=mindist, maxdist=maxdist, combinations=combinations,
+            anchor=anchor, unbalanced=unbalanced, cov_norm=False,
+            rescale=rescale, rescale_pad=rescale_pad,
+            rescale_size=rescale_size)
+        ctrls = {chrom:lps for chrom, lps in zip(chroms,
                                              p.map(f, chrom_mids(chroms, mids)))}
     p.close()
 
@@ -549,7 +570,7 @@ if __name__ == "__main__":
     bedname = args.baselist.split('/')[-1].split('.bed')[0].split('_mm9')[0].split('_mm10')[0]
     if args.expected is not None:
         if args.nshifts > 0:
-            warnings.warn('Wtih specifie expected will not use controls')
+            warnings.warn('With specified expected will not use controls')
             args.nshifts = 0
         if not os.path.isfile(args.expected):
             raise FileExistsError("Expected file doesn't exist")
@@ -638,6 +659,10 @@ if __name__ == "__main__":
             raise ValueError("Can't make local by-window pileups")
         if anchor:
             raise ValueError("Can't make by-window combinations with an anchor")
+        if args.coverage_norm:
+            raise NotImplementedError("""Can't make by-window combinations with
+                                      coverage normalization - please use
+                                      balanced data instead""")
         if args.outname!='auto':
             warnings.warn("Always using autonaming for by-window pileups")
 
