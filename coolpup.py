@@ -351,11 +351,11 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
     else:
         data = get_data(chrom, c, unbalanced, local=False)
 
-    if unbalanced and cov_norm and expected is False:
-        coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0))) + \
-                   np.nan_to_num(np.ravel(np.sum(data, axis=1)))
-    else:
-        coverage=False
+#    if unbalanced and cov_norm and expected is False:
+#        coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0))) + \
+#                   np.nan_to_num(np.ravel(np.sum(data, axis=1)))
+#    else:
+    coverage=False
 
     curmids = mids[mids["chr"] == chrom]
     mymaps = {}
@@ -396,7 +396,7 @@ def pileupsByWindowWithControl(mids, filename, pad, nproc, chroms,
     #Loops
     f = partial(pileupsByWindow, c=c, pad=pad, ctrl=False,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
-                expected=expected,
+                expected=False,
                 mindist=mindist, maxdist=maxdist, unbalanced=unbalanced,
                 cov_norm=False)
     loops = {chrom:lps for chrom, lps in zip(chroms,
@@ -407,15 +407,17 @@ def pileupsByWindowWithControl(mids, filename, pad, nproc, chroms,
                     minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                     expected=expected,
                     mindist=mindist, maxdist=maxdist, unbalanced=unbalanced,
-                    cov_norm=cov_norm)
+                    cov_norm=cov_norm,
+                    rescale=rescale, rescale_pad=rescale_pad,
+                    rescale_size=rescale_size)
         ctrls = {chrom:lps for chrom, lps in zip(chroms,
                                              p.map(f, chrom_mids(chroms, mids)))}
     elif expected is not False:
-        f = partial(pileupsByWindow, c=c, pad=pad, ctrl=False, local=False,
+        f = partial(pileupsByWindow, c=c, pad=pad, ctrl=False,
             expected=expected,
             minshift=minshift, maxshift=maxshift, nshifts=nshifts,
-            mindist=mindist, maxdist=maxdist, combinations=combinations,
-            anchor=anchor, unbalanced=unbalanced, cov_norm=False,
+            mindist=mindist, maxdist=maxdist,
+            unbalanced=unbalanced, cov_norm=False,
             rescale=rescale, rescale_pad=rescale_pad,
             rescale_size=rescale_size)
         ctrls = {chrom:lps for chrom, lps in zip(chroms,
@@ -652,6 +654,35 @@ if __name__ == "__main__":
         combinations = False
     if args.subset > 0 and args.subset < len(mids):
         mids = mids.sample(args.subset)
+
+        if args.outname=='auto':
+            outname = '%s-%sK_over_%s' % (coolname, c.binsize/1000, bedname)
+            if args.nshifts>0:
+                outname += '_%s-shifts' % args.nshifts
+            if args.expected is not None:
+                outname += '_expected'
+            if args.nshifts <= 0 and args.expected is None:
+                outname += '_noNorm'
+            if anchor:
+                outname += '_from_%s' % anchor_name
+            if args.mindist is not None or args.maxdist is not None:
+                outname += '_dist_%s-%s' % (mindist, maxdist)
+            if args.local:
+                outname += '_local'
+            if args.rescale:
+                outname += '_rescaled'
+            if args.unbalanced:
+                outname += '_unbalanced'
+            if args.coverage_norm:
+                outname += '_covnorm'
+            if args.subset > 0:
+                outname += '_subset-%s' % args.subset
+            if args.by_window:
+                outname += '_Enrichment.txt'
+            else:
+                outname += '.np.txt'
+        else:
+            outname = args.outname
     if args.by_window:
         if not combinations:
             raise ValueError("Can't make by-window pileups without making combinations")
@@ -721,32 +752,6 @@ if __name__ == "__main__":
                                        rescale=args.rescale,
                                        rescale_pad=args.rescale_pad,
                                        rescale_size=args.rescale_size)
-        if args.outname=='auto':
-            outname = '%s-%sK_over_%s' % (coolname, c.binsize/1000, bedname)
-            if args.nshifts>0:
-                outname += '_%s-shifts' % args.nshifts
-            if args.expected is not None:
-                outname += '_expected'
-            if args.nshifts <= 0 and args.expected is None:
-                outname += '_noNorm'
-            if anchor:
-                outname += '_from_%s' % anchor_name
-            if args.mindist is not None or args.maxdist is not None:
-                outname += '_dist_%s-%s' % (mindist, maxdist)
-            if args.local:
-                outname += '_local'
-            if args.rescale:
-                outname += '_rescaled'
-            if args.unbalanced:
-                outname += '_unbalanced'
-            if args.coverage_norm:
-                outname += '_covnorm'
-            if args.subset > 0:
-                outname += '_subset-%s' % args.subset
-            outname += '.np.txt'
-
-        else:
-            outname = args.outname
         try:
             np.savetxt(os.path.join(args.outdir, outname), loop)
         except FileNotFoundError:
