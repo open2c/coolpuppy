@@ -430,28 +430,6 @@ def pileupsByWindowWithControl(mids, filename, pad, nproc, chroms,
             finloops[(chrom, pos)] = lp/ctrls[chrom][pos]
     return finloops
 
-def prepare_single(item):
-    key, amap = item
-    if np.any(amap<0):
-        print(amap)
-        amap = np.zeros_like(amap)
-    coords = (key[0], int(key[1]//c.binsize*c.binsize),
-                      int(key[1]//c.binsize*c.binsize + c.binsize))
-    enr1 = get_enrichment(amap, 1)
-    enr3 = get_enrichment(amap, 3)
-    cv3 = cornerCV(amap, 3)
-    cv5 = cornerCV(amap, 5)
-    if args.save_all:
-        outname = baseoutname + '_%s:%s-%s.np.txt' % coords
-        try:
-            np.savetxt(os.path.join(args.outdir, 'individual', outname),
-                       amap)
-        except FileNotFoundError:
-            os.mkdir(os.path.join(args.outdir, 'individual'))
-            np.savetxt(os.path.join(args.outdir, 'individual', outname),
-                       amap)
-    return list(coords)+[enr1, enr3, cv3, cv5]
-
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
@@ -486,6 +464,12 @@ if __name__ == "__main__":
                         help="""Minimal distance of intersections to use""")
     parser.add_argument("--maxdist", type=int, required=False,
                         help="""Maximal distance of intersections to use""")
+    parser.add_argument("--minlen", type=int, required=False,
+                        help="""Minimal length of features to use for local
+                        analysis""")
+    parser.add_argument("--maxlen", type=int, required=False,
+                        help="""Maximal length of features to use for local
+                        analysis""")
     parser.add_argument("--excl_chrs", default='chrY,chrM', type=str,
                         required=False,
                         help="""Exclude these chromosomes form analysis""")
@@ -633,6 +617,13 @@ if __name__ == "__main__":
         bases.columns = ['chr', 'start', 'end']
         if not np.all(bases['end']>=bases['start']):
             raise ValueError('Some ends in the file are smaller than starts')
+        if args.local:
+            if args.minlen is None:
+                args.minlen = 0
+            if args.maxlen is None:
+                args.maxlen = np.inf
+            length = bases['end']-bases['start']
+            bases = bases[(length >= args.minlen) & (length <= args.maxlen)]
         mids = get_mids(bases, combinations=True)
         combinations = True
     else:
@@ -669,6 +660,8 @@ if __name__ == "__main__":
             outname += '_dist_%s-%s' % (mindist, maxdist)
         if args.local:
             outname += '_local'
+            if args.minlen > 0 or args.maxlen < np.inf:
+                outname += '_len_%s-%s' % (args.minlen, args.maxlen)
         if args.rescale:
             outname += '_rescaled'
         if args.unbalanced:
@@ -714,7 +707,28 @@ if __name__ == "__main__":
                                               rescale=args.rescale,
                                               rescale_pad=args.rescale_pad,
                                               rescale_size=args.rescale_size)
-        data = []
+
+        def prepare_single(item, outname=outname):
+            key, amap = item
+            if np.any(amap<0):
+                print(amap)
+                amap = np.zeros_like(amap)
+            coords = (key[0], int(key[1]//c.binsize*c.binsize),
+                              int(key[1]//c.binsize*c.binsize + c.binsize))
+            enr1 = get_enrichment(amap, 1)
+            enr3 = get_enrichment(amap, 3)
+            cv3 = cornerCV(amap, 3)
+            cv5 = cornerCV(amap, 5)
+            if args.save_all:
+                outname = outname + '_%s:%s-%s.np.txt' % coords
+                try:
+                    np.savetxt(os.path.join(args.outdir, 'individual', outname),
+                               amap)
+                except FileNotFoundError:
+                    os.mkdir(os.path.join(args.outdir, 'individual'))
+                    np.savetxt(os.path.join(args.outdir, 'individual', outname),
+                               amap)
+            return list(coords)+[enr1, enr3, cv3, cv5]
 
         p = Pool(nproc)
         data = p.map(prepare_single, finloops.items())
