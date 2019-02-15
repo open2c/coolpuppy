@@ -23,6 +23,8 @@ from scipy import sparse
 from scipy.linalg import toeplitz
 from mirnylib import numutils
 import warnings
+from functools import partial
+from scipy import ndimage
 
 def cornerCV(amap, i=4):
     corners = np.concatenate((amap[0:i, 0:i], amap[-i:, -i:]))
@@ -129,6 +131,8 @@ def get_data(chrom, c, unbalanced, local):
         data = sparse.triu(data, 2).tocsr()
     return data
 
+zoom_function = partial(ndimage.zoom, order=1)
+
 def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
                 rescale, rescale_pad, rescale_size, coverage):
     mymap = make_outmap(pad, rescale, rescale_size)
@@ -170,7 +174,8 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
                     newmap = np.zeros((rescale_size, rescale_size))
                 else:
                     newmap = numutils.zoomArray(newmap, (rescale_size,
-                                                         rescale_size))
+                                                         rescale_size),
+                                                zoomFunction=zoom_function)
 
             mymap += np.nan_to_num(newmap)
             if unbalanced and cov_norm and expected is False:
@@ -181,8 +186,12 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
                         new_cov_start = np.zeros(rescale_size)
                     if len(new_cov_end)==0:
                         new_cov_end = np.zeros(rescale_size)
-                    new_cov_start = numutils.zoomArray(new_cov_start, (rescale_size,))
-                    new_cov_end = numutils.zoomArray(new_cov_end, (rescale_size,))
+                    new_cov_start = numutils.zoomArray(new_cov_start,
+                                                       (rescale_size,),
+                                                    zoomFunction=zoom_function)
+                    new_cov_end = numutils.zoomArray(new_cov_end,
+                                                     (rescale_size,),
+                                                    zoomFunction=zoom_function)
                 else:
                     l = len(new_cov_start)
                     r = len(new_cov_end)
@@ -215,7 +224,7 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
 
     if expected is not False:
         data = False
-        expected = np.nan_to_num(expected[expected['chrom']==chrom]['balanced.avg'].values)
+        expected = expected[expected['chrom']==chrom]['balanced.avg'].values
         print('Doing expected')
     else:
         data = get_data(chrom, c, unbalanced, local)
