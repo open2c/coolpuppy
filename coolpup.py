@@ -585,7 +585,7 @@ if __name__ == "__main__":
         raise NotImplementedError("""Rescaling with by-window pileups is not
                                   supported""")
 
-    if args.rescale and args.rescale_size%3!=0:
+    if args.rescale and args.rescale_size%2==0:
         raise ValueError("Please provide an odd rescale_size")
 
     if args.anchor is not None:
