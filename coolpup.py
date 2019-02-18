@@ -125,7 +125,10 @@ def make_outmap(pad, rescale=False, rescale_size=41):
 def get_data(chrom, c, unbalanced, local):
     print('Loading data')
     data = c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom)
-    data = sparse.triu(data, 2).tocsr()
+    if local:
+        data = data.tocsr()
+    else:
+        data = sparse.triu(data, 2).tocsr()
     return data
 
 zoom_function = partial(ndimage.zoom, order=1)
@@ -207,7 +210,8 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
                 cov_end += +np.nan_to_num(new_cov_end)
             n += 1
     if local:
-        mymap += np.rot90(np.fliplr(mymap))
+        mymap = np.triu(mymap, 0)
+        mymap += np.rot90(np.fliplr(np.triu(mymap, 1)))
     return mymap, n, cov_start, cov_end
 
 def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
