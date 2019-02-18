@@ -142,6 +142,9 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
     for stBin, endBin, stPad, endPad in mids:
         if stBin > endBin:
             stBin, stPad, endBin, endPad = endBin, endPad, stBin, stPad
+            invert = True
+        else :
+            invert = False
         if rescale:
             stPad = stPad + int(round(rescale_pad*2*stPad))
             endPad = endPad + int(round(rescale_pad*2*endPad))
@@ -176,7 +179,8 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
                     newmap = numutils.zoomArray(newmap, (rescale_size,
                                                          rescale_size),
                                                 zoomFunction=zoom_function)
-
+            if invert:
+                mymap = np.rot90(np.flipud(mymap))
             mymap += np.nan_to_num(newmap)
             if unbalanced and cov_norm and expected is False:
                 new_cov_start = coverage[lo_left:hi_left]
