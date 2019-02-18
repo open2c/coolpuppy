@@ -125,10 +125,7 @@ def make_outmap(pad, rescale=False, rescale_size=41):
 def get_data(chrom, c, unbalanced, local):
     print('Loading data')
     data = c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom)
-    if local:
-        data = data.tocsr()
-    else:
-        data = sparse.triu(data, 2).tocsr()
+    data = sparse.triu(data, 2).tocsr()
     return data
 
 zoom_function = partial(ndimage.zoom, order=1)
@@ -209,6 +206,8 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
                 cov_start += np.nan_to_num(new_cov_start)
                 cov_end += +np.nan_to_num(new_cov_end)
             n += 1
+    if local:
+        mymap += np.rot90(np.fliplr(mymap))
     return mymap, n, cov_start, cov_end
 
 def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
@@ -669,12 +668,12 @@ if __name__ == "__main__":
             outname += '_noNorm'
         if anchor:
             outname += '_from_%s' % anchor_name
-        if args.mindist is not None or args.maxdist is not None:
-            outname += '_dist_%s-%s' % (mindist, maxdist)
         if args.local:
             outname += '_local'
             if args.minlen > 0 or args.maxlen < np.inf:
                 outname += '_len_%s-%s' % (args.minlen, args.maxlen)
+        elif args.mindist is not None or args.maxdist is not None:
+            outname += '_dist_%s-%s' % (mindist, maxdist)
         if args.rescale:
             outname += '_rescaled'
         if args.unbalanced:
