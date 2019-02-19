@@ -477,13 +477,14 @@ if __name__ == "__main__":
                         and use randomly shifted controls""")
 ### Filtering
     parser.add_argument("--mindist", type=int, required=False,
-                        help="""Minimal distance of intersections to use""")
+                        help="""Minimal distance of intersections to use. If
+                        not specified, uses --pad as mindist""")
     parser.add_argument("--maxdist", type=int, required=False,
                         help="""Maximal distance of intersections to use""")
-    parser.add_argument("--minlen", type=int, required=False,
+    parser.add_argument("--minsize", type=int, required=False,
                         help="""Minimal length of features to use for local
                         analysis""")
-    parser.add_argument("--maxlen", type=int, required=False,
+    parser.add_argument("--maxsize", type=int, required=False,
                         help="""Maximal length of features to use for local
                         analysis""")
     parser.add_argument("--excl_chrs", default='chrY,chrM', type=str,
@@ -583,7 +584,7 @@ if __name__ == "__main__":
     pad = args.pad*1000//c.binsize
 
     if args.mindist is None:
-        mindist=0
+        mindist=pad*c.binsize
     else:
         mindist=args.mindist
 
@@ -634,12 +635,12 @@ if __name__ == "__main__":
         if not np.all(bases['end']>=bases['start']):
             raise ValueError('Some ends in the file are smaller than starts')
         if args.local:
-            if args.minlen is None:
-                args.minlen = 0
-            if args.maxlen is None:
-                args.maxlen = np.inf
+            if args.minsize is None:
+                args.minsize = 0
+            if args.maxsize is None:
+                args.maxsize = np.inf
             length = bases['end']-bases['start']
-            bases = bases[(length >= args.minlen) & (length <= args.maxlen)]
+            bases = bases[(length >= args.minsize) & (length <= args.maxsize)]
         mids = get_mids(bases, combinations=True)
         combinations = True
     else:
@@ -674,8 +675,8 @@ if __name__ == "__main__":
             outname += '_from_%s' % anchor_name
         if args.local:
             outname += '_local'
-            if args.minlen > 0 or args.maxlen < np.inf:
-                outname += '_len_%s-%s' % (args.minlen, args.maxlen)
+            if args.minsize > 0 or args.maxsize < np.inf:
+                outname += '_len_%s-%s' % (args.minsize, args.maxsize)
         elif args.mindist is not None or args.maxdist is not None:
             outname += '_dist_%s-%s' % (mindist, maxdist)
         if args.rescale:
