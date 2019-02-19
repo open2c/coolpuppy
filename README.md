@@ -32,12 +32,13 @@ Help message should help you get started to use the tool. It is a single command
 ```
 Usage: coolpup.py [-h] [--pad PAD] [--minshift MINSHIFT] [--maxshift MAXSHIFT]
                   [--nshifts NSHIFTS] [--expected EXPECTED]
-                  [--mindist MINDIST] [--maxdist MAXDIST]
-                  [--excl_chrs EXCL_CHRS] [--incl_chrs INCL_CHRS]
-                  [--subset SUBSET] [--anchor ANCHOR] [--by_window]
-                  [--save_all] [--local] [--unbalanced] [--coverage_norm]
-                  [--rescale] [--rescale_pad RESCALE_PAD] [--size SIZE]
-                  [--n_proc N_PROC] [--outdir OUTDIR] [--outname OUTNAME]
+                  [--mindist MINDIST] [--maxdist MAXDIST] [--minsize MINSIZE]
+                  [--maxsize MAXSIZE] [--excl_chrs EXCL_CHRS]
+                  [--incl_chrs INCL_CHRS] [--subset SUBSET] [--anchor ANCHOR]
+                  [--by_window] [--save_all] [--local] [--unbalanced]
+                  [--coverage_norm] [--rescale] [--rescale_pad RESCALE_PAD]
+                  [--rescale_size RESCALE_SIZE] [--n_proc N_PROC]
+                  [--outdir OUTDIR] [--outname OUTNAME]
                   coolfile baselist
 
 positional arguments:
@@ -58,10 +59,13 @@ optional arguments:
                         when creating controls
   --nshifts NSHIFTS     Number of control regions per averaged window
   --expected EXPECTED   File with expected (output of cooltools compute-
-                        expected). If None, don't use expected and use randomly
-                        shifted controls
-  --mindist MINDIST     Minimal distance of intersections to use
+                        expected). If None, don't use expected and use
+                        randomly shifted controls
+  --mindist MINDIST     Minimal distance of intersections to use. If not
+                        specified, uses --pad as mindist
   --maxdist MAXDIST     Maximal distance of intersections to use
+  --minsize MINSIZE     Minimal length of features to use for local analysis
+  --maxsize MAXSIZE     Maximal length of features to use for local analysis
   --excl_chrs EXCL_CHRS
                         Exclude these chromosomes form analysis
   --incl_chrs INCL_CHRS
@@ -80,18 +84,21 @@ optional arguments:
                         table with coordinates, their enrichments and
                         cornerCV, which is reflective of noisiness
   --local               Create local pileups, i.e. along the diagonal
-  --unbalanced          Do not use balanced data - rather average cis coverage
-                        of all regions, and use it to normalize the final
-                        pileups. Useful for single-cell Hi-C data, not
-                        recommended otherwise.
+  --unbalanced          Do not use balanced data. Useful for single-cell Hi-C
+                        data together with --coverage_norm, not recommended
+                        otherwise.
   --coverage_norm       If --unbalanced, also add coverage normalization based
                         on chromosome marginals
-  --rescale             Do not use pad, and rather use the actual feature
-                        sizes and rescale pileups to the same shape
+  --rescale             Do not use centres of features and pad, and rather use
+                        the actual feature sizes and rescale pileups to the
+                        same shape and size
   --rescale_pad RESCALE_PAD
                         If --rescale, padding in fraction of feature length
-  --size SIZE           If --rescale, this is used to determine the final size
-                        of the pileup, i.e. it ill be size×size
+  --rescale_size RESCALE_SIZE
+                        If --rescale, this is used to determine the final size
+                        of the pileup, i.e. it ill be size×size. Due to
+                        technical limitation in the current implementation,
+                        has to be an odd number
   --n_proc N_PROC       Number of processes to use. Each process works on a
                         separate chromosome, so might require quite a bit more
                         memory, although the data are always stored as sparse
@@ -99,8 +106,6 @@ optional arguments:
   --outdir OUTDIR       Directory to save the data in
   --outname OUTNAME     Name of the output file. If not set, is generated
                         automatically to include important information.
-
-
 
 ```
 
