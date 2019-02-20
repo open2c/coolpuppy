@@ -2,8 +2,8 @@ from setuptools import setup
 
 setup(
       name='coolpuppy',
-      version='0.6.1',
+      version='0.7',
       scripts=['coolpup.py'],
       install_requires=['numpy', 'cooler', 'pandas', 'natsort', 'scipy',
-                        'mirnylib', 'cooltools']
+                        'mirnylib', 'cooltools', 'multiprocessing', 'warnings']
 )
