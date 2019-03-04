@@ -75,7 +75,8 @@ def get_combinations(mids, res, local=False, anchor=None):
         for i, pi in zip(m, p):
             yield anchor_bin, i, anchor_pad, pi
     else:
-        for i, j in zip(itertools.combinations(m, 2), itertools.combinations(p, 2)):
+        for i, j in zip(itertools.combinations(m, 2),
+                        itertools.combinations(p, 2)):
             yield list(i)+list(j)
 
 def get_positions_pairs(mids, res):
@@ -140,10 +141,13 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
     n = 0
     for stBin, endBin, stPad, endPad in mids:
         invert = False
+        rot = False
         if stBin > endBin:
             stBin, stPad, endBin, endPad = endBin, endPad, stBin, stPad
             if anchor is None:
                 invert = True
+            else:
+                rot = True
         if rescale:
             stPad = stPad + int(round(rescale_pad*2*stPad))
             endPad = endPad + int(round(rescale_pad*2*endPad))
@@ -180,6 +184,8 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
                                                 zoomFunction=zoom_function)
             if invert:
                 mymap = np.rot90(np.flipud(mymap))
+            elif rot:
+                mymap = np.rot90(mymap)
             mymap += np.nan_to_num(newmap)
             if unbalanced and cov_norm and expected is False:
                 new_cov_start = coverage[lo_left:hi_left]
