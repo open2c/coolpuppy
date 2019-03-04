@@ -23,7 +23,6 @@ from scipy import sparse
 from scipy.linalg import toeplitz
 from mirnylib import numutils
 import warnings
-from functools import partial
 from scipy import ndimage
 
 def cornerCV(amap, i=4):
@@ -134,13 +133,13 @@ def get_data(chrom, c, unbalanced, local):
 zoom_function = partial(ndimage.zoom, order=1)
 
 def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
-                rescale, rescale_pad, rescale_size, coverage):
+                rescale, rescale_pad, rescale_size, coverage, anchor):
     mymap = make_outmap(pad, rescale, rescale_size)
     cov_start = np.zeros(mymap.shape[0])
     cov_end = np.zeros(mymap.shape[1])
     n = 0
     for stBin, endBin, stPad, endPad in mids:
-        if stBin > endBin:
+        if stBin > endBin and anchor is not None:
             stBin, stPad, endBin, endPad = endBin, endPad, stBin, stPad
             invert = True
         else :
@@ -275,7 +274,8 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
                                                coverage=coverage,
                                                rescale=rescale,
                                                rescale_pad=rescale_pad,
-                                               rescale_size=rescale_size)
+                                               rescale_size=rescale_size,
+                                               anchor=anchor)
     print(chrom, n)
     return mymap, n, cov_start, cov_end
 
@@ -489,7 +489,7 @@ if __name__ == "__main__":
                         analysis""")
     parser.add_argument("--excl_chrs", default='chrY,chrM', type=str,
                         required=False,
-                        help="""Exclude these chromosomes form analysis""")
+                        help="""Exclude these chromosomes from analysis""")
     parser.add_argument("--incl_chrs", default='all', type=str, required=False,
                         help="""Include these chromosomes; default is all.
                         excl_chrs overrides this.""")
