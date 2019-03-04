@@ -140,14 +140,14 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
     cov_end = np.zeros(mymap.shape[1])
     n = 0
     for stBin, endBin, stPad, endPad in mids:
-        invert = False
-        rot = False
+        rot_flip = False
+        flip_rot = False
         if stBin > endBin:
             stBin, stPad, endBin, endPad = endBin, endPad, stBin, stPad
             if anchor is None:
-                invert = True
+                rot_flip = True
             else:
-                rot = True
+                flip_rot = True
         if rescale:
             stPad = stPad + int(round(rescale_pad*2*stPad))
             endPad = endPad + int(round(rescale_pad*2*endPad))
@@ -182,10 +182,10 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
                     newmap = numutils.zoomArray(newmap, (rescale_size,
                                                          rescale_size),
                                                 zoomFunction=zoom_function)
-            if invert:
-                mymap = np.rot90(np.flipud(mymap))
-            elif rot:
-                mymap = np.rot90(mymap)
+            if rot_flip:
+                newmap = np.rot90(np.flipud(newmap), -1)
+            elif flip_rot:
+                newmap = np.flipud(np.rot90(newmap))
             mymap += np.nan_to_num(newmap)
             if unbalanced and cov_norm and expected is False:
                 new_cov_start = coverage[lo_left:hi_left]
