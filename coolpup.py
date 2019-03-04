@@ -139,7 +139,7 @@ def _do_pileups(mids, data, pad, expected, local, unbalanced, cov_norm,
     cov_end = np.zeros(mymap.shape[1])
     n = 0
     for stBin, endBin, stPad, endPad in mids:
-        if stBin > endBin and anchor is not None:
+        if stBin > endBin and anchor is None:
             stBin, stPad, endBin, endPad = endBin, endPad, stBin, stPad
             invert = True
         else :
