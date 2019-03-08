@@ -58,7 +58,7 @@ def get_mids(intervals, combinations=True):
                              'chr2':intervals['chr2'],
                              'Mids2':mids2,
                              'Pad2':widths2/2},
-                            ).drop_duplicates()
+                            ).drop_duplicates(['chr1', 'Mids1', 'chr2', 'Mids2'])
     return mids
 
 def get_combinations(mids, res, local=False, anchor=None):
