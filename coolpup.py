@@ -118,9 +118,9 @@ def get_expected_matrix(left_interval, right_interval, expected, local):
 
 def make_outmap(pad, rescale=False, rescale_size=41):
     if rescale:
-        return np.zeros((rescale_size, rescale_size), np.float64)
+        return np.zeros((rescale_size, rescale_size))
     else:
-        return np.zeros((2*pad + 1, 2*pad + 1), np.float64)
+        return np.zeros((2*pad + 1, 2*pad + 1))
 
 def get_data(chrom, c, unbalanced, local):
     print('Loading data')
@@ -395,7 +395,7 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
     if not len(curmids) > 1:
 #        mymap.fill(np.nan)
         return mymaps
-    for m in curmids['Mids'].values:
+    for i, (m, p) in curmids[['Mids', 'Pad']].astype(int).iterrows():
         if ctrl:
             current = controlRegions(get_combinations(curmids, c.binsize,
                                                     anchor=(chrom, m, m)),
@@ -403,8 +403,11 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
         else:
              current = get_combinations(curmids, c.binsize, anchor=(chrom, m, m))
         mymap, n, cov_starts, cov_ends = _do_pileups(mids=current, data=data,
+                                                     binsize=c.binsize,
                                                      pad=pad,
                                                      expected=expected,
+                                                     mindist=mindist,
+                                                     maxdist=maxdist,
                                                      local=False,
                                                      unbalanced=unbalanced,
                                                      cov_norm=cov_norm,
@@ -416,25 +419,32 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
         if n > 0:
             mymap = mymap/n
         else:
-            mymap = make_outmap(make_outmap(pad, rescale, rescale_pad))
-        mymaps[m] = mymap
+            mymap = make_outmap(pad, rescale, rescale_pad)
+        mymaps[(m-p, m+p)] = mymap
     return mymaps
 
-def pileupsByWindowWithControl(mids, filename, pad, nproc, chroms,
-                            minshift, maxshift, nshifts,
-                            expected, mindist, maxdist,
-                            unbalanced, cov_norm,
-                            rescale, rescale_pad, rescale_size):
+def pileupsByWindowWithControl(mids, filename, pad=100, nproc=1, chroms=None,
+                               minshift=100000, maxshift=100000, nshifts=10,
+                               expected=None,
+                               mindist=0, maxdist=np.inf,
+                               unbalanced=False,
+                               cov_norm=False,
+                               rescale=False, rescale_pad=1, rescale_size=99):
     p = Pool(nproc)
     c = cooler.Cooler(filename)
+    if chroms is None:
+        chroms = c.chromnames
     #Loops
     f = partial(pileupsByWindow, c=c, pad=pad, ctrl=False,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                 expected=False,
                 mindist=mindist, maxdist=maxdist, unbalanced=unbalanced,
-                cov_norm=False)
+                cov_norm=False,
+                rescale=rescale, rescale_pad=rescale_pad,
+                rescale_size=rescale_size)
+    chrommids = chrom_mids(chroms, mids, True)
     loops = {chrom:lps for chrom, lps in zip(chroms,
-                                             p.map(f, chrom_mids(chroms, mids)))}
+                                             p.map(f, chrommids))}
     #Controls
     if nshifts>0:
         f = partial(pileupsByWindow, c=c, pad=pad, ctrl=True,
@@ -444,8 +454,9 @@ def pileupsByWindowWithControl(mids, filename, pad, nproc, chroms,
                     cov_norm=cov_norm,
                     rescale=rescale, rescale_pad=rescale_pad,
                     rescale_size=rescale_size)
+        chrommids = chrom_mids(chroms, mids, True)
         ctrls = {chrom:lps for chrom, lps in zip(chroms,
-                                             p.map(f, chrom_mids(chroms, mids)))}
+                                             p.map(f, chrommids))}
     elif expected is not False:
         f = partial(pileupsByWindow, c=c, pad=pad, ctrl=False,
             expected=expected,
@@ -454,14 +465,15 @@ def pileupsByWindowWithControl(mids, filename, pad, nproc, chroms,
             unbalanced=unbalanced, cov_norm=False,
             rescale=rescale, rescale_pad=rescale_pad,
             rescale_size=rescale_size)
+        chrommids = chrom_mids(chroms, mids, True)
         ctrls = {chrom:lps for chrom, lps in zip(chroms,
-                                             p.map(f, chrom_mids(chroms, mids)))}
+                                             p.map(f, chrommids))}
     p.close()
 
     finloops = {}
     for chrom in loops.keys():
         for pos, lp in loops[chrom].items():
-            finloops[(chrom, pos)] = lp/ctrls[chrom][pos]
+            finloops[(chrom, pos[0], pos[1])] = lp/ctrls[chrom][pos]
     return finloops
 
 if __name__ == "__main__":
@@ -647,7 +659,7 @@ if __name__ == "__main__":
                             names=['chr1', 'start1', 'end1',
                                    'chr2', 'start2', 'end2'],
                         index_col=False)
-    if np.all(pd.isnull(bases[['chr2', 'start2', 'end2']])):
+    if np.all(pd.isnull(bases[['chr2', 'start2', 'end2']].values)):
         bases = bases[['chr1', 'start1', 'end1']]
         bases.columns = ['chr', 'start', 'end']
         if not np.all(bases['end']>=bases['start']):
@@ -742,28 +754,29 @@ if __name__ == "__main__":
                                               rescale=args.rescale,
                                               rescale_pad=args.rescale_pad,
                                               rescale_size=args.rescale_size)
+        if args.save_all:
+            outdict = {'%s:%s-%s' % key : val.tolist() for key,val in finloops.items()}
+            import json
+            with open(os.path.join(args.outdir, outname)[:-4] + '.json', 'w') as fp:
+                json.dump(outdict, fp)#, sort_keys=True, indent=4)
 
         def prepare_single(item, outname=outname):
             key, amap = item
-            if np.any(amap<0):
-                print(amap)
-                amap = np.zeros_like(amap)
-            coords = (key[0], int(key[1]//c.binsize*c.binsize),
-                              int(key[1]//c.binsize*c.binsize + c.binsize))
+#            coords = (key[0], int(key[1]), int(key[2]))
             enr1 = get_enrichment(amap, 1)
             enr3 = get_enrichment(amap, 3)
             cv3 = cornerCV(amap, 3)
             cv5 = cornerCV(amap, 5)
-            if args.save_all:
-                outname = outname + '_%s:%s-%s.np.txt' % coords
-                try:
-                    np.savetxt(os.path.join(args.outdir, 'individual', outname),
-                               amap)
-                except FileNotFoundError:
-                    os.mkdir(os.path.join(args.outdir, 'individual'))
-                    np.savetxt(os.path.join(args.outdir, 'individual', outname),
-                               amap)
-            return list(coords)+[enr1, enr3, cv3, cv5]
+#            if args.save_all:
+#                outname = outname + '_%s:%s-%s.np.txt' % coords
+#                try:
+#                    np.savetxt(os.path.join(args.outdir, 'individual', outname),
+#                               amap)
+#                except FileNotFoundError:
+#                    os.mkdir(os.path.join(args.outdir, 'individual'))
+#                    np.savetxt(os.path.join(args.outdir, 'individual', outname),
+#                               amap)
+            return list(key)+[enr1, enr3, cv3, cv5]
 
         p = Pool(nproc)
         data = p.map(prepare_single, finloops.items())
