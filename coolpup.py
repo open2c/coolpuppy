@@ -37,14 +37,15 @@ def get_enrichment(amap, n):
     c = int(np.floor(amap.shape[0]/2))
     return np.nanmean(amap[c-n//2:c+n//2+1, c-n//2:c+n//2+1])
 
-def get_mids(intervals, combinations=True):
+def get_mids(intervals, resolution, combinations=True):
     if combinations:
         intervals = intervals.sort_values(['chr', 'start'])
         mids = np.round((intervals['end']+intervals['start'])/2).astype(int)
         widths = np.round((intervals['end']-intervals['start'])).astype(int)
         mids = pd.DataFrame({'chr':intervals['chr'],
                              'Mids':mids,
-                             'Pad':widths/2}).drop_duplicates(['chr', 'Mids'])
+                             'Bin':mids//resolution,
+                             'Pad':widths/2}).drop_duplicates(['chr', 'Bin']).drop('Bin', axis=1)
     else:
         intervals = intervals.sort_values(['chr1', 'chr2',
                                            'start1', 'start2'])
@@ -54,11 +55,16 @@ def get_mids(intervals, combinations=True):
         widths2 = np.round((intervals['end2']-intervals['start2'])).astype(int)
         mids = pd.DataFrame({'chr1':intervals['chr1'],
                              'Mids1':mids1,
+                             'Bin1':mids1//resolution,
                              'Pad1':widths1/2,
                              'chr2':intervals['chr2'],
                              'Mids2':mids2,
+                             'Bin2':mids2//resolution,
                              'Pad2':widths2/2},
-                            ).drop_duplicates(['chr1', 'Mids1', 'chr2', 'Mids2'])
+                            ).drop_duplicates(['chr1', 'Mids1',
+                                      'chr2', 'Mids2']).drop_duplicates(['chr',
+                                                 'Bin1', 'Bin2']).drop(['Bin1',
+                                                         '      Bin2'], axis=1)
     return mids
 
 def get_combinations(mids, res, local=False, anchor=None):
@@ -671,7 +677,6 @@ if __name__ == "__main__":
                 args.maxsize = np.inf
             length = bases['end']-bases['start']
             bases = bases[(length >= args.minsize) & (length <= args.maxsize)]
-        mids = get_mids(bases, combinations=True)
         combinations = True
     else:
         if not np.all(bases['chr1']==bases['chr2']):
@@ -688,8 +693,8 @@ if __name__ == "__main__":
 #        if not np.all(bases[['start2', 'end2']].mean(axis=1)>=bases[['start1', 'end1']].mean(axis=1)):
 #            raise ValueError('Some centres of right ends in the file are\
 #                             smaller than centres in the left ends')
-        mids = get_mids(bases, combinations=False)
         combinations = False
+    mids = get_mids(bases, resolution=c.binsize, combinations=combinations)
     if args.subset > 0 and args.subset < len(mids):
         mids = mids.sample(args.subset)
 
