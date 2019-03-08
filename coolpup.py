@@ -44,7 +44,7 @@ def get_mids(intervals, combinations=True):
         widths = np.round((intervals['end']-intervals['start'])).astype(int)
         mids = pd.DataFrame({'chr':intervals['chr'],
                              'Mids':mids,
-                             'Pad':widths/2}).drop_duplicates()
+                             'Pad':widths/2}).drop_duplicates(['chr', 'Mids'])
     else:
         intervals = intervals.sort_values(['chr1', 'chr2',
                                            'start1', 'start2'])
