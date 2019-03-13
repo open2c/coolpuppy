@@ -67,7 +67,7 @@ optional arguments:
   --minsize MINSIZE     Minimal length of features to use for local analysis
   --maxsize MAXSIZE     Maximal length of features to use for local analysis
   --excl_chrs EXCL_CHRS
-                        Exclude these chromosomes form analysis
+                        Exclude these chromosomes from analysis
   --incl_chrs INCL_CHRS
                         Include these chromosomes; default is all. excl_chrs
                         overrides this.
