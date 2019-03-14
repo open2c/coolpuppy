@@ -67,7 +67,7 @@ optional arguments:
   --minsize MINSIZE     Minimal length of features to use for local analysis
   --maxsize MAXSIZE     Maximal length of features to use for local analysis
   --excl_chrs EXCL_CHRS
-                        Exclude these chromosomes form analysis
+                        Exclude these chromosomes from analysis
   --incl_chrs INCL_CHRS
                         Include these chromosomes; default is all. excl_chrs
                         overrides this.
@@ -77,12 +77,12 @@ optional arguments:
                         data.
   --anchor ANCHOR       A UCSC-style coordinate to use as an anchor to create
                         intersections with coordinates in the baselist
-  --by_window           Create a pile-up for each coordinate in the baselist
-  --save_all            If by-window, save all individual pile-ups as separate
-                        text files. Can create a very large number of files,
-                        so use cautiosly! If not used, will save a master-
-                        table with coordinates, their enrichments and
-                        cornerCV, which is reflective of noisiness
+  --by_window           Create a pile-up for each coordinate in the baselist.
+                        Will save a master-table with coordinates, their
+                        enrichments and cornerCV, which is reflective of
+                        noisiness
+  --save_all            If by-window, save all individual pile-ups in a
+                        separate json file
   --local               Create local pileups, i.e. along the diagonal
   --unbalanced          Do not use balanced data. Useful for single-cell Hi-C
                         data together with --coverage_norm, not recommended
