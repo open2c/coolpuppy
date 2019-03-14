@@ -30,8 +30,8 @@ def cornerCV(amap, i=4):
     corners = corners[np.isfinite(corners)]
     return np.std(corners)/np.mean(corners)
 
-#def normCis(amap, i=3):
-#    return amap/np.nanmean((amap[0:i, 0:i]+amap[-i:, -i:]))*2
+def normCis(amap, i=3):
+    return amap/np.nanmean((amap[0:i, 0:i]+amap[-i:, -i:]))*2
 
 def get_enrichment(amap, n):
     c = int(np.floor(amap.shape[0]/2))
@@ -492,7 +492,8 @@ if __name__ == "__main__":
                         coordinates which intersections to pile-up.
                         Alternatively, a 6-column double-bed file (i.e.
                         chr1,start1,end1,chr2,start2,end2) with coordinates of
-                        centers of windows that will be piled-up""")
+                        centers of windows that will be piled-up. Can be piped
+                        in via stdin, then use "-".""")
 ##### Extra arguments
     parser.add_argument("--pad", default=100, type=int, required=False,
                         help="""Padding of the windows (i.e. final size of the
@@ -542,15 +543,13 @@ if __name__ == "__main__":
     parser.add_argument("--by_window", action='store_true', default=False,
                         required=False,
                         help="""Create a pile-up for each coordinate in the
-                        baselist""")
-    parser.add_argument("--save_all", action='store_true', default=False,
-                        required=False,
-                        help="""If by-window, save all individual pile-ups as
-                        separate text files. Can create a very large number of
-                        files, so use cautiosly!
-                        If not used, will save a master-table with coordinates,
+                        baselist. Will save a master-table with coordinates,
                         their enrichments and cornerCV, which is reflective of
                         noisiness""")
+    parser.add_argument("--save_all", action='store_true', default=False,
+                        required=False,
+                        help="""If by-window, save all individual pile-ups in a
+                        separate json file""")
     parser.add_argument("--local", action='store_true', default=False,
                         required=False,
                         help="""Create local pileups, i.e. along the
@@ -602,11 +601,16 @@ if __name__ == "__main__":
 
     c = cooler.Cooler(args.coolfile)
 
-    if not os.path.isfile(args.baselist):
+    if not os.path.isfile(args.baselist) and args.baselist != '-':
         raise FileExistsError("Loop(base) coordinate file doesn't exist")
 
     coolname = args.coolfile.split('::')[0].split('/')[-1].split('.')[0]
-    bedname = args.baselist.split('/')[-1].split('.bed')[0].split('_mm9')[0].split('_mm10')[0]
+    if args.baselist != '-':
+        bedname = args.baselist.split('/')[-1].split('.bed')[0].split('_mm9')[0].split('_mm10')[0]
+    else:
+        bedname = 'stdin'
+        import sys
+        args.baselist = sys.stdin
     if args.expected is not None:
         if args.nshifts > 0:
             warnings.warn('With specified expected will not use controls')
