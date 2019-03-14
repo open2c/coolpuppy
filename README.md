@@ -22,8 +22,21 @@ What's not shown here is normalization to the expected values. This can be done 
 # Getting started
 
 ## Installation
+All requirements apart from `mirlylib` are available from PyPI or conda. For `mirnylib`, do
 
-`pip install coolpuppy` (or `pip install https://github.com/Phlya/coolpuppy/archive/master.zip` to get the latest version from GitHub) , will make `coolpup.py` callable in your terminal, and importable in python as `coolpup`.
+`pip install https://bitbucket.org/mirnylab/mirnylib/get/tip.tar.gz`
+
+or follow more detailed instructions here: https://bitbucket.org/mirnylab/mirnylib
+
+For coolpuppy (and other dependencies) simply do:
+
+`pip install coolpuppy`
+
+or
+
+`pip install https://github.com/Phlya/coolpuppy/archive/master.zip`
+
+to get the latest version from GitHub. This will make `coolpup.py` callable in your terminal, and importable in python as `coolpup`.
 
 ## Usage
 
