@@ -47,7 +47,8 @@ positional arguments:
                         which intersections to pile-up. Alternatively, a
                         6-column double-bed file (i.e.
                         chr1,start1,end1,chr2,start2,end2) with coordinates of
-                        centers of windows that will be piled-up
+                        centers of windows that will be piled-up. Can be piped
+                        in via stdin, then use "-".
 
 optional arguments:
   -h, --help            show this help message and exit
