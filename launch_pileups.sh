@@ -9,4 +9,4 @@
 #$ -V
 
 # args: coolfile baselist outdir
-python3 coolpup.py $1 $2 --n_proc 4 --outdir $3
+coolpup.py $1 $2 --n_proc 4 --outdir $3
