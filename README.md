@@ -29,7 +29,10 @@ What's not shown here is normalization to the expected values. This can be done 
 ## Installation
 All requirements apart from `mirlylib` are available from PyPI or conda. For `mirnylib`, do
 
-`pip install https://bitbucket.org/mirnylab/mirnylib/get/tip.tar.gz`
+```
+pip install Cython
+pip install https://bitbucket.org/mirnylab/mirnylib/get/tip.tar.gz
+```
 
 or follow more detailed instructions here: https://bitbucket.org/mirnylab/mirnylib
 
