@@ -7,7 +7,12 @@
 
 A versatile tool to perform pile-up analysis on Hi-C data in .cool format (https://github.com/mirnylab/cooler). And who doesn't like cool pupppies?
 
-.cool is a modern and flexible (and the best, in my opinion) format to store Hi-C data. It uses HDF5 to store sparse a representation of the Hi-C data, which allows low memory requirements when dealing with high resolution datasets. Another popular format to store Hi-C data, .hic, can be converted into .cool files using `hic2cool` (https://github.com/4dn-dcic/hic2cool).
+.cool is a modern and flexible (and the best, in my opinion) format to store Hi-C data. 
+It uses HDF5 to store sparse a representation of the Hi-C data, which allows low memory requirements when dealing with high resolution datasets. Another popular format to store Hi-C data, .hic, can be converted into .cool files using `hic2cool` (https://github.com/4dn-dcic/hic2cool).
+
+See for details:
+
+Abdennur, N., and Mirny, L. (2019). Cooler: scalable storage for Hi-C data and other genomically-labeled arrays. BioRxiv, 557660. doi: [10.1101/557660](https://doi.org/10.1101/557660)
 
 ## What are pileups?
 
