@@ -21,17 +21,16 @@ import os
 from natsort import index_natsorted, order_by_index
 from scipy import sparse
 from scipy.linalg import toeplitz
-from mirnylib import numutils
+from cooltools import numutils
 import warnings
-from scipy import ndimage
 
 def cornerCV(amap, i=4):
     corners = np.concatenate((amap[0:i, 0:i], amap[-i:, -i:]))
     corners = corners[np.isfinite(corners)]
     return np.std(corners)/np.mean(corners)
 
-def normCis(amap, i=3):
-    return amap/np.nanmean((amap[0:i, 0:i]+amap[-i:, -i:]))*2
+#def normCis(amap, i=3):
+#    return amap/np.nanmean((amap[0:i, 0:i]+amap[-i:, -i:]))*2
 
 def get_enrichment(amap, n):
     c = int(np.floor(amap.shape[0]/2))
@@ -137,8 +136,6 @@ def get_data(chrom, c, unbalanced, local):
         data = sparse.triu(data, 2).tocsr()
     return data
 
-zoom_function = partial(ndimage.zoom, order=1)
-
 def _do_pileups(mids, data, binsize, pad, expected, mindist, maxdist, local,
                 unbalanced, cov_norm, rescale, rescale_pad, rescale_size,
                 coverage, anchor):
@@ -187,8 +184,7 @@ def _do_pileups(mids, data, binsize, pad, expected, mindist, maxdist, local,
                     newmap = np.zeros((rescale_size, rescale_size))
                 else:
                     newmap = numutils.zoomArray(newmap, (rescale_size,
-                                                         rescale_size),
-                                                zoomFunction=zoom_function)
+                                                         rescale_size))
             if rot_flip:
                 newmap = np.rot90(np.flipud(newmap), -1)
             elif flip_rot:
@@ -203,11 +199,9 @@ def _do_pileups(mids, data, binsize, pad, expected, mindist, maxdist, local,
                     if len(new_cov_end)==0:
                         new_cov_end = np.zeros(rescale_size)
                     new_cov_start = numutils.zoomArray(new_cov_start,
-                                                       (rescale_size,),
-                                                    zoomFunction=zoom_function)
+                                                       (rescale_size,))
                     new_cov_end = numutils.zoomArray(new_cov_end,
-                                                     (rescale_size,),
-                                                    zoomFunction=zoom_function)
+                                                     (rescale_size,))
                 else:
                     l = len(new_cov_start)
                     r = len(new_cov_end)
