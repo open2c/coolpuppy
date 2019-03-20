@@ -27,14 +27,11 @@ What's not shown here is normalization to the expected values. This can be done 
 # Getting started
 
 ## Installation
-All requirements apart from `mirlylib` are available from PyPI or conda. For `mirnylib`, do
+All requirements apart from `cooltools` are available from PyPI or conda. For `cooltools`, do
 
 ```
-pip install Cython
-pip install https://bitbucket.org/mirnylab/mirnylib/get/tip.tar.gz
+pip install https://github.com/mirnylab/cooltools/archive/master.zip
 ```
-
-or follow more detailed instructions here: https://bitbucket.org/mirnylab/mirnylib
 
 For coolpuppy (and other dependencies) simply do:
 
