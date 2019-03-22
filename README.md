@@ -29,9 +29,9 @@ What's not shown here is normalization to the expected values. This can be done 
 ## Installation
 All requirements apart from `cooltools` are available from PyPI or conda. For `cooltools`, do
 
-```
+`
 pip install https://github.com/mirnylab/cooltools/archive/master.zip
-```
+`
 
 For coolpuppy (and other dependencies) simply do:
 
@@ -130,10 +130,20 @@ optional arguments:
 
 Currently, `coolpup.py` doesn't support inter-chromosomal pileups, but this is an addition that is planned for the future.
 
+## Citing coolpup.py
+
+Until it has been published in a peer-reviewed journal, please cite our preprint
+
+**Coolpup.py - a versatile tool to perform pile-up analysis of Hi-C data**
+
+Ilya M. Flyamer, Robert S. Illingworth, Wendy A. Bickmore
+
+https://www.biorxiv.org/content/10.1101/586537v1
+
 ## This tool has been used in the following publications
 
 **DNA methylation directs polycomb-dependent 3D genome re- organisation in naive pluripotency**
 
 Katy A McLaughlin, Ilya M Flyamer, John P Thomson, Heidi K Mjoseng, Ruchi Shukla, Iain Williamson, Graeme R Grimes, Robert S Illingworth, Ian R Adams, Sari Pennings, Richard R Meehan, Wendy A Bickmore
 
-https://www.biorxiv.org/content/early/2019/01/22/527309
+https://www.biorxiv.org/content/10.1101/527309v1
