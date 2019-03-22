@@ -22,7 +22,6 @@ from natsort import index_natsorted, order_by_index
 from scipy import sparse
 from scipy.linalg import toeplitz
 from cooltools import numutils
-import warnings
 
 def cornerCV(amap, i=4):
     corners = np.concatenate((amap[0:i, 0:i], amap[-i:, -i:]))
@@ -128,7 +127,7 @@ def make_outmap(pad, rescale=False, rescale_size=41):
         return np.zeros((2*pad + 1, 2*pad + 1))
 
 def get_data(chrom, c, unbalanced, local):
-    print('Loading data')
+    logging.debug('Loading data')
     data = c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom)
     if local:
         data = data.tocsr()
@@ -205,13 +204,10 @@ def _do_pileups(mids, data, binsize, pad, expected, mindist, maxdist, local,
                 else:
                     l = len(new_cov_start)
                     r = len(new_cov_end)
-                    try:
-                        new_cov_start = np.pad(new_cov_start, (mymap.shape[0]-l, 0),
-                                                           'constant')
-                        new_cov_end = np.pad(new_cov_end,
-                                         (0, mymap.shape[1]-r), 'constant')
-                    except:
-                        print(l, r)
+                    new_cov_start = np.pad(new_cov_start, (mymap.shape[0]-l, 0),
+                                                       'constant')
+                    new_cov_end = np.pad(new_cov_end,
+                                     (0, mymap.shape[1]-r), 'constant')
                 cov_start += np.nan_to_num(new_cov_start)
                 cov_end += +np.nan_to_num(new_cov_end)
             n += 1
@@ -232,13 +228,13 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
     cov_end = np.zeros(mymap.shape[1])
 
     if not len(mids) > 1:
-        print('Nothing to sum up in chromosome %s' % chrom)
+        logging.info('Nothing to sum up in chromosome %s' % chrom)
         return make_outmap(pad, rescale, rescale_size), 0, cov_start, cov_end
 
     if expected is not False:
         data = False
         expected = expected[expected['chrom']==chrom]['balanced.avg'].values
-        print('Doing expected')
+        logging.info('Doing expected')
     else:
         data = get_data(chrom, c, unbalanced, local)
 
@@ -251,7 +247,7 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
     if anchor:
         assert chrom==anchor[0]
 #        anchor_bin = (anchor[1]+anchor[2])/2//c.binsize
-        print(anchor)
+        logging.info('Anchor: %s:%s-%s' % anchor)
     else:
         anchor = None
 
@@ -286,7 +282,7 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
                                                rescale_pad=rescale_pad,
                                                rescale_size=rescale_size,
                                                anchor=anchor)
-    print(chrom, n)
+    logging.info(chrom, n)
     return mymap, n, cov_start, cov_end
 
 def chrom_mids(chroms, mids, combinations):
@@ -332,7 +328,7 @@ def pileupsWithControl(mids, filename, pad=100, nproc=1, chroms=None,
         cov_end = np.sum(cov_starts, axis=0)
         loop = norm_coverage(loop, cov_start, cov_end)
     loop /= n
-    print('Total number of piled up windows: %s' % n)
+    logging.info('Total number of piled up windows: %s' % n)
     #Controls
     if nshifts>0:
         chrommids = chrom_mids(chroms, mids, combinations)
@@ -380,7 +376,7 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
     if expected is not False:
         data = False
         expected = np.nan_to_num(expected[expected['chrom']==chrom]['balanced.avg'].values)
-        print('Doing expected')
+        logging.info('Doing expected')
     else:
         data = get_data(chrom, c, unbalanced, local=False)
 
@@ -478,6 +474,7 @@ def pileupsByWindowWithControl(mids, filename, pad=100, nproc=1, chroms=None,
 
 if __name__ == "__main__":
     import argparse
+    import logging
     parser = argparse.ArgumentParser()
     parser.add_argument("coolfile", type=str,
                         help="Cooler file with your Hi-C data")
@@ -587,7 +584,7 @@ if __name__ == "__main__":
                         generated automatically to include important
                         information.""")
     args = parser.parse_args()
-    print(args)
+    logging.info(args)
     if args.n_proc==0:
         nproc=-1
     else:
@@ -607,7 +604,7 @@ if __name__ == "__main__":
         args.baselist = sys.stdin
     if args.expected is not None:
         if args.nshifts > 0:
-            warnings.warn('With specified expected will not use controls')
+            logging.warning('With specified expected will not use controls')
             args.nshifts = 0
         if not os.path.isfile(args.expected):
             raise FileExistsError("Expected file doesn't exist")
@@ -678,8 +675,7 @@ if __name__ == "__main__":
         combinations = True
     else:
         if not np.all(bases['chr1']==bases['chr2']):
-            import warnings
-            warnings.warn("Found inter-chromosomal loci pairs, discarding them")
+            logging.warning("Found inter-chromosomal loci pairs, discarding them")
             bases = bases[bases['chr1']==bases['chr2']]
         if anchor:
             raise ValueError("Can't use anchor with both sides of loops defined")
@@ -739,7 +735,7 @@ if __name__ == "__main__":
                                       coverage normalization - please use
                                       balanced data instead""")
         if args.outname!='auto':
-            warnings.warn("Always using autonaming for by-window pileups")
+            logging.warning("Always using autonaming for by-window pileups")
 
         finloops = pileupsByWindowWithControl(mids=mids,
                                               filename=args.coolfile,
