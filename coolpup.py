@@ -583,7 +583,15 @@ if __name__ == "__main__":
                         help="""Name of the output file. If not set, is
                         generated automatically to include important
                         information.""")
+    parser.add_argument("-l", "--log", dest="logLevel",
+                        choices=['DEBUG', 'INFO', 'WARNING',
+                                 'ERROR', 'CRITICAL'],
+                        default='INFO',
+                        help="Set the logging level.")
     args = parser.parse_args()
+
+    logging.basicConfig(level=getattr(logging, args.logLevel))
+
     logging.info(args)
     if args.n_proc==0:
         nproc=-1
