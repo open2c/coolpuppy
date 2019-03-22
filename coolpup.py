@@ -282,7 +282,7 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
                                                rescale_pad=rescale_pad,
                                                rescale_size=rescale_size,
                                                anchor=anchor)
-    logging.info(chrom, n)
+    logging.info('%s: %s', (chrom, n))
     return mymap, n, cov_start, cov_end
 
 def chrom_mids(chroms, mids, combinations):
