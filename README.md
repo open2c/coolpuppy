@@ -57,6 +57,7 @@ Usage: coolpup.py [-h] [--pad PAD] [--minshift MINSHIFT] [--maxshift MAXSHIFT]
                   [--coverage_norm] [--rescale] [--rescale_pad RESCALE_PAD]
                   [--rescale_size RESCALE_SIZE] [--n_proc N_PROC]
                   [--outdir OUTDIR] [--outname OUTNAME]
+                  [-l {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
                   coolfile baselist
 
 positional arguments:
@@ -125,7 +126,8 @@ optional arguments:
   --outdir OUTDIR       Directory to save the data in
   --outname OUTNAME     Name of the output file. If not set, is generated
                         automatically to include important information.
-
+  -l {DEBUG,INFO,WARNING,ERROR,CRITICAL}, --log {DEBUG,INFO,WARNING,ERROR,CRITICAL}
+                        Set the logging level.
 ```
 
 Currently, `coolpup.py` doesn't support inter-chromosomal pileups, but this is an addition that is planned for the future.
