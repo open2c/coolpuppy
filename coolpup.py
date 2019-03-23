@@ -182,7 +182,7 @@ def _do_pileups(mids, data, binsize, pad, expected, mindist, maxdist, local,
                 if newmap.size==0:
                     newmap = np.zeros((rescale_size, rescale_size))
                 else:
-                    newmap = numutils.zoomArray(newmap, (rescale_size,
+                    newmap = numutils.zoom_array(newmap, (rescale_size,
                                                          rescale_size))
             if rot_flip:
                 newmap = np.rot90(np.flipud(newmap), -1)
@@ -197,9 +197,9 @@ def _do_pileups(mids, data, binsize, pad, expected, mindist, maxdist, local,
                         new_cov_start = np.zeros(rescale_size)
                     if len(new_cov_end)==0:
                         new_cov_end = np.zeros(rescale_size)
-                    new_cov_start = numutils.zoomArray(new_cov_start,
+                    new_cov_start = numutils.zoom_array(new_cov_start,
                                                        (rescale_size,))
-                    new_cov_end = numutils.zoomArray(new_cov_end,
+                    new_cov_end = numutils.zoom_array(new_cov_end,
                                                      (rescale_size,))
                 else:
                     l = len(new_cov_start)
