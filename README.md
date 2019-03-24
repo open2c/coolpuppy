@@ -72,62 +72,72 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   --pad PAD             Padding of the windows (i.e. final size of the matrix
-                        is 2×pad+res), in kb
+                        is 2×pad+res), in kb (default: 100)
   --minshift MINSHIFT   Shortest distance for randomly shifting coordinates
-                        when creating controls
+                        when creating controls (default: 100000)
   --maxshift MAXSHIFT   Longest distance for randomly shifting coordinates
-                        when creating controls
+                        when creating controls (default: 1000000)
   --nshifts NSHIFTS     Number of control regions per averaged window
+                        (default: 10)
   --expected EXPECTED   File with expected (output of cooltools compute-
                         expected). If None, don't use expected and use
-                        randomly shifted controls
+                        randomly shifted controls (default: None)
   --mindist MINDIST     Minimal distance of intersections to use. If not
-                        specified, uses --pad as mindist
-  --maxdist MAXDIST     Maximal distance of intersections to use
+                        specified, uses --pad as mindist (default: None)
+  --maxdist MAXDIST     Maximal distance of intersections to use (default:
+                        None)
   --minsize MINSIZE     Minimal length of features to use for local analysis
+                        (default: None)
   --maxsize MAXSIZE     Maximal length of features to use for local analysis
+                        (default: None)
   --excl_chrs EXCL_CHRS
-                        Exclude these chromosomes from analysis
+                        Exclude these chromosomes from analysis (default:
+                        chrY,chrM)
   --incl_chrs INCL_CHRS
                         Include these chromosomes; default is all. excl_chrs
-                        overrides this.
+                        overrides this. (default: all)
   --subset SUBSET       Take a random sample of the bed file - useful for
                         files with too many featuers to run as is, i.e. some
                         repetitive elements. Set to 0 or lower to keep all
-                        data.
+                        data. (default: 0)
   --anchor ANCHOR       A UCSC-style coordinate to use as an anchor to create
                         intersections with coordinates in the baselist
+                        (default: None)
   --by_window           Create a pile-up for each coordinate in the baselist.
                         Will save a master-table with coordinates, their
                         enrichments and cornerCV, which is reflective of
-                        noisiness
+                        noisiness (default: False)
   --save_all            If by-window, save all individual pile-ups in a
-                        separate json file
+                        separate json file (default: False)
   --local               Create local pileups, i.e. along the diagonal
+                        (default: False)
   --unbalanced          Do not use balanced data. Useful for single-cell Hi-C
                         data together with --coverage_norm, not recommended
-                        otherwise.
+                        otherwise. (default: False)
   --coverage_norm       If --unbalanced, also add coverage normalization based
-                        on chromosome marginals
+                        on chromosome marginals (default: False)
   --rescale             Do not use centres of features and pad, and rather use
                         the actual feature sizes and rescale pileups to the
-                        same shape and size
+                        same shape and size (default: False)
   --rescale_pad RESCALE_PAD
                         If --rescale, padding in fraction of feature length
+                        (default: 1.0)
   --rescale_size RESCALE_SIZE
                         If --rescale, this is used to determine the final size
                         of the pileup, i.e. it ill be size×size. Due to
                         technical limitation in the current implementation,
-                        has to be an odd number
+                        has to be an odd number (default: 99)
   --n_proc N_PROC       Number of processes to use. Each process works on a
                         separate chromosome, so might require quite a bit more
                         memory, although the data are always stored as sparse
-                        matrices
-  --outdir OUTDIR       Directory to save the data in
+                        matrices (default: 1)
+  --outdir OUTDIR       Directory to save the data in (default: .)
   --outname OUTNAME     Name of the output file. If not set, is generated
                         automatically to include important information.
+                        (default: auto)
   -l {DEBUG,INFO,WARNING,ERROR,CRITICAL}, --log {DEBUG,INFO,WARNING,ERROR,CRITICAL}
-                        Set the logging level.
+                        Set the logging level. (default: INFO)
+
 ```
 
 Currently, `coolpup.py` doesn't support inter-chromosomal pileups, but this is an addition that is planned for the future.
