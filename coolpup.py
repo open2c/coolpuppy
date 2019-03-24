@@ -475,7 +475,8 @@ def pileupsByWindowWithControl(mids, filename, pad=100, nproc=1, chroms=None,
 if __name__ == "__main__":
     import argparse
     import logging
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("coolfile", type=str,
                         help="Cooler file with your Hi-C data")
     parser.add_argument("baselist", type=str,
