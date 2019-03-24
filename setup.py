@@ -7,7 +7,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 
 setup(
       name='coolpuppy',
-      version='0.8.1',
+      version='0.8.2',
       scripts=['coolpup.py'],
       install_requires=['numpy', 'cooler', 'pandas', 'natsort', 'scipy',
                         'cooltools'],
