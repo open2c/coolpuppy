@@ -567,7 +567,7 @@ if __name__ == "__main__":
     parser.add_argument("--rescale_size", type=int,
                         default=99, required=False,
                         help="""If --rescale, this is used to determine the
-                        final size of the pileup, i.e. it ill be size×size. Due
+                        final size of the pileup, i.e. it will be size×size. Due
                         to technical limitation in the current implementation,
                         has to be an odd number""")
 
