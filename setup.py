@@ -11,7 +11,7 @@ setup(
       scripts=['coolpup.py'],
       install_requires=['numpy', 'cooler', 'pandas', 'natsort', 'scipy',
                         'cooltools'],
-      description='A versatile tool to perform pile-up analysis on Hi-C data in .cool format.'
+      description='A versatile tool to perform pile-up analysis on Hi-C data in .cool format.',
       long_description=long_description,
       long_description_content_type='text/markdown',
       project_urls={'Source':'https://github.com/Phlya/coolpuppy',
