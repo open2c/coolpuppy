@@ -8,7 +8,9 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 setup(
       name='coolpuppy',
       version='0.8.3',
-      scripts=['coolpup.py'],
+      packages=['coolpuppy'],
+      entry_points={
+          'console_scripts': ['coolpuppy = coolpuppy.__main__:main']},
       install_requires=['numpy', 'cooler', 'pandas', 'natsort', 'scipy',
                         'cooltools'],
       description='A versatile tool to perform pile-up analysis on Hi-C data in .cool format.',
