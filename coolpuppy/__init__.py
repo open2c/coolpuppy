@@ -1,1 +1,1 @@
-from coolpuppy import *
+from .coolpup import *

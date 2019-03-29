@@ -1,4 +1,4 @@
-from coolpuppy import *
+from .coolpup import *
 import cooler
 import pandas as pd
 import os
