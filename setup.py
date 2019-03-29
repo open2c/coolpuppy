@@ -10,7 +10,7 @@ setup(
       version='0.8.3',
       packages=['coolpuppy'],
       entry_points={
-          'console_scripts': ['coolpuppy = coolpuppy.__main__:main']},
+          'console_scripts': ['coolpup.py = coolpuppy.__main__:main']},
       install_requires=['numpy', 'cooler', 'pandas', 'natsort', 'scipy',
                         'cooltools'],
       description='A versatile tool to perform pile-up analysis on Hi-C data in .cool format.',
