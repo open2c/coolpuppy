@@ -5,6 +5,8 @@ import os
 from natsort import index_natsorted, order_by_index
 import argparse
 import logging
+import numpy as np
+from multiprocessing import Pool
 
 def main():
     parser = argparse.ArgumentParser(
