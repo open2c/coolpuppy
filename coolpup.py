@@ -480,16 +480,19 @@ if __name__ == "__main__":
     parser.add_argument("coolfile", type=str,
                         help="Cooler file with your Hi-C data")
     parser.add_argument("baselist", type=str,
-                        help="""A 3-column tab-delimited bed file with
-                        coordinates which intersections to pile-up.
-                        Alternatively, a 6-column double-bed file (i.e.
-                        chr1,start1,end1,chr2,start2,end2) with coordinates of
-                        centers of windows that will be piled-up. Can be piped
-                        in via stdin, then use "-".""")
+                        help="""A 3-column bed file or a 6-column double-bed
+                        file (i.e. chr1,start1,end1,chr2,start2,end2).
+                        Should be tab-delimited.
+                        With a bed file, will consider all cis combinations
+                        of intervals. To pileup features along the diagonal
+                        instead, use the --local argument.
+                        Can be piped in via stdin, then use "-".""")
 ##### Extra arguments
     parser.add_argument("--pad", default=100, type=int, required=False,
-                        help="""Padding of the windows (i.e. final size of the
-                        matrix is 2×pad+res), in kb""")
+                        help="""Padding of the windows around the centres of
+                        specified features (i.e. final size of the matrix is
+                        2×pad+res), in kb.
+                        Ignored with --rescale, use --rescale_pad instead.""")
 ### Control of controls
     parser.add_argument("--minshift", default=10**5, type=int, required=False,
                         help="""Shortest distance for randomly shifting
