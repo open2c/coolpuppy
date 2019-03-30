@@ -700,7 +700,10 @@ if __name__ == "__main__":
     mids = get_mids(bases, resolution=c.binsize, combinations=combinations)
     if args.subset > 0 and args.subset < len(mids):
         mids = mids.sample(args.subset)
-
+    
+    if args.outdir=='.':
+        args.outdir = os.getcwd()
+    
     if args.outname=='auto':
         outname = '%s-%sK_over_%s' % (coolname, c.binsize/1000, bedname)
         if args.nshifts>0:
