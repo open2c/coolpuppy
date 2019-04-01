@@ -41,7 +41,7 @@ or
 
 `pip install https://github.com/Phlya/coolpuppy/archive/master.zip`
 
-to get the latest version from GitHub. This will make `coolpup.py` callable in your terminal, and importable in python as `coolpup`.
+to get the latest version from GitHub. This will make `coolpup.py` callable in your terminal, and importable in python as `coolpuppy`.
 
 ## Usage
 
