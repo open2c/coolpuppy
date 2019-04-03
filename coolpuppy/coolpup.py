@@ -59,9 +59,8 @@ def get_mids(intervals, resolution, combinations=True):
                              'Bin2':mids2//resolution,
                              'Pad2':widths2/2},
                             ).drop_duplicates(['chr1', 'Mids1',
-                                      'chr2', 'Mids2']).drop_duplicates(['chr',
-                                                 'Bin1', 'Bin2']).drop(['Bin1',
-                                                         '      Bin2'], axis=1)
+                                      'chr2', 'Mids2']).drop_duplicates(['Bin1', 'Bin2']).drop(['Bin1',
+                                                         'Bin2'], axis=1)
     return mids
 
 def get_combinations(mids, res, local=False, anchor=None):
