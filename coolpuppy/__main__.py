@@ -1,4 +1,5 @@
-from .coolpup import *
+from coolpup import *
+from .plotpup import *
 import cooler
 import pandas as pd
 import os
@@ -367,5 +368,103 @@ def main():
                 pass
             np.savetxt(os.path.join(args.outdir, outname), loop)
 
-if __name__ == "__main__":
-    main()
+def plotpuppy():
+    from matplotlib.colors import LogNorm, Normalize
+    from matplotlib.ticker import FormatStrFormatter
+    import matplotlib.pyplot as plt
+    import matplotlib as mpl
+    import matplotlib.font_manager as font_manager
+    from itertools import product
+    font_path = '/usr/share/fonts/truetype/msttcorefonts/Arial.ttf'
+    font_prop = font_manager.FontProperties(fname=font_path)
+    mpl.rcParams['svg.fonttype'] = u'none'
+    mpl.rcParams['pdf.fonttype'] = 42
+
+    parser = argparse.ArgumentParser(
+                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--cmap", type=str,
+                    required=False, default='coolwarm',
+                    help="""Colourmap to use
+                    (see https://matplotlib.org/users/colormaps.html)""")
+    parser.add_argument("--symmetric", type=bool,
+                    required=False, default=True,
+                    help="""Whether to make colormap symmetric around 1, if log
+                    scale""")
+    parser.add_argument("--vmin", type=float,
+                    required=False,
+                    help="""Value for the lowest colour""")
+    parser.add_argument("--vmax", type=float,
+                    required=False,
+                    help="""Value for the highest colour""")
+    parser.add_argument("--scale", type=str, default='log',
+                    required=False, choices={"linear", "log"},
+                    help="""Whether to use linear or log scaling for mapping
+                    colours""")
+    parser.add_argument("--n_cols", type=int, default=0,
+                    required=False,
+                    help="""How many columns to use for plotting the data.
+                    If 0, automatically make the figure as square as
+                    possible""")
+    parser.add_argument('--col_names', type=str,
+                        required=False,
+                        help="""A comma separated list of column names""")
+    parser.add_argument('--row_names', type=str,
+                        required=False,
+                        help="""A comma separated list of row names""")
+#    parser.add_argument("--n_rows", type=int, default=0,
+#                    required=False,
+#                    help="""How many rows to use for plotting the data""")
+    parser.add_argument("--output", type=str,
+                    required=False, default='pup.pdf',
+                    help="""Where to save the plot""")
+    parser.add_argument("pileup_files", type=str,
+                    nargs='*',
+                    help="""All files to plot""")
+
+    args = parser.parse_args()
+
+    pups = [np.loadtxt(f) for f in args.pileup_files]
+
+    n = len(pups)
+    if args.n_cols==0:
+        n_rows, n_cols = auto_rows_cols(n)
+
+    elif args.n_cols < n:
+        n_rows = int(round(n/args.n_cols))
+        n_cols = args.n_cols
+
+    else:
+        n_cols = args.n_cols
+        n_rows = 1
+
+    f, axarr = plt.subplots(n_rows, n_cols, sharex=True, sharey=True,# similar to subplot(111)
+                            figsize=(n_cols+0.5, n_rows),
+                            dpi=300
+                            )
+    sym=False
+    if args.scale=='log':
+        norm=LogNorm
+        if args.symmetric:
+            sym=True
+    else:
+        norm=Normalize
+
+    vmin, vmax = get_min_max(pups, args.vmin, args.vmax, sym=sym)
+
+    for i, j in product(range(n_rows), range(n_cols)):
+        ax = axarr[i, j]
+        m = ax.imshow(pups[i*n_cols+(j%n_cols)], norm=norm(vmax=vmax,
+                      vmin=vmin),
+                      cmap=args.cmap)
+        ax.set_xticks([])
+        ax.set_yticks([])
+    if args.col_names is not None:
+        args.col_names = args.col_names.split(',')
+        for i, name in enumerate(args.col_names):
+            axarr[-1, i].set_xlabel(name)
+    if args.row_names is not None:
+        args.row_names = args.row_names.split(',')
+        for i, name in enumerate(args.row_names):
+            axarr[i, 0].set_ylabel(name)
+    cb = plt.colorbar(m, ax=axarr)#, format=FormatStrFormatter('%.2f'))
+    plt.savefig(args.output)
