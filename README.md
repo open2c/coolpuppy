@@ -142,6 +142,40 @@ optional arguments:
 
 Currently, `coolpup.py` doesn't support inter-chromosomal pileups, but this is an addition that is planned for the future.
 
+### Plotting results
+For flexible plotting, I suggest to use `matplotlib`. However simple plotting capabilities are included in this package. Just run `plotpup.py` with desired options and list all the output files of `coolpup.py` you'd like to plot.
+```
+Usage: plotpup.py [-h] [--cmap CMAP] [--symmetric SYMMETRIC] [--vmin VMIN]
+                  [--vmax VMAX] [--scale {log,linear}] [--n_cols N_COLS]
+                  [--col_names COL_NAMES] [--row_names ROW_NAMES]
+                  [--output OUTPUT]
+                  [pileup_files [pileup_files ...]]
+
+positional arguments:
+  pileup_files          All files to plot (default: None)
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --cmap CMAP           Colourmap to use (see
+                        https://matplotlib.org/users/colormaps.html) (default:
+                        coolwarm)
+  --symmetric SYMMETRIC
+                        Whether to make colormap symmetric around 1, if log
+                        scale (default: True)
+  --vmin VMIN           Value for the lowest colour (default: None)
+  --vmax VMAX           Value for the highest colour (default: None)
+  --scale {log,linear}  Whether to use linear or log scaling for mapping
+                        colours (default: log)
+  --n_cols N_COLS       How many columns to use for plotting the data. If 0,
+                        automatically make the figure as square as possible
+                        (default: 0)
+  --col_names COL_NAMES
+                        A comma separated list of column names (default: None)
+  --row_names ROW_NAMES
+                        A comma separated list of row names (default: None)
+  --output OUTPUT       Where to save the plot (default: pup.pdf)
+  ```
+
 ## Citing coolpup.py
 
 Until it has been published in a peer-reviewed journal, please cite our preprint
