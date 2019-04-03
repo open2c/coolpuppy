@@ -439,7 +439,7 @@ def plotpuppy():
 
     f, axarr = plt.subplots(n_rows, n_cols, sharex=True, sharey=True,# similar to subplot(111)
                             figsize=(n_cols+0.5, n_rows),
-                            dpi=300
+                            dpi=300, squeeze=False,
                             )
     sym=False
     if args.scale=='log':
