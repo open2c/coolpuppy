@@ -309,26 +309,6 @@ def main():
             import json
             with open(os.path.join(args.outdir, outname)[:-4] + '.json', 'w') as fp:
                 json.dump(outdict, fp)#, sort_keys=True, indent=4)
-        
-        global prepare_single
-
-        def prepare_single(item, outname=outname):
-            key, amap = item
-#            coords = (key[0], int(key[1]), int(key[2]))
-            enr1 = get_enrichment(amap, 1)
-            enr3 = get_enrichment(amap, 3)
-            cv3 = cornerCV(amap, 3)
-            cv5 = cornerCV(amap, 5)
-#            if args.save_all:
-#                outname = outname + '_%s:%s-%s.np.txt' % coords
-#                try:
-#                    np.savetxt(os.path.join(args.outdir, 'individual', outname),
-#                               amap)
-#                except FileNotFoundError:
-#                    os.mkdir(os.path.join(args.outdir, 'individual'))
-#                    np.savetxt(os.path.join(args.outdir, 'individual', outname),
-#                               amap)
-            return list(key)+[enr1, enr3, cv3, cv5]
 
         p = Pool(nproc)
         data = p.map(prepare_single, finloops.items())
