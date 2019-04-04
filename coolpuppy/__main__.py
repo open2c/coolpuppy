@@ -1,6 +1,5 @@
 from .coolpup import *
 from .plotpup import *
-from coolpuppy import *
 import cooler
 import pandas as pd
 import os
@@ -309,7 +308,7 @@ def main():
             import json
             with open(os.path.join(args.outdir, outname)[:-4] + '.json', 'w') as fp:
                 json.dump(outdict, fp)#, sort_keys=True, indent=4)
-
+        global prepare_single
         def prepare_single(item, outname=outname):
             key, amap = item
 #            coords = (key[0], int(key[1]), int(key[2]))
