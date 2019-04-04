@@ -60,7 +60,6 @@ def get_mids(intervals, resolution, combinations=True):
                              'Pad2':widths2/2},
                             ).drop_duplicates(['chr1', 'chr2',
                                 'Bin1', 'Bin2'])#.drop(['Bin1', 'Bin2'], axis=1)
->>>>>>> fix column names in get_mids
     return mids
 
 def get_combinations(mids, res, local=False, anchor=None):

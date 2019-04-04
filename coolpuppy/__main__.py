@@ -1,5 +1,6 @@
 from .coolpup import *
 from .plotpup import *
+from coolpuppy import *
 import cooler
 import pandas as pd
 import os
