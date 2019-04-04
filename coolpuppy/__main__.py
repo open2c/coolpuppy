@@ -1,4 +1,4 @@
-from coolpup import *
+from .coolpup import *
 from .plotpup import *
 from coolpuppy import *
 import cooler
@@ -438,9 +438,24 @@ def plotpuppy():
         n_cols = args.n_cols
         n_rows = 1
 
+    if args.col_names is not None:
+        args.col_names = args.col_names.split(',')
+
+    if args.row_names is not None:
+        args.row_names = args.row_names.split(',')
+
+
+    if n_cols != len(args.col_names):
+        raise ValueError("""Number of column names is not equal to number of\
+                         columns!""")
+    if n_rows != len(args.row_names):
+        raise ValueError("""Number of row names is not equal to number of\
+                         rows!""")
+
     f, axarr = plt.subplots(n_rows, n_cols, sharex=True, sharey=True,# similar to subplot(111)
                             figsize=(n_cols+0.5, n_rows),
                             dpi=300, squeeze=False,
+                            constrained_layout=True
                             )
     sym=False
     if args.scale=='log':
@@ -454,18 +469,19 @@ def plotpuppy():
 
     for i, j in product(range(n_rows), range(n_cols)):
         ax = axarr[i, j]
-        m = ax.imshow(pups[i*n_cols+(j%n_cols)], norm=norm(vmax=vmax,
-                      vmin=vmin),
+        m = ax.imshow(pups[i*n_cols+(j%n_cols)],
+                      norm=norm(vmax=vmax, vmin=vmin),
                       cmap=args.cmap)
         ax.set_xticks([])
         ax.set_yticks([])
-    if args.col_names is not None:
-        args.col_names = args.col_names.split(',')
-        for i, name in enumerate(args.col_names):
-            axarr[-1, i].set_xlabel(name)
-    if args.row_names is not None:
-        args.row_names = args.row_names.split(',')
-        for i, name in enumerate(args.row_names):
-            axarr[i, 0].set_ylabel(name)
-    cb = plt.colorbar(m, ax=axarr)#, format=FormatStrFormatter('%.2f'))
+
+    for i, name in enumerate(args.col_names):
+        axarr[-1, i].set_xlabel(name)
+
+    for i, name in enumerate(args.row_names):
+        axarr[i, 0].set_ylabel(name)
+
+    cb = plt.colorbar(m, ax=axarr, fraction=0.046, pad=0.05)#, format=FormatStrFormatter('%.2f'))
+#    if sym:
+#        cb.ax.yaxis.set_ticks([vmin, 1, vmax])
     plt.savefig(args.output)

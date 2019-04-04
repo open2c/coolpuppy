@@ -40,9 +40,9 @@ def get_mids(intervals, resolution, combinations=True):
         mids = np.round((intervals['end']+intervals['start'])/2).astype(int)
         widths = np.round((intervals['end']-intervals['start'])).astype(int)
         mids = pd.DataFrame({'chr':intervals['chr'],
-                             'Mids':mids,
+#                             'Mids':mids,
                              'Bin':mids//resolution,
-                             'Pad':widths/2}).drop_duplicates(['chr', 'Bin']).drop('Bin', axis=1)
+                             'Pad':widths/2}).drop_duplicates(['chr', 'Bin'])#.drop('Bin', axis=1)
     else:
         intervals = intervals.sort_values(['chr1', 'chr2',
                                            'start1', 'start2'])
@@ -51,22 +51,21 @@ def get_mids(intervals, resolution, combinations=True):
         mids2 = np.round((intervals['end2']+intervals['start2'])/2).astype(int)
         widths2 = np.round((intervals['end2']-intervals['start2'])).astype(int)
         mids = pd.DataFrame({'chr1':intervals['chr1'],
-                             'Mids1':mids1,
+#                             'Mids1':mids1,
                              'Bin1':mids1//resolution,
                              'Pad1':widths1/2,
                              'chr2':intervals['chr2'],
-                             'Mids2':mids2,
+#                             'Mids2':mids2,
                              'Bin2':mids2//resolution,
                              'Pad2':widths2/2},
-                            ).drop_duplicates(['chr1', 'Mids1',
-                                      'chr2', 'Mids2']).drop_duplicates(['Bin1', 'Bin2']).drop(['Bin1',
-                                                         'Bin2'], axis=1)
+                            ).drop_duplicates(['chr1', 'chr2',
+                                'Bin1', 'Bin2'])#.drop(['Bin1', 'Bin2'], axis=1)
     return mids
 
 def get_combinations(mids, res, local=False, anchor=None):
     if local and anchor:
         raise ValueError("Can't have a local pileup with an anchor")
-    m = (mids['Mids']//res).values.astype(int)
+    m = mids['Bin'].values.astype(int)
     p = (mids['Pad']//res).values.astype(int)
     if local:
         for i, pi in zip(m, p):
@@ -82,8 +81,8 @@ def get_combinations(mids, res, local=False, anchor=None):
             yield list(i)+list(j)
 
 def get_positions_pairs(mids, res):
-    m1 = (mids['Mids1']//res).astype(int).values
-    m2 = (mids['Mids2']//res).astype(int).values
+    m1 = mids['Bin1'].astype(int).values
+    m2 = mids['Bin2'].astype(int).values
     p1 = (mids['Pad1']//res).astype(int).values
     p2 = (mids['Pad2']//res).astype(int).values
     for posdata in zip(m1, m2, p1, p2):
@@ -389,7 +388,7 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
     if not len(curmids) > 1:
 #        mymap.fill(np.nan)
         return mymaps
-    for i, (m, p) in curmids[['Mids', 'Pad']].astype(int).iterrows():
+    for i, (m, p) in curmids[['Bin', 'Pad']].astype(int).iterrows():
         if ctrl:
             current = controlRegions(get_combinations(curmids, c.binsize,
                                                     anchor=(chrom, m, m)),
