@@ -1,4 +1,4 @@
-from coolpup import *
+from .coolpup import *
 from .plotpup import *
 import cooler
 import pandas as pd
