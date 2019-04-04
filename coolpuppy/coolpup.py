@@ -87,6 +87,14 @@ def get_positions_pairs(mids, res):
     p2 = (mids['Pad2']//res).astype(int).values
     for posdata in zip(m1, m2, p1, p2):
         yield posdata
+    
+def prepare_single(item):
+    key, amap = item
+    enr1 = get_enrichment(amap, 1)
+    enr3 = get_enrichment(amap, 3)
+    cv3 = cornerCV(amap, 3)
+    cv5 = cornerCV(amap, 5)
+    return list(key)+[enr1, enr3, cv3, cv5]
 
 def controlRegions(midcombs, res, minshift=10**5, maxshift=10**6, nshifts=1):
     minbin = minshift//res
