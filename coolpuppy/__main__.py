@@ -352,6 +352,8 @@ def main():
             np.savetxt(os.path.join(args.outdir, outname), loop)
 
 def plotpuppy():
+    import matplotlib
+    matplotlib.use('Agg')
     from matplotlib.colors import LogNorm, Normalize
     from matplotlib.ticker import FormatStrFormatter
     import matplotlib.pyplot as plt
