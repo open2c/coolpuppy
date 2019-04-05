@@ -427,15 +427,15 @@ def plotpuppy():
         args.row_names = args.row_names.split(',')
 
 
-    if n_cols != len(args.col_names):
+    if args.col_names is not None and n_cols != len(args.col_names):
         raise ValueError("""Number of column names is not equal to number of\
                          columns!""")
-    if n_rows != len(args.row_names):
+    if args.row_names is not None and n_rows != len(args.row_names):
         raise ValueError("""Number of row names is not equal to number of\
                          rows!""")
 
     f, axarr = plt.subplots(n_rows, n_cols, sharex=True, sharey=True,# similar to subplot(111)
-                            figsize=(n_cols+0.5, n_rows),
+                            figsize=(max(3.5, n_cols+0.5), max(3, n_rows)),
                             dpi=300, squeeze=False,
                             constrained_layout=True
                             )
@@ -457,11 +457,12 @@ def plotpuppy():
         ax.set_xticks([])
         ax.set_yticks([])
 
-    for i, name in enumerate(args.col_names):
-        axarr[-1, i].set_xlabel(name)
-
-    for i, name in enumerate(args.row_names):
-        axarr[i, 0].set_ylabel(name)
+    if args.col_names is not None:
+        for i, name in enumerate(args.col_names):
+            axarr[-1, i].set_xlabel(name)
+    if args.row_names is not None:
+        for i, name in enumerate(args.row_names):
+            axarr[i, 0].set_ylabel(name)
 
     cb = plt.colorbar(m, ax=axarr, fraction=0.046, pad=0.05)#, format=FormatStrFormatter('%.2f'))
 #    if sym:
