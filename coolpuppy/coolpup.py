@@ -397,6 +397,7 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
 #        mymap.fill(np.nan)
         return mymaps
     for i, (m, p) in curmids[['Bin', 'Pad']].astype(int).iterrows():
+        m *= c.binsize
         if ctrl:
             current = controlRegions(get_combinations(curmids, c.binsize,
                                                     anchor=(chrom, m, m)),
