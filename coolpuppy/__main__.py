@@ -305,7 +305,8 @@ def main():
                                               rescale_pad=args.rescale_pad,
                                               rescale_size=args.rescale_size)
         if args.save_all:
-            outdict = {'%s:%s-%s' % key : val.tolist() for key,val in finloops.items()}
+            outdict = {'%s:%s-%s' % key : (val[0], val[1].tolist())
+                                               for key,val in finloops.items()}
             import json
             with open(os.path.join(args.outdir, outname)[:-4] + '.json', 'w') as fp:
                 json.dump(outdict, fp)#, sort_keys=True, indent=4)
@@ -313,8 +314,9 @@ def main():
         p = Pool(nproc)
         data = p.map(prepare_single, finloops.items())
         p.close()
-        data = pd.DataFrame(data, columns=['chr', 'start', 'end',
-                                           'Enrichment1', 'Enrichment3', 'CV3', 'CV5'])
+        data = pd.DataFrame(data, columns=['chr', 'start', 'end', 'N',
+                                           'Enrichment1', 'Enrichment3',
+                                           'CV3', 'CV5'])
         data = data.reindex(index=order_by_index(data.index,
                                         index_natsorted(zip(data['chr'],
                                                               data['start']))))

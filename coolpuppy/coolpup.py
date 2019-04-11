@@ -40,7 +40,7 @@ def get_mids(intervals, resolution, combinations=True):
         mids = np.round((intervals['end']+intervals['start'])/2).astype(int)
         widths = np.round((intervals['end']-intervals['start'])).astype(int)
         mids = pd.DataFrame({'chr':intervals['chr'],
-#                             'Mids':mids,
+                             'Mids':mids,
                              'Bin':mids//resolution,
                              'Pad':widths/2}).drop_duplicates(['chr', 'Bin'])#.drop('Bin', axis=1)
     else:
@@ -51,11 +51,11 @@ def get_mids(intervals, resolution, combinations=True):
         mids2 = np.round((intervals['end2']+intervals['start2'])/2).astype(int)
         widths2 = np.round((intervals['end2']-intervals['start2'])).astype(int)
         mids = pd.DataFrame({'chr1':intervals['chr1'],
-#                             'Mids1':mids1,
+                             'Mids1':mids1,
                              'Bin1':mids1//resolution,
                              'Pad1':widths1/2,
                              'chr2':intervals['chr2'],
-#                             'Mids2':mids2,
+                             'Mids2':mids2,
                              'Bin2':mids2//resolution,
                              'Pad2':widths2/2},
                             ).drop_duplicates(['chr1', 'chr2',
@@ -87,14 +87,14 @@ def get_positions_pairs(mids, res):
     p2 = (mids['Pad2']//res).astype(int).values
     for posdata in zip(m1, m2, p1, p2):
         yield posdata
-    
+
 def prepare_single(item):
-    key, amap = item
+    key, (n, amap) = item
     enr1 = get_enrichment(amap, 1)
     enr3 = get_enrichment(amap, 3)
     cv3 = cornerCV(amap, 3)
     cv5 = cornerCV(amap, 5)
-    return list(key)+[enr1, enr3, cv3, cv5]
+    return list(key)+[n, enr1, enr3, cv3, cv5]
 
 def controlRegions(midcombs, res, minshift=10**5, maxshift=10**6, nshifts=1):
     minbin = minshift//res
@@ -396,8 +396,7 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
     if not len(curmids) > 1:
 #        mymap.fill(np.nan)
         return mymaps
-    for i, (m, p) in curmids[['Bin', 'Pad']].astype(int).iterrows():
-        m *= c.binsize
+    for i, (b, m, p) in curmids[['Bin', 'Mids', 'Pad']].astype(int).iterrows():
         if ctrl:
             current = controlRegions(get_combinations(curmids, c.binsize,
                                                     anchor=(chrom, m, m)),
@@ -422,7 +421,7 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
             mymap = mymap/n
         else:
             mymap = make_outmap(pad, rescale, rescale_pad)
-        mymaps[(m-p, m+p)] = mymap
+        mymaps[(m-p, m+p)] = n, mymap
     return mymaps
 
 def pileupsByWindowWithControl(mids, filename, pad=100, nproc=1, chroms=None,
@@ -475,5 +474,5 @@ def pileupsByWindowWithControl(mids, filename, pad=100, nproc=1, chroms=None,
     finloops = {}
     for chrom in loops.keys():
         for pos, lp in loops[chrom].items():
-            finloops[(chrom, pos[0], pos[1])] = lp/ctrls[chrom][pos]
+            finloops[(chrom, pos[0], pos[1])] = lp[0], lp[1]/ctrls[chrom][pos][1]
     return finloops
