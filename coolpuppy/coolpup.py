@@ -149,13 +149,13 @@ def _do_pileups(mids, data, binsize, pad, expected, mindist, maxdist, local,
     n = 0
     for stBin, endBin, stPad, endPad in mids:
         rot_flip = False
-        flip_rot = False
+        rot = False
         if stBin > endBin:
             stBin, stPad, endBin, endPad = endBin, endPad, stBin, stPad
             if anchor is None:
                 rot_flip = True
             else:
-                flip_rot = True
+                rot = True
         if rescale:
             stPad = stPad + int(round(rescale_pad*2*stPad))
             endPad = endPad + int(round(rescale_pad*2*endPad))
@@ -191,8 +191,8 @@ def _do_pileups(mids, data, binsize, pad, expected, mindist, maxdist, local,
                                                          rescale_size))
             if rot_flip:
                 newmap = np.rot90(np.flipud(newmap), -1)
-            elif flip_rot:
-                newmap = np.flipud(np.rot90(newmap))
+            elif rot:
+                newmap = np.rot90(newmap, -1)
             mymap += np.nan_to_num(newmap)
             if unbalanced and cov_norm and expected is False:
                 new_cov_start = coverage[lo_left:hi_left]
