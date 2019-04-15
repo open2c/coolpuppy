@@ -4,7 +4,7 @@ from coolpuppy import *
 import cooler
 import pandas as pd
 import os
-from natsort import index_natsorted, order_by_index
+from natsort import index_natsorted, order_by_index, natsorted
 import argparse
 import logging
 import numpy as np
@@ -238,7 +238,9 @@ def main():
         combinations = False
         basechroms = set(bases['chr1']) | set(bases['chr2'])
 
-    if len(set(fchroms)&basechroms)==0:
+    fchroms = natsorted(list(set(fchroms)&basechroms))
+
+    if len(fchroms)==0:
         raise ValueError("""No chromosomes are in common between the coordinate
                          file/anchor and the cooler file. Are they in the same
                          format, e.g. starting with "chr"?""")
