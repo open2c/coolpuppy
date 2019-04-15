@@ -203,7 +203,6 @@ def main():
             if chrom not in args.excl_chrs.split(',') and chrom in incl_chrs:
                 fchroms.append(chrom)
 
-
     bases = pd.read_csv(args.baselist, sep='\t',
                             names=['chr1', 'start1', 'end1',
                                    'chr2', 'start2', 'end2'],
@@ -221,6 +220,7 @@ def main():
             length = bases['end']-bases['start']
             bases = bases[(length >= args.minsize) & (length <= args.maxsize)]
         combinations = True
+        basechroms = set(bases['chr'])
     else:
         if not np.all(bases['chr1']==bases['chr2']):
             logging.warning("Found inter-chromosomal loci pairs, discarding them")
@@ -236,6 +236,13 @@ def main():
 #            raise ValueError('Some centres of right ends in the file are\
 #                             smaller than centres in the left ends')
         combinations = False
+        basechroms = set(bases['chr1']) | set(bases['chr2'])
+
+    if len(set(fchroms)&basechroms)==0:
+        raise ValueError("""No chromosomes are in common between the coordinate
+                         file/anchor and the cooler file. Are they in the same
+                         format, e.g. starting with "chr"?""")
+
     mids = get_mids(bases, resolution=c.binsize, combinations=combinations)
     if args.subset > 0 and args.subset < len(mids):
         mids = mids.sample(args.subset)
