@@ -110,7 +110,10 @@ def main():
                         to technical limitation in the current implementation,
                         has to be an odd number""")
 
-
+    parser.add_argument("--weight_name", default='weight', type=str,
+                        required=False,
+                        help="""Name of the norm to use for getting balanced
+                        data""")
     parser.add_argument("--n_proc", default=1, type=int, required=False,
                         help="""Number of processes to use. Each process works
                         on a separate chromosome, so might require quite a bit
@@ -143,6 +146,11 @@ def main():
     if not os.path.isfile(args.baselist) and args.baselist != '-':
         raise FileExistsError("Loop(base) coordinate file doesn't exist")
 
+    if args.unbalanced:
+        balance = False
+    else:
+        balance = args.weight_name
+
     coolname = args.coolfile.split('::')[0].split('/')[-1].split('.')[0]
     if args.baselist != '-':
         bedname = args.baselist.split('/')[-1].split('.bed')[0].split('_mm9')[0].split('_mm10')[0]
@@ -163,7 +171,7 @@ def main():
     pad = args.pad*1000//c.binsize
 
     if args.mindist is None:
-        mindist=pad*c.binsize
+        mindist = 2*pad*c.binsize
     else:
         mindist=args.mindist
 
@@ -290,12 +298,10 @@ def main():
             raise ValueError("Can't make local by-window pileups")
         if anchor:
             raise ValueError("Can't make by-window combinations with an anchor")
-        if args.coverage_norm:
-            raise NotImplementedError("""Can't make by-window combinations with
-                                      coverage normalization - please use
-                                      balanced data instead""")
-        if args.outname!='auto':
-            logging.warning("Always using autonaming for by-window pileups")
+#        if args.coverage_norm:
+#            raise NotImplementedError("""Can't make by-window combinations with
+#                                      coverage normalization - please use
+#                                      balanced data instead""")
 
         finloops = pileupsByWindowWithControl(mids=mids,
                                               filename=args.coolfile,
@@ -308,7 +314,7 @@ def main():
                                               expected=expected,
                                               mindist=mindist,
                                               maxdist=maxdist,
-                                              unbalanced=args.unbalanced,
+                                              balance=balance,
                                               cov_norm=args.coverage_norm,
                                               rescale=args.rescale,
                                               rescale_pad=args.rescale_pad,
@@ -348,7 +354,7 @@ def main():
                                        maxdist=maxdist,
                                        combinations=combinations,
                                        anchor=anchor,
-                                       unbalanced=args.unbalanced,
+                                       balance=balance,
                                        cov_norm=args.coverage_norm,
                                        rescale=args.rescale,
                                        rescale_pad=args.rescale_pad,
@@ -434,17 +440,18 @@ def plotpuppy():
         n_rows = 1
 
     if args.col_names is not None:
-        args.col_names = args.col_names.split(',')
+        args.col_names = args.col_names.strip(', ').split(',')
 
     if args.row_names is not None:
-        args.row_names = args.row_names.split(',')
+        args.row_names = args.row_names.strip(', ').split(',')
 
 
-    if args.col_names is not None and n_cols != len(args.col_names):
-        raise ValueError("""Number of column names is not equal to number of\
-                         columns!""")
+    if args.col_names!=None and n_cols != len(args.col_names):
+        raise ValueError("""Number of column names is not equal to number of
+                         columns! You specified %s columns and %s column
+                         names""" % (n_cols, len(args.col_names)))
     if args.row_names is not None and n_rows != len(args.row_names):
-        raise ValueError("""Number of row names is not equal to number of\
+        raise ValueError("""Number of row names is not equal to number of
                          rows!""")
 
     f, axarr = plt.subplots(n_rows, n_cols, sharex=True, sharey=True,# similar to subplot(111)
@@ -463,12 +470,16 @@ def plotpuppy():
     vmin, vmax = get_min_max(pups, args.vmin, args.vmax, sym=sym)
 
     for i, j in product(range(n_rows), range(n_cols)):
-        ax = axarr[i, j]
-        m = ax.imshow(pups[i*n_cols+(j%n_cols)],
-                      norm=norm(vmax=vmax, vmin=vmin),
-                      cmap=args.cmap)
-        ax.set_xticks([])
-        ax.set_yticks([])
+        n = i*n_cols+(j%n_cols)
+        if n<len(pups):
+            ax = axarr[i, j]
+            m = ax.imshow(pups[n],
+                          norm=norm(vmax=vmax, vmin=vmin),
+                          cmap=args.cmap)
+            ax.set_xticks([])
+            ax.set_yticks([])
+        else:
+            axarr[i, j].axis('off')
 
     if args.col_names is not None:
         for i, name in enumerate(args.col_names):

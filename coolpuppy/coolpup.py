@@ -131,9 +131,9 @@ def make_outmap(pad, rescale=False, rescale_size=41):
     else:
         return np.zeros((2*pad + 1, 2*pad + 1))
 
-def get_data(chrom, c, unbalanced, local):
+def get_data(chrom, c, balance, local):
     logging.debug('Loading data')
-    data = c.matrix(sparse=True, balance=bool(1-unbalanced)).fetch(chrom)
+    data = c.matrix(sparse=True, balance=balance).fetch(chrom)
     if local:
         data = data.tocsr()
     else:
@@ -141,7 +141,7 @@ def get_data(chrom, c, unbalanced, local):
     return data
 
 def _do_pileups(mids, data, binsize, pad, expected, mindist, maxdist, local,
-                unbalanced, cov_norm, rescale, rescale_pad, rescale_size,
+                balance, cov_norm, rescale, rescale_pad, rescale_size,
                 coverage, anchor):
     mymap = make_outmap(pad, rescale, rescale_size)
     cov_start = np.zeros(mymap.shape[0])
@@ -194,7 +194,7 @@ def _do_pileups(mids, data, binsize, pad, expected, mindist, maxdist, local,
             elif rot:
                 newmap = np.rot90(newmap, -1)
             mymap += np.nan_to_num(newmap)
-            if unbalanced and cov_norm and expected is False:
+            if cov_norm and (expected is False) and (balance is False):
                 new_cov_start = coverage[lo_left:hi_left]
                 new_cov_end = coverage[lo_right:hi_right]
                 if rescale:
@@ -224,7 +224,7 @@ def _do_pileups(mids, data, binsize, pad, expected, mindist, maxdist, local,
 def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
             minshift=10**5, maxshift=10**6, nshifts=1, expected=False,
             mindist=0, maxdist=10**9, combinations=True, anchor=None,
-            unbalanced=False, cov_norm=False,
+            balance=True, cov_norm=False,
             rescale=False, rescale_pad=50, rescale_size=41):
     chrom, mids = chrom_mids
 
@@ -238,12 +238,12 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
 
     if expected is not False:
         data = False
-        expected = expected[expected['chrom']==chrom]['balanced.avg'].values
+        expected = expected[expected['chrom']==chrom]['balanced.avg'].values #Always named like this by cooltools, irrespective of --weight-name
         logging.info('Doing expected')
     else:
-        data = get_data(chrom, c, unbalanced, local)
+        data = get_data(chrom, c, balance, local)
 
-    if unbalanced and cov_norm and expected is False:
+    if cov_norm and (expected is False) and (balance is False):
         coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0))) + \
                    np.nan_to_num(np.ravel(np.sum(data, axis=1)))
     else:
@@ -280,7 +280,7 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
                                                mindist=mindist,
                                                maxdist=maxdist,
                                                local=local,
-                                               unbalanced=unbalanced,
+                                               balance=balance,
                                                cov_norm=cov_norm,
                                                coverage=coverage,
                                                rescale=rescale,
@@ -309,7 +309,7 @@ def pileupsWithControl(mids, filename, pad=100, nproc=1, chroms=None,
                        minshift=100000, maxshift=100000, nshifts=10,
                        expected=None,
                        mindist=0, maxdist=np.inf,
-                       combinations=True, anchor=None, unbalanced=False,
+                       combinations=True, anchor=None, balance=True,
                        cov_norm=False,
                        rescale=False, rescale_pad=1, rescale_size=99):
     c = cooler.Cooler(filename)
@@ -321,7 +321,7 @@ def pileupsWithControl(mids, filename, pad=100, nproc=1, chroms=None,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                 expected=False,
                 mindist=mindist, maxdist=maxdist, combinations=combinations,
-                anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm,
+                anchor=anchor, balance=balance, cov_norm=cov_norm,
                 rescale=rescale, rescale_pad=rescale_pad,
                 rescale_size=rescale_size)
     chrommids = chrom_mids(chroms, mids, combinations)
@@ -341,7 +341,7 @@ def pileupsWithControl(mids, filename, pad=100, nproc=1, chroms=None,
                     expected=False,
                     minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                     mindist=mindist, maxdist=maxdist, combinations=combinations,
-                    anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm,
+                    anchor=anchor, balance=balance, cov_norm=cov_norm,
                     rescale=rescale, rescale_pad=rescale_pad,
                     rescale_size=rescale_size)
         ctrls, ns, cov_starts, cov_ends = list(zip(*p.map(f, chrommids)))
@@ -359,7 +359,7 @@ def pileupsWithControl(mids, filename, pad=100, nproc=1, chroms=None,
             expected=expected,
             minshift=minshift, maxshift=maxshift, nshifts=nshifts,
             mindist=mindist, maxdist=maxdist, combinations=combinations,
-            anchor=anchor, unbalanced=unbalanced, cov_norm=cov_norm,
+            anchor=anchor, balance=balance, cov_norm=cov_norm,
             rescale=rescale, rescale_pad=rescale_pad,
             rescale_size=rescale_size)
         exps, ns, cov_starts, cov_ends = list(zip(*p.map(f, chrommids)))
@@ -374,7 +374,7 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
                     minshift=10**5, maxshift=10**6, nshifts=1,
                     expected=False,
                     mindist=0, maxdist=10**9,
-                    unbalanced=False, cov_norm=False,
+                    balance=True, cov_norm=False,
                     rescale=False, rescale_pad=50, rescale_size=41):
     chrom, mids = chrom_mids
 
@@ -383,7 +383,7 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
         expected = np.nan_to_num(expected[expected['chrom']==chrom]['balanced.avg'].values)
         logging.info('Doing expected')
     else:
-        data = get_data(chrom, c, unbalanced, local=False)
+        data = get_data(chrom, c, balance, local=False)
 
 #    if unbalanced and cov_norm and expected is False:
 #        coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0))) + \
@@ -410,7 +410,7 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
                                                      mindist=mindist,
                                                      maxdist=maxdist,
                                                      local=False,
-                                                     unbalanced=unbalanced,
+                                                     balance=balance,
                                                      cov_norm=cov_norm,
                                                      rescale=rescale,
                                                      rescale_pad=rescale_pad,
@@ -428,7 +428,7 @@ def pileupsByWindowWithControl(mids, filename, pad=100, nproc=1, chroms=None,
                                minshift=100000, maxshift=100000, nshifts=10,
                                expected=None,
                                mindist=0, maxdist=np.inf,
-                               unbalanced=False,
+                               balance=True,
                                cov_norm=False,
                                rescale=False, rescale_pad=1, rescale_size=99):
     p = Pool(nproc)
@@ -439,7 +439,7 @@ def pileupsByWindowWithControl(mids, filename, pad=100, nproc=1, chroms=None,
     f = partial(pileupsByWindow, c=c, pad=pad, ctrl=False,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                 expected=False,
-                mindist=mindist, maxdist=maxdist, unbalanced=unbalanced,
+                mindist=mindist, maxdist=maxdist, balance=balance,
                 cov_norm=False,
                 rescale=rescale, rescale_pad=rescale_pad,
                 rescale_size=rescale_size)
@@ -451,7 +451,7 @@ def pileupsByWindowWithControl(mids, filename, pad=100, nproc=1, chroms=None,
         f = partial(pileupsByWindow, c=c, pad=pad, ctrl=True,
                     minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                     expected=expected,
-                    mindist=mindist, maxdist=maxdist, unbalanced=unbalanced,
+                    mindist=mindist, maxdist=maxdist, balance=balance,
                     cov_norm=cov_norm,
                     rescale=rescale, rescale_pad=rescale_pad,
                     rescale_size=rescale_size)
@@ -463,7 +463,7 @@ def pileupsByWindowWithControl(mids, filename, pad=100, nproc=1, chroms=None,
             expected=expected,
             minshift=minshift, maxshift=maxshift, nshifts=nshifts,
             mindist=mindist, maxdist=maxdist,
-            unbalanced=unbalanced, cov_norm=False,
+            balance=balance, cov_norm=False,
             rescale=rescale, rescale_pad=rescale_pad,
             rescale_size=rescale_size)
         chrommids = chrom_mids(chroms, mids, True)
