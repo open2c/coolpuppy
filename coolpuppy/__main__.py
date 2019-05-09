@@ -46,7 +46,7 @@ def main():
 ### Filtering
     parser.add_argument("--mindist", type=int, required=False,
                         help="""Minimal distance of intersections to use. If
-                        not specified, uses --pad as mindist""")
+                        not specified, uses 2*pad+2 (in bins) as mindist""")
     parser.add_argument("--maxdist", type=int, required=False,
                         help="""Maximal distance of intersections to use""")
     parser.add_argument("--minsize", type=int, required=False,
@@ -133,7 +133,8 @@ def main():
                         help="Set the logging level.")
     args = parser.parse_args()
 
-    logging.basicConfig(level=getattr(logging, args.logLevel))
+    logging.basicConfig(format='%(message)s',
+                        level=getattr(logging, args.logLevel))
 
     logging.info(args)
     if args.n_proc==0:
@@ -171,7 +172,7 @@ def main():
     pad = args.pad*1000//c.binsize
 
     if args.mindist is None:
-        mindist = 2*pad*c.binsize
+        mindist = (2*pad+2)*c.binsize
     else:
         mindist=args.mindist
 
