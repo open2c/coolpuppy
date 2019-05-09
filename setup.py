@@ -7,7 +7,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 
 setup(
       name='coolpuppy',
-      version='0.8.4',
+      version='0.8.5',
       packages=['coolpuppy'],
       entry_points={
           'console_scripts': ['coolpup.py = coolpuppy.__main__:main',
