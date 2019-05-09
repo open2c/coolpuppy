@@ -55,24 +55,26 @@ Usage: coolpup.py [-h] [--pad PAD] [--minshift MINSHIFT] [--maxshift MAXSHIFT]
                   [--incl_chrs INCL_CHRS] [--subset SUBSET] [--anchor ANCHOR]
                   [--by_window] [--save_all] [--local] [--unbalanced]
                   [--coverage_norm] [--rescale] [--rescale_pad RESCALE_PAD]
-                  [--rescale_size RESCALE_SIZE] [--n_proc N_PROC]
-                  [--outdir OUTDIR] [--outname OUTNAME]
+                  [--rescale_size RESCALE_SIZE] [--weight_name WEIGHT_NAME]
+                  [--n_proc N_PROC] [--outdir OUTDIR] [--outname OUTNAME]
                   [-l {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
                   coolfile baselist
 
 positional arguments:
   coolfile              Cooler file with your Hi-C data
-  baselist              A 3-column tab-delimited bed file with coordinates
-                        which intersections to pile-up. Alternatively, a
-                        6-column double-bed file (i.e.
-                        chr1,start1,end1,chr2,start2,end2) with coordinates of
-                        centers of windows that will be piled-up. Can be piped
-                        in via stdin, then use "-".
+  baselist              A 3-column bed file or a 6-column double-bed file
+                        (i.e. chr1,start1,end1,chr2,start2,end2). Should be
+                        tab-delimited. With a bed file, will consider all cis
+                        combinations of intervals. To pileup features along
+                        the diagonal instead, use the --local argument. Can be
+                        piped in via stdin, then use "-".
 
 optional arguments:
   -h, --help            show this help message and exit
-  --pad PAD             Padding of the windows (i.e. final size of the matrix
-                        is 2×pad+res), in kb (default: 100)
+  --pad PAD             Padding of the windows around the centres of specified
+                        features (i.e. final size of the matrix is 2×pad+res),
+                        in kb. Ignored with --rescale, use --rescale_pad
+                        instead. (default: 100)
   --minshift MINSHIFT   Shortest distance for randomly shifting coordinates
                         when creating controls (default: 100000)
   --maxshift MAXSHIFT   Longest distance for randomly shifting coordinates
@@ -83,7 +85,8 @@ optional arguments:
                         expected). If None, don't use expected and use
                         randomly shifted controls (default: None)
   --mindist MINDIST     Minimal distance of intersections to use. If not
-                        specified, uses --pad as mindist (default: None)
+                        specified, uses 2*pad+2 (in bins) as mindist (default:
+                        None)
   --maxdist MAXDIST     Maximal distance of intersections to use (default:
                         None)
   --minsize MINSIZE     Minimal length of features to use for local analysis
@@ -124,9 +127,12 @@ optional arguments:
                         (default: 1.0)
   --rescale_size RESCALE_SIZE
                         If --rescale, this is used to determine the final size
-                        of the pileup, i.e. it ill be size×size. Due to
+                        of the pileup, i.e. it will be size×size. Due to
                         technical limitation in the current implementation,
                         has to be an odd number (default: 99)
+  --weight_name WEIGHT_NAME
+                        Name of the norm to use for getting balanced data
+                        (default: weight)
   --n_proc N_PROC       Number of processes to use. Each process works on a
                         separate chromosome, so might require quite a bit more
                         memory, although the data are always stored as sparse
