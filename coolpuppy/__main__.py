@@ -152,9 +152,9 @@ def main():
     else:
         balance = args.weight_name
 
-    coolname = args.coolfile.split('::')[0].split('/')[-1].split('.')[0]
+    coolname = os.path.splitext(os.path.basename(c.filename))[0]
     if args.baselist != '-':
-        bedname = args.baselist.split('/')[-1].split('.bed')[0].split('_mm9')[0].split('_mm10')[0]
+        bedname = os.path.splitext(os.path.basename(args.baselist))[0].split('_mm9')[0].split('_mm10')[0]
     else:
         bedname = 'stdin'
         import sys
@@ -320,12 +320,6 @@ def main():
                                               rescale=args.rescale,
                                               rescale_pad=args.rescale_pad,
                                               rescale_size=args.rescale_size)
-        if args.save_all:
-            outdict = {'%s:%s-%s' % key : (val[0], val[1].tolist())
-                                               for key,val in finloops.items()}
-            import json
-            with open(os.path.join(args.outdir, outname)[:-4] + '.json', 'w') as fp:
-                json.dump(outdict, fp)#, sort_keys=True, indent=4)
 
         p = Pool(nproc)
         data = p.map(prepare_single, finloops.items())
@@ -343,6 +337,16 @@ def main():
             os.mkdir(args.outdir)
             data.to_csv(os.path.join(args.outdir, outname),
                         sep='\t', index=False)
+        finally:
+            logging.info("Saved enrichment table to %s" % os.path.join(args.outdir, outname))
+
+        if args.save_all:
+            outdict = {'%s:%s-%s' % key : (val[0], val[1].tolist())
+                                               for key,val in finloops.items()}
+            import json
+            with open(os.path.join(args.outdir, outname)[:-4] + '.json', 'w') as fp:
+                json.dump(outdict, fp)#, sort_keys=True, indent=4)
+                logging.info("Saved individual pileups to %s.json" % os.path.join(args.outdir, outname)[:-4])
     else:
         loop = pileupsWithControl(mids=mids, filename=args.coolfile,
                                        pad=pad, nproc=nproc,
@@ -368,6 +372,8 @@ def main():
             except FileExistsError:
                 pass
             np.savetxt(os.path.join(args.outdir, outname), loop)
+        finally:
+            logging.info("Saved output to %s" % os.path.join(args.outdir, outname))
 
 def plotpuppy():
     import matplotlib
