@@ -420,6 +420,12 @@ def plotpuppy():
     parser.add_argument('--row_names', type=str,
                         required=False,
                         help="""A comma separated list of row names""")
+    parser.add_argument("--enrichment", type=int,
+                    required=False, default=1,
+                    help="""Whether to show the level of enrichment in the
+                    central pixels. 0 to not show, odd positive number to
+                    define the size of the central square which values are
+                    averaged.""")
 #    parser.add_argument("--n_rows", type=int, default=0,
 #                    required=False,
 #                    help="""How many rows to use for plotting the data""")
@@ -461,6 +467,10 @@ def plotpuppy():
         raise ValueError("""Number of row names is not equal to number of
                          rows!""")
 
+    if args.enrichment %2 == 0 and args.enrichment > 0:
+        raise ValueError("""Side of the square to calculate enrichment has
+                         to be an odd number""")
+
     f, axarr = plt.subplots(n_rows, n_cols, sharex=True, sharey=True,# similar to subplot(111)
                             figsize=(max(3.5, n_cols+0.5), max(3, n_rows)),
                             dpi=300, squeeze=False,
@@ -485,6 +495,11 @@ def plotpuppy():
                           cmap=args.cmap)
             ax.set_xticks([])
             ax.set_yticks([])
+            if args.enrichment > 0:
+                enr = get_enrichment(pups[n], args.enrichment, 2)
+                ax.text(s=enr, y=0.95, x=0.05, ha='left', va='top',
+                                   size='x-small',
+                                   transform = ax.transAxes)
         else:
             axarr[i, j].axis('off')
 
