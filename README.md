@@ -152,9 +152,9 @@ Currently, `coolpup.py` doesn't support inter-chromosomal pileups, but this is a
 For flexible plotting, I suggest to use `matplotlib`. However simple plotting capabilities are included in this package. Just run `plotpup.py` with desired options and list all the output files of `coolpup.py` you'd like to plot.
 ```
 Usage: plotpup.py [-h] [--cmap CMAP] [--symmetric SYMMETRIC] [--vmin VMIN]
-                  [--vmax VMAX] [--scale {log,linear}] [--n_cols N_COLS]
+                  [--vmax VMAX] [--scale {linear,log}] [--n_cols N_COLS]
                   [--col_names COL_NAMES] [--row_names ROW_NAMES]
-                  [--output OUTPUT]
+                  [--enrichment ENRICHMENT] [--output OUTPUT]
                   [pileup_files [pileup_files ...]]
 
 positional arguments:
@@ -170,7 +170,7 @@ optional arguments:
                         scale (default: True)
   --vmin VMIN           Value for the lowest colour (default: None)
   --vmax VMAX           Value for the highest colour (default: None)
-  --scale {log,linear}  Whether to use linear or log scaling for mapping
+  --scale {linear,log}  Whether to use linear or log scaling for mapping
                         colours (default: log)
   --n_cols N_COLS       How many columns to use for plotting the data. If 0,
                         automatically make the figure as square as possible
@@ -179,6 +179,11 @@ optional arguments:
                         A comma separated list of column names (default: None)
   --row_names ROW_NAMES
                         A comma separated list of row names (default: None)
+  --enrichment ENRICHMENT
+                        Whether to show the level of enrichment in the central
+                        pixels. 0 to not show, odd positive number to define
+                        the size of the central square which values are
+                        averaged. (default: 1)
   --output OUTPUT       Where to save the plot (default: pup.pdf)
   ```
 
