@@ -380,6 +380,7 @@ def plotpuppy():
     matplotlib.use('Agg')
     from matplotlib.colors import LogNorm, Normalize
     from matplotlib.ticker import FormatStrFormatter
+    from mpl_toolkits.axes_grid1 import ImageGrid
     import matplotlib.pyplot as plt
     import matplotlib as mpl
     import matplotlib.font_manager as font_manager
@@ -420,12 +421,18 @@ def plotpuppy():
     parser.add_argument('--row_names', type=str,
                         required=False,
                         help="""A comma separated list of row names""")
+    parser.add_argument("--norm_corners", type=int,
+                    required=False, default=0,
+                    help="""Whether to normalize pileups by their top left and
+                    bottom right corners. 0 for no normalization, positive
+                    number to define the size of the corner squares whose
+                    values are averaged""")
     parser.add_argument("--enrichment", type=int,
                     required=False, default=1,
                     help="""Whether to show the level of enrichment in the
                     central pixels. 0 to not show, odd positive number to
-                    define the size of the central square which values are
-                    averaged.""")
+                    define the size of the central square whose values are
+                    averaged""")
 #    parser.add_argument("--n_rows", type=int, default=0,
 #                    required=False,
 #                    help="""How many rows to use for plotting the data""")
@@ -439,6 +446,9 @@ def plotpuppy():
     args = parser.parse_args()
 
     pups = [np.loadtxt(f) for f in args.pileup_files]
+
+    if args.norm_corners > 0:
+        pups = [norm_cis(pup) for pup in pups]
 
     n = len(pups)
     if args.n_cols==0:
@@ -471,11 +481,25 @@ def plotpuppy():
         raise ValueError("""Side of the square to calculate enrichment has
                          to be an odd number""")
 
-    f, axarr = plt.subplots(n_rows, n_cols, sharex=True, sharey=True,# similar to subplot(111)
-                            figsize=(max(3.5, n_cols+0.5), max(3, n_rows)),
-                            dpi=300, squeeze=False,
-                            constrained_layout=True
-                            )
+    f = plt.figure(dpi=300, figsize=(max(3.5, n_cols+0.5), max(3, n_rows)))
+    grid = ImageGrid(f, 111,  share_all=False,# similar to subplot(111)
+                     nrows_ncols=(n_rows, n_cols),
+#                     direction='column',
+                     axes_pad=0.05,
+                     add_all=True,
+                     label_mode="L",
+                     cbar_location="right",
+                     cbar_mode="single",
+                     cbar_size="5%",
+                     cbar_pad="3%",
+                     )
+    axarr = np.array(grid).reshape((n_rows, n_cols))
+
+#    f, axarr = plt.subplots(n_rows, n_cols, sharex=True, sharey=True,# similar to subplot(111)
+#                            figsize=(max(3.5, n_cols+0.5), max(3, n_rows)),
+#                            dpi=300, squeeze=False,
+#                            constrained_layout=True
+#                            )
     sym=False
     if args.scale=='log':
         norm=LogNorm
@@ -510,7 +534,7 @@ def plotpuppy():
         for i, name in enumerate(args.row_names):
             axarr[i, 0].set_ylabel(name)
 
-    cb = plt.colorbar(m, ax=axarr, fraction=0.046, pad=0.05)#, format=FormatStrFormatter('%.2f'))
+    cb = plt.colorbar(m, cax=grid.cbar_axes[0])#, format=FormatStrFormatter('%.2f'))
 #    if sym:
 #        cb.ax.yaxis.set_ticks([vmin, 1, vmax])
-    plt.savefig(args.output)
+    plt.savefig(args.output, bbox_inches='tight')

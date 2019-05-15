@@ -4,7 +4,7 @@
 
 import numpy as np
 
-def normCis(amap, i=3):
+def norm_cis(amap, i=3):
     return amap/np.nanmean((amap[0:i, 0:i]+amap[-i:, -i:]))*2
 
 def get_enrichment(amap, n, dec=2):
