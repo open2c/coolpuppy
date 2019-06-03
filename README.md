@@ -7,7 +7,7 @@
 
 A versatile tool to perform pile-up analysis on Hi-C data in .cool format (https://github.com/mirnylab/cooler). And who doesn't like cool pupppies?
 
-.cool is a modern and flexible (and the best, in my opinion) format to store Hi-C data. 
+.cool is a modern and flexible (and the best, in my opinion) format to store Hi-C data.
 It uses HDF5 to store sparse a representation of the Hi-C data, which allows low memory requirements when dealing with high resolution datasets. Another popular format to store Hi-C data, .hic, can be converted into .cool files using `hic2cool` (https://github.com/4dn-dcic/hic2cool).
 
 See for details:
@@ -152,9 +152,11 @@ Currently, `coolpup.py` doesn't support inter-chromosomal pileups, but this is a
 For flexible plotting, I suggest to use `matplotlib`. However simple plotting capabilities are included in this package. Just run `plotpup.py` with desired options and list all the output files of `coolpup.py` you'd like to plot.
 ```
 Usage: plotpup.py [-h] [--cmap CMAP] [--symmetric SYMMETRIC] [--vmin VMIN]
-                  [--vmax VMAX] [--scale {linear,log}] [--n_cols N_COLS]
+                  [--vmax VMAX] [--scale {linear,log}]
+                  [--cbar_mode {edge,each,single}] [--n_cols N_COLS]
                   [--col_names COL_NAMES] [--row_names ROW_NAMES]
-                  [--enrichment ENRICHMENT] [--output OUTPUT]
+                  [--norm_corners NORM_CORNERS] [--enrichment ENRICHMENT]
+                  [--output OUTPUT]
                   [pileup_files [pileup_files ...]]
 
 positional arguments:
@@ -172,6 +174,9 @@ optional arguments:
   --vmax VMAX           Value for the highest colour (default: None)
   --scale {linear,log}  Whether to use linear or log scaling for mapping
                         colours (default: log)
+  --cbar_mode {edge,each,single}
+                        Whether to show a single colorbar, one per row or one
+                        for each subplot (default: single)
   --n_cols N_COLS       How many columns to use for plotting the data. If 0,
                         automatically make the figure as square as possible
                         (default: 0)
@@ -179,11 +184,16 @@ optional arguments:
                         A comma separated list of column names (default: None)
   --row_names ROW_NAMES
                         A comma separated list of row names (default: None)
+  --norm_corners NORM_CORNERS
+                        Whether to normalize pileups by their top left and
+                        bottom right corners. 0 for no normalization, positive
+                        number to define the size of the corner squares whose
+                        values are averaged (default: 0)
   --enrichment ENRICHMENT
                         Whether to show the level of enrichment in the central
                         pixels. 0 to not show, odd positive number to define
-                        the size of the central square which values are
-                        averaged. (default: 1)
+                        the size of the central square whose values are
+                        averaged (default: 1)
   --output OUTPUT       Where to save the plot (default: pup.pdf)
   ```
 

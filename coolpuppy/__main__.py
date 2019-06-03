@@ -410,6 +410,10 @@ def plotpuppy():
                     required=False, choices={"linear", "log"},
                     help="""Whether to use linear or log scaling for mapping
                     colours""")
+    parser.add_argument("--cbar_mode", type=str, default='single',
+                    required=False, choices={"single", "edge", "each"},
+                    help="""Whether to show a single colorbar, one per row
+                         or one for each subplot""")
     parser.add_argument("--n_cols", type=int, default=0,
                     required=False,
                     help="""How many columns to use for plotting the data.
@@ -482,14 +486,14 @@ def plotpuppy():
                          to be an odd number""")
 
     f = plt.figure(dpi=300, figsize=(max(3.5, n_cols+0.5), max(3, n_rows)))
-    grid = ImageGrid(f, 111,  share_all=False,# similar to subplot(111)
+    grid = ImageGrid(f, 111,  share_all=True,# similar to subplot(111)
                      nrows_ncols=(n_rows, n_cols),
 #                     direction='column',
                      axes_pad=0.05,
                      add_all=True,
                      label_mode="L",
                      cbar_location="right",
-                     cbar_mode="single",
+                     cbar_mode=args.cbar_mode,
                      cbar_size="5%",
                      cbar_pad="3%",
                      )
@@ -508,24 +512,46 @@ def plotpuppy():
     else:
         norm=Normalize
 
-    vmin, vmax = get_min_max(pups, args.vmin, args.vmax, sym=sym)
+    if args.cbar_mode == 'single':
+        vmin, vmax = get_min_max(pups, args.vmin, args.vmax, sym=sym)
+    elif args.cbar_mode=='edge':
+        colorscales = [get_min_max(row, args.vmin, args.vmax, sym=sym) for row in pups]
+    elif args.cbar_mode=='each':
+        grid.cbar_axes = np.asarray(grid.cbar_axes).reshape((n_rows, n_cols))
 
-    for i, j in product(range(n_rows), range(n_cols)):
-        n = i*n_cols+(j%n_cols)
-        if n<len(pups):
-            ax = axarr[i, j]
-            m = ax.imshow(pups[n],
-                          norm=norm(vmax=vmax, vmin=vmin),
-                          cmap=args.cmap)
-            ax.set_xticks([])
-            ax.set_yticks([])
-            if args.enrichment > 0:
-                enr = get_enrichment(pups[n], args.enrichment, 2)
-                ax.text(s=enr, y=0.95, x=0.05, ha='left', va='top',
-                                   size='x-small',
-                                   transform = ax.transAxes)
-        else:
-            axarr[i, j].axis('off')
+    n_grid = n_rows * n_cols
+    extra = [None for i in range(n_grid-len(pups))]
+    pups = np.asarray(pups+extra).reshape((n_rows, n_cols))
+
+
+    for i in range(n_rows):
+        if args.cbar_mode == 'edge':
+            vmin, vmax = colorscales[i]
+        for j in range(n_cols):
+#        n = i*n_cols+(j%n_cols)
+            if pups[i, j] is not None:
+                if args.cbar_mode== 'each':
+                    vmin = np.nanmin(pups[i, j])
+                    vmax = np.nanmax(pups[i, j])
+                ax = axarr[i, j]
+                m = ax.imshow(pups[i, j], interpolation='nearest',
+                              norm=norm(vmax=vmax, vmin=vmin),
+                              cmap=args.cmap,
+                              extent=(0, 1, 0, 1))
+                ax.set_xticks([])
+                ax.set_yticks([])
+                if args.enrichment > 0:
+                    enr = get_enrichment(pups[i, j], args.enrichment, 2)
+                    ax.text(s=enr, y=0.95, x=0.05, ha='left', va='top',
+                                       size='x-small',
+                                       transform = ax.transAxes)
+                if args.cbar_mode == 'each':
+                    cb = plt.colorbar(m, cax=grid.cbar_axes[i, j])
+            else:
+                axarr[i, j].axis('off')
+                grid.cbar_axes[i, j].axis('off')
+        if args.cbar_mode == 'edge':
+            cb = plt.colorbar(m, cax=grid.cbar_axes[i])
 
     if args.col_names is not None:
         for i, name in enumerate(args.col_names):
@@ -533,8 +559,8 @@ def plotpuppy():
     if args.row_names is not None:
         for i, name in enumerate(args.row_names):
             axarr[i, 0].set_ylabel(name)
-
-    cb = plt.colorbar(m, cax=grid.cbar_axes[0])#, format=FormatStrFormatter('%.2f'))
+    if args.cbar_mode == 'single':
+        cb = plt.colorbar(m, cax=grid.cbar_axes[0])#, format=FormatStrFormatter('%.2f'))
 #    if sym:
 #        cb.ax.yaxis.set_ticks([vmin, 1, vmax])
     plt.savefig(args.output, bbox_inches='tight')
