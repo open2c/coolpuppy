@@ -238,7 +238,7 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
 
     if expected is not False:
         data = False
-        expected = expected[expected['chrom']==chrom]['balanced.avg'].values #Always named like this by cooltools, irrespective of --weight-name
+        expected = np.nan_to_num(expected[expected['chrom']==chrom]['balanced.avg'].values) #Always named like this by cooltools, irrespective of --weight-name
         logging.info('Doing expected')
     else:
         data = get_data(chrom, c, balance, local)
@@ -368,6 +368,7 @@ def pileupsWithControl(mids, filename, pad=100, nproc=1, chroms=None,
         exp /= n
         loop /= exp
     p.close()
+    loop[~np.isfinite(loop)] = 0
     return loop
 
 def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
@@ -474,5 +475,7 @@ def pileupsByWindowWithControl(mids, filename, pad=100, nproc=1, chroms=None,
     finloops = {}
     for chrom in loops.keys():
         for pos, lp in loops[chrom].items():
-            finloops[(chrom, pos[0], pos[1])] = lp[0], lp[1]/ctrls[chrom][pos][1]
+            loop = lp[1]/ctrls[chrom][pos][1]
+            loop[~np.isfinite(loop)] = 0
+            finloops[(chrom, pos[0], pos[1])] = lp[0], loop
     return finloops
