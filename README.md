@@ -1,5 +1,6 @@
 # coolpup.py
 [![DOI](https://zenodo.org/badge/147190130.svg)](https://zenodo.org/badge/latestdoi/147190130)
+[![PyPI version](https://badge.fury.io/py/coolpuppy.svg)](https://badge.fury.io/py/coolpuppy)
 
 .**cool** file **p**ile-**up**s with **py**thon.
 
