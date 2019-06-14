@@ -46,7 +46,9 @@ to get the latest version from GitHub. This will make `coolpup.py` callable in y
 
 ## Usage
 
-Help message should help you get started to use the tool. It is a single command that has a lot of options and can do a lot of things!
+Some examples to get you started are available here: https://github.com/Phlya/coolpuppy/blob/master/docs/Examples.ipynb
+
+Help message should help you with the details. It is a single command that has a lot of options and can do a lot of things!
 
 ```
 Usage: coolpup.py [-h] [--pad PAD] [--minshift MINSHIFT] [--maxshift MAXSHIFT]
