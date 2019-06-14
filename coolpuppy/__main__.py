@@ -521,8 +521,13 @@ def plotpuppy():
 
     n_grid = n_rows * n_cols
     extra = [None for i in range(n_grid-len(pups))]
-    pups = np.asarray(pups+extra).reshape((n_rows, n_cols))
+    pupsarray = np.empty(n_rows*n_cols, dtype=object)
+    for i, pup in enumerate(pups+extra):
+        pupsarray[i] = pup
+    pups = pupsarray.reshape((n_rows, n_cols))
 
+
+    cbs = []
 
     for i in range(n_rows):
         if args.cbar_mode == 'edge':
@@ -546,12 +551,12 @@ def plotpuppy():
                                        size='x-small',
                                        transform = ax.transAxes)
                 if args.cbar_mode == 'each':
-                    cb = plt.colorbar(m, cax=grid.cbar_axes[i, j])
+                    cbs.append(plt.colorbar(m, cax=grid.cbar_axes[i, j]))
             else:
                 axarr[i, j].axis('off')
                 grid.cbar_axes[i, j].axis('off')
         if args.cbar_mode == 'edge':
-            cb = plt.colorbar(m, cax=grid.cbar_axes[i])
+            cbs.append(plt.colorbar(m, cax=grid.cbar_axes[i]))
 
     if args.col_names is not None:
         for i, name in enumerate(args.col_names):
@@ -560,7 +565,8 @@ def plotpuppy():
         for i, name in enumerate(args.row_names):
             axarr[i, 0].set_ylabel(name)
     if args.cbar_mode == 'single':
-        cb = plt.colorbar(m, cax=grid.cbar_axes[0])#, format=FormatStrFormatter('%.2f'))
+        cbs.append(plt.colorbar(m, cax=grid.cbar_axes[0]))#, format=FormatStrFormatter('%.2f'))
+#    plt.setp(cbs, ticks=mpl.ticker.LogLocator())
 #    if sym:
 #        cb.ax.yaxis.set_ticks([vmin, 1, vmax])
     plt.savefig(args.output, bbox_inches='tight')
