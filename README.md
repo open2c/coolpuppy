@@ -208,7 +208,7 @@ Until it has been published in a peer-reviewed journal, please cite our preprint
 
 Ilya M. Flyamer, Robert S. Illingworth, Wendy A. Bickmore
 
-https://www.biorxiv.org/content/10.1101/586537v1
+https://www.biorxiv.org/content/10.1101/586537v3
 
 ## This tool has been used in the following publications
 
