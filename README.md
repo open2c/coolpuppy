@@ -1,6 +1,7 @@
 # coolpup.py
 [![DOI](https://zenodo.org/badge/147190130.svg)](https://zenodo.org/badge/latestdoi/147190130)
 [![PyPI version](https://badge.fury.io/py/coolpuppy.svg)](https://badge.fury.io/py/coolpuppy)
+[![Build Status](https://travis-ci.org/Phlya/coolpuppy.svg?branch=master)](https://travis-ci.org/Phlya/coolpuppy)
 
 .**cool** file **p**ile-**up**s with **py**thon.
 
