@@ -212,39 +212,18 @@ def main():
             if chrom not in args.excl_chrs.split(',') and chrom in incl_chrs:
                 fchroms.append(chrom)
 
-    bases = pd.read_csv(args.baselist, sep='\t',
-                            names=['chr1', 'start1', 'end1',
-                                   'chr2', 'start2', 'end2'],
-                        index_col=False)
-    if np.all(pd.isnull(bases[['chr2', 'start2', 'end2']].values)):
-        bases = bases[['chr1', 'start1', 'end1']]
-        bases.columns = ['chr', 'start', 'end']
-        if not np.all(bases['end']>=bases['start']):
-            raise ValueError('Some ends in the file are smaller than starts')
-        if args.local:
-            if args.minsize is None:
-                args.minsize = 0
-            if args.maxsize is None:
-                args.maxsize = np.inf
-            length = bases['end']-bases['start']
-            bases = bases[(length >= args.minsize) & (length <= args.maxsize)]
-        combinations = True
+    bases = auto_read_bed(args.baselist, args.minsize, args.maxsize,
+                          args.mindist, args.maxdist, fchroms)
+
+    if len(bases.columns==3):
+        bed = True
         basechroms = set(bases['chr'])
     else:
-        if not np.all(bases['chr1']==bases['chr2']):
-            logging.warning("Found inter-chromosomal loci pairs, discarding them")
-            bases = bases[bases['chr1']==bases['chr2']]
+        bed = False
         if anchor:
             raise ValueError("Can't use anchor with both sides of loops defined")
         elif args.local:
             raise ValueError("Can't make local with both sides of loops defined")
-#        if not np.all(bases['end1']>=bases['start1']) or\
-#           not np.all(bases['end2']>=bases['start2']):
-#            raise ValueError('Some interval ends in the file are smaller than starts')
-#        if not np.all(bases[['start2', 'end2']].mean(axis=1)>=bases[['start1', 'end1']].mean(axis=1)):
-#            raise ValueError('Some centres of right ends in the file are\
-#                             smaller than centres in the left ends')
-        combinations = False
         basechroms = set(bases['chr1']) | set(bases['chr2'])
 
     fchroms = natsorted(list(set(fchroms)&basechroms))
@@ -254,7 +233,7 @@ def main():
                          file/anchor and the cooler file. Are they in the same
                          format, e.g. starting with "chr"?""")
 
-    mids = get_mids(bases, resolution=c.binsize, combinations=combinations)
+    mids = get_mids(bases, resolution=c.binsize, bed=bed)
     if args.subset > 0 and args.subset < len(mids):
         mids = mids.sample(args.subset)
 
@@ -293,7 +272,7 @@ def main():
         outname = args.outname
 
     if args.by_window:
-        if not combinations:
+        if not bed:
             raise ValueError("Can't make by-window pileups without making combinations")
         if args.local:
             raise ValueError("Can't make local by-window pileups")
@@ -357,7 +336,7 @@ def main():
                                        expected=expected,
                                        mindist=mindist,
                                        maxdist=maxdist,
-                                       combinations=combinations,
+                                       bed=bed,
                                        anchor=anchor,
                                        balance=balance,
                                        cov_norm=args.coverage_norm,
@@ -546,7 +525,7 @@ def plotpuppy():
                 ax.set_xticks([])
                 ax.set_yticks([])
                 if args.enrichment > 0:
-                    enr = get_enrichment(pups[i, j], args.enrichment, 2)
+                    enr = round(get_enrichment(pups[i, j], args.enrichment), 2)
                     ax.text(s=enr, y=0.95, x=0.05, ha='left', va='top',
                                        size='x-small',
                                        transform = ax.transAxes)

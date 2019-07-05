@@ -7,11 +7,6 @@ import numpy as np
 def norm_cis(amap, i=3):
     return amap/np.nanmean((amap[0:i, 0:i]+amap[-i:, -i:]))*2
 
-def get_enrichment(amap, n, dec=2):
-    c = int(np.floor(amap.shape[0]/2))
-    return np.round(np.nanmean(amap[c-n//2:c+n//2+1, c-n//2:c+n//2+1]),
-                    decimals=dec)
-
 def auto_rows_cols(n):
     rows = int(np.ceil(np.sqrt(n)))
     cols = int(np.ceil(n/rows))

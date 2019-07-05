@@ -1,16 +1,4 @@
-#!/usr/bin/env python
-
 # -*- coding: utf-8 -*-
-
-# Takes a cooler file and a bed file with coordinates of features, i.e. ChIP-seq
-# peaks, finds all cis intersections of the features and makes a pileup for them
-# using sparse-whole chromosome matrices (in parallel). Can also use paired bed
-# intervals, i.e. called loops. Based on Max's approach with shifted windows to
-# normalize for scaling.
-
-# Comes with a battery included - has a simple qsub launch script for an SGE
-# cluster.
-
 import numpy as np
 import cooler
 import pandas as pd
@@ -34,8 +22,82 @@ def get_enrichment(amap, n):
     c = int(np.floor(amap.shape[0]/2))
     return np.nanmean(amap[c-n//2:c+n//2+1, c-n//2:c+n//2+1])
 
-def get_mids(intervals, resolution, combinations=True):
-    if combinations:
+def filter_bed(df, minsize, maxsize, chroms):
+    length = df['end'] - df['start']
+    df = df[(length>=minsize) & (length<=maxsize)]
+    if chroms != 'all':
+        df = df[df['chr'].isin(chroms)]
+    if not np.all(df['end']>=df['start']):
+        raise ValueError('Some ends in the file are smaller than starts')
+    return df
+
+def filter_bedpe(df, mindist, maxdist, chroms):
+    mid1 = np.mean(df[['start1', 'end1']], axis=1)
+    mid2 = np.mean(df[['start2', 'end2']], axis=1)
+    length = mid2 - mid1
+    df = df[(length>=mindist) & (length<=maxdist)]
+    if chroms != 'all':
+        df = df[(df['chr1'].isin(chroms)) & (df['chr2'].isin(chroms))]
+    return df
+
+def check_bed_bedpe(df):
+    if np.any(df[['chr2', 'start2', 'end2']].isnull().all()):
+        # If the file has <6 columns, assume bed
+        return 'bed'
+    else:
+        # Else assume bedpe
+        return 'bedpe'
+
+def auto_read_bed(f, chroms='all', kind='auto', minsize=0, maxsize=np.inf,
+                                  mindist=0, maxdist=np.inf):
+    if kind == 'auto': #Guessing whether it's bed or bedpe style file
+        testdf = pd.read_csv(f, sep='\t',
+                                names=['chr1', 'start1', 'end1',
+                                       'chr2', 'start2', 'end2'],
+                            index_col=False, chunksize = 10).__next__()
+        kind = check_bed_bedpe(testdf)
+
+    if kind == 'bed':
+        filter_func = partial(filter_bed, minsize=minsize, maxsize=maxsize,
+                              chroms=chroms)
+        names = ['chr', 'start', 'end']
+    else: #bedpe
+        filter_func = partial(filter_bedpe, mindist=mindist, maxdist=maxdist,
+                              chroms=chroms)
+        names = ['chr1', 'start1', 'end1', 'chr2', 'start2', 'end2']
+
+    bases = []
+    for chunk in pd.read_csv(f, sep='\t',
+                            names=names, index_col=False, chunksize = 10**4):
+        bases.append(filter_func(chunk))
+    bases = pd.concat(bases)
+    return bases
+
+def bedpe2bed(df, ends=True, how='center'):
+    # If ends==True, will combine all coordinates from both loop ends into one bed-style df
+    # Else, will convert to long intervals covering the whole loop, for e.g. rescaled averaging
+    # how: center - take center of loop bases; inner or outer
+    if ends:
+        df1 = df[['chr1', 'start1', 'end1']]
+        df1.columns = ['chr', 'start', 'end']
+        df2 = df[['chr2', 'start2', 'end2']]
+        df2.columns = ['chr', 'start', 'end']
+        return pd.concat([df1, df2]).sort_values(['chr', 'start', 'end']).reset_index(drop=True)
+
+    if how=='center':
+        df['start'] = np.mean(df['start1'], df['end1'], axis=0)
+        df['end'] = np.mean(df['start2'], df['end2'], axis=0)
+    elif how == 'outer':
+        df = df[['chr1', 'start1', 'end2']]
+        df.columns = ['chr', 'start', 'end']
+    elif how == 'inner':
+        df = df[['chr1', 'end1', 'start2']]
+        df.columns = ['chr', 'start', 'end']
+    return df
+
+
+def get_mids(intervals, resolution, bed=True):
+    if bed:
         intervals = intervals.sort_values(['chr', 'start'])
         mids = np.round((intervals['end']+intervals['start'])/2).astype(int)
         widths = np.round((intervals['end']-intervals['start'])).astype(int)
@@ -188,7 +250,7 @@ def _do_pileups(mids, data, binsize, pad, expected, mindist, maxdist, local,
                     newmap = np.zeros((rescale_size, rescale_size))
                 else:
                     newmap = numutils.zoom_array(newmap, (rescale_size,
-                                                         rescale_size))
+                                                          rescale_size))
             if rot_flip:
                 newmap = np.rot90(np.flipud(newmap), -1)
             elif rot:
@@ -223,7 +285,7 @@ def _do_pileups(mids, data, binsize, pad, expected, mindist, maxdist, local,
 
 def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
             minshift=10**5, maxshift=10**6, nshifts=1, expected=False,
-            mindist=0, maxdist=10**9, combinations=True, anchor=None,
+            mindist=0, maxdist=10**9, bed=True, anchor=None,
             balance=True, cov_norm=False,
             rescale=False, rescale_pad=50, rescale_size=41):
     chrom, mids = chrom_mids
@@ -256,13 +318,13 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
     else:
         anchor = None
 
-    if combinations:
+    if bed:
         assert np.all(mids['chr']==chrom)
     else:
         assert np.all(mids['chr1']==chrom) & np.all(mids['chr1']==chrom)
 
     if ctrl:
-        if combinations:
+        if bed:
             mids = controlRegions(get_combinations(mids, c.binsize, local,
                                                     anchor),
                                    c.binsize, minshift, maxshift, nshifts)
@@ -270,7 +332,7 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
             mids = controlRegions(get_positions_pairs(mids, c.binsize),
                                    c.binsize, minshift, maxshift, nshifts)
     else:
-        if combinations:
+        if bed:
             mids = get_combinations(mids, c.binsize, local, anchor)
         else:
             mids = get_positions_pairs(mids, c.binsize)
@@ -290,9 +352,9 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
     logging.info('%s: %s' % (chrom, n))
     return mymap, n, cov_start, cov_end
 
-def chrom_mids(chroms, mids, combinations):
+def chrom_mids(chroms, mids, bed):
     for chrom in chroms:
-        if combinations:
+        if bed:
             yield chrom, mids[mids['chr']==chrom]
         else:
             yield chrom, mids[mids['chr1']==chrom]
@@ -309,7 +371,7 @@ def pileupsWithControl(mids, filename, pad=100, nproc=1, chroms=None,
                        minshift=100000, maxshift=100000, nshifts=10,
                        expected=None,
                        mindist=0, maxdist=np.inf,
-                       combinations=True, anchor=None, balance=True,
+                       bed=True, anchor=None, balance=True,
                        cov_norm=False,
                        rescale=False, rescale_pad=1, rescale_size=99):
     c = cooler.Cooler(filename)
@@ -320,11 +382,11 @@ def pileupsWithControl(mids, filename, pad=100, nproc=1, chroms=None,
     f = partial(pileups, c=c, pad=pad, ctrl=False, local=local,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                 expected=False,
-                mindist=mindist, maxdist=maxdist, combinations=combinations,
+                mindist=mindist, maxdist=maxdist, bed=bed,
                 anchor=anchor, balance=balance, cov_norm=cov_norm,
                 rescale=rescale, rescale_pad=rescale_pad,
                 rescale_size=rescale_size)
-    chrommids = chrom_mids(chroms, mids, combinations)
+    chrommids = chrom_mids(chroms, mids, bed)
     loops, ns, cov_starts, cov_ends = list(zip(*p.map(f, chrommids)))
     loop = np.sum(loops, axis=0)
     n = np.sum(ns)
@@ -336,11 +398,11 @@ def pileupsWithControl(mids, filename, pad=100, nproc=1, chroms=None,
     logging.info('Total number of piled up windows: %s' % n)
     #Controls
     if nshifts>0:
-        chrommids = chrom_mids(chroms, mids, combinations)
+        chrommids = chrom_mids(chroms, mids, bed)
         f = partial(pileups, c=c, pad=pad, ctrl=True, local=local,
                     expected=False,
                     minshift=minshift, maxshift=maxshift, nshifts=nshifts,
-                    mindist=mindist, maxdist=maxdist, combinations=combinations,
+                    mindist=mindist, maxdist=maxdist, bed=bed,
                     anchor=anchor, balance=balance, cov_norm=cov_norm,
                     rescale=rescale, rescale_pad=rescale_pad,
                     rescale_size=rescale_size)
@@ -354,11 +416,11 @@ def pileupsWithControl(mids, filename, pad=100, nproc=1, chroms=None,
         ctrl /= n
         loop /= ctrl
     elif expected is not False:
-        chrommids = chrom_mids(chroms, mids, combinations)
+        chrommids = chrom_mids(chroms, mids, bed)
         f = partial(pileups, c=c, pad=pad, ctrl=False, local=local,
             expected=expected,
             minshift=minshift, maxshift=maxshift, nshifts=nshifts,
-            mindist=mindist, maxdist=maxdist, combinations=combinations,
+            mindist=mindist, maxdist=maxdist, bed=bed,
             anchor=anchor, balance=balance, cov_norm=cov_norm,
             rescale=rescale, rescale_pad=rescale_pad,
             rescale_size=rescale_size)
