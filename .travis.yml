@@ -1,0 +1,12 @@
+language: python
+python:
+  - "3.5"
+  - "3.6"
+  - "3.7"
+# command to install dependencies
+install:
+  - pip install pip install https://github.com/mirnylab/cooltools/archive/master.zip
+  - pip install .
+# command to run tests
+script:
+  - pytest
