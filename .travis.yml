@@ -5,7 +5,7 @@ python:
   - "3.7"
 # command to install dependencies
 install:
-  - pip install pip install https://github.com/mirnylab/cooltools/archive/master.zip
+  - pip install https://github.com/mirnylab/cooltools/archive/master.zip
   - pip install .
 # command to run tests
 script:
