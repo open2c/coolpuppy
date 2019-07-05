@@ -368,7 +368,7 @@ def norm_coverage(loop, cov_start, cov_end):
 
 def pileupsWithControl(mids, filename, pad=100, nproc=1, chroms=None,
                        local=False,
-                       minshift=100000, maxshift=100000, nshifts=10,
+                       minshift=100000, maxshift=1000000, nshifts=10,
                        expected=None,
                        mindist=0, maxdist=np.inf,
                        bed=True, anchor=None, balance=True,
