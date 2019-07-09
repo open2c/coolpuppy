@@ -280,7 +280,7 @@ def main():
                          Alternatively, all regions might have been filtered
                          by distance/size filters.""")
 
-    mids = get_mids(bases, resolution=c.binsize, kind='bed')
+    mids = get_mids(bases, resolution=c.binsize, kind=kind)
     if args.bed2 is not None:
         mids2 = get_mids(bases2, resolution=c.binsize, kind='bed')
     else:

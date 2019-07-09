@@ -55,6 +55,7 @@ def test_get_mids():
     assert np.all(bedpe_mids['Pad2'] == [100, 1000, 50, 1000])
 
 amapbed2 = np.loadtxt('tests/Scc1-control.10000-10.0K_over_Bonev_CTCF+_vs_Bonev_CTCF-dist_210000-800000_unbalanced_covnorm.np.txt')
+
 def test_pileupsWithControl():
     np.random.seed(0)
     loops = auto_read_bed('tests/CH12_loops_Rao.bed')

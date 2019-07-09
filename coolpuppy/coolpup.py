@@ -228,10 +228,10 @@ def get_expected_matrix(left_interval, right_interval, expected, local):
     exp_hi = hi_right - lo_left
     if exp_lo < 0:
         exp_subset = expected[0:exp_hi]
-        if local:
-            exp_subset = np.pad(exp_subset, (-exp_lo, 0), mode='reflect')
-        else:
-            exp_subset = np.pad(exp_subset, (-exp_lo, 0), mode='constant')
+#        if local:
+        exp_subset = np.pad(exp_subset, (-exp_lo, 0), mode='reflect')
+#        else:
+#            exp_subset = np.pad(exp_subset, (-exp_lo, 0), mode='constant')
         i = len(exp_subset)//2
         exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
     else:
@@ -249,10 +249,10 @@ def make_outmap(pad, rescale=False, rescale_size=41):
 def get_data(chrom, c, balance, local):
     logging.debug('Loading data')
     data = c.matrix(sparse=True, balance=balance).fetch(chrom)
-    if local:
-        data = data.tocsr()
-    else:
-        data = sparse.triu(data, 2).tocsr()
+#    if local:
+    data = data.tocsr()
+#    else:
+#        data = sparse.triu(data, 2).tocsr()
     return data
 
 def _do_pileups(mids, data, binsize, pad, expected, mindist, maxdist, local,
