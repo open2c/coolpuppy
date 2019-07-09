@@ -42,11 +42,11 @@ def test_auto_read_bed():
     assert np.all(auto_read_bed('tests/test.bedpe') == bedpe)
 
 def test_get_mids():
-    bed_mids = get_mids(bed, 1000, bed=True)
+    bed_mids = get_mids(bed, 1000, kind='bed')
     assert np.all(bed_mids['Bin'] == [1, 12, 2, 1])
     assert np.all(bed_mids['Pad'] == [500, 10000, 1000, 500])
 
-    bedpe_mids = get_mids(bedpe, 1000, bed=False)
+    bedpe_mids = get_mids(bedpe, 1000, kind='bedpe')
     assert np.all(bedpe_mids['Bin1'] == [1, 21, 1, 101])
     assert np.all(bedpe_mids['Bin2'] == [3, 51, 1, 201])
     assert np.all(bedpe_mids['Pad1'] == [100, 1000, 150, 1000])
@@ -56,8 +56,8 @@ def test_get_mids():
 def test_pileupsWithControl():
     np.random.seed(0)
     loops = auto_read_bed('tests/CH12_loops_Rao.bed')
-    loopmids = get_mids(loops, resolution=10000, bed=False)
+    loopmids = get_mids(loops, resolution=10000, kind='bedpe')
     pup = pileupsWithControl(loopmids, 'tests/Scc1-control.10000.cool',
                              mindist=100000, balance=False, cov_norm=True,
-                             bed=False, pad=10)
+                             kind='bedpe', pad=10)
     assert np.allclose(pup, amap)

@@ -9,6 +9,7 @@ import argparse
 import logging
 import numpy as np
 from multiprocessing import Pool
+import sys
 
 def main():
     parser = argparse.ArgumentParser(
@@ -24,6 +25,18 @@ def main():
                         instead, use the --local argument.
                         Can be piped in via stdin, then use "-".""")
 ##### Extra arguments
+    parser.add_argument("--bed2", type=str,
+                        help="""A 3-column bed file.
+                        Should be tab-delimited.
+                        Will consider all cis combinations of intervals
+                        between baselist and bed2.""",
+                        required=False)
+    parser.add_argument("--bed2_unordered", action='store_false',
+                        dest='bed2_ordered',
+                        help="""Whether to only use baselist as left ends,
+                        and bed2 as right ends of regions.""",
+                        required=False)
+    parser.set_defaults(bed_ordered=True)
     parser.add_argument("--pad", default=100, type=int, required=False,
                         help="""Padding of the windows around the centres of
                         specified features (i.e. final size of the matrix is
@@ -154,11 +167,12 @@ def main():
 
     coolname = os.path.splitext(os.path.basename(c.filename))[0]
     if args.baselist != '-':
-        bedname = os.path.splitext(os.path.basename(args.baselist))[0].split('_mm9')[0].split('_mm10')[0]
+        bedname = os.path.splitext(os.path.basename(args.baselist))[0]
     else:
         bedname = 'stdin'
-        import sys
         args.baselist = sys.stdin
+    if args.bed2 is not None:
+        bedname += '_vs_' + os.path.splitext(os.path.basename(args.bed2))[0]
     if args.expected is not None:
         if args.nshifts > 0:
             logging.warning('With specified expected will not use controls')
@@ -177,9 +191,20 @@ def main():
         mindist=args.mindist
 
     if args.maxdist is None:
-        maxdist=np.inf
+        maxdist = np.inf
     else:
-        maxdist=args.maxdist
+        maxdist = args.maxdist
+
+    if args.minsize is None:
+        minsize = 0
+    else:
+        minsize = args.minsize
+
+    if args.maxsize is None:
+        maxsize = np.inf
+    else:
+        maxsize = args.maxsize
+
 
     if args.incl_chrs=='all':
         incl_chrs = c.chromnames
@@ -212,30 +237,58 @@ def main():
             if chrom not in args.excl_chrs.split(',') and chrom in incl_chrs:
                 fchroms.append(chrom)
 
-    bases = auto_read_bed(args.baselist, args.minsize, args.maxsize,
-                          args.mindist, args.maxdist, fchroms)
+    bases = auto_read_bed(args.baselist, kind='auto', chroms=fchroms,
+                          minsize=minsize,
+                          maxsize=maxsize,
+                          mindist=mindist,
+                          maxdist=maxdist,
+                          stdin=args.baselist==sys.stdin)
 
-    if len(bases.columns==3):
-        bed = True
+    if len(bases.columns)==3:
+        kind = 'bed'
         basechroms = set(bases['chr'])
     else:
-        bed = False
+        kind = 'bedpe'
         if anchor:
             raise ValueError("Can't use anchor with both sides of loops defined")
         elif args.local:
             raise ValueError("Can't make local with both sides of loops defined")
         basechroms = set(bases['chr1']) | set(bases['chr2'])
 
+    if args.bed2 is not None:
+        if kind != 'bed':
+            raise ValueError("""Please provide two BED files; baselist doesn't
+                             seem to be one""")
+        bases2 = auto_read_bed(args.bed2, kind='auto', chroms=fchroms,
+                          minsize=minsize,
+                          maxsize=maxsize,
+                          mindist=mindist,
+                          maxdist=maxdist,
+                          stdin=False)
+        if len(bases2.columns)>3:
+            raise ValueError("""Please provide two BED files; bed2 doesn't seem
+                             to be one""")
+        bed2chroms = set(bases['chr'])
+        basechroms = basechroms & bed2chroms
+
     fchroms = natsorted(list(set(fchroms)&basechroms))
 
     if len(fchroms)==0:
         raise ValueError("""No chromosomes are in common between the coordinate
                          file/anchor and the cooler file. Are they in the same
-                         format, e.g. starting with "chr"?""")
+                         format, e.g. starting with "chr"?
+                         Alternatively, all regions might have been filtered
+                         by distance/size filters.""")
 
-    mids = get_mids(bases, resolution=c.binsize, bed=bed)
+    mids = get_mids(bases, resolution=c.binsize, kind='bed')
+    if args.bed2 is not None:
+        mids2 = get_mids(bases2, resolution=c.binsize, kind='bed')
+    else:
+        mids2 = None
     if args.subset > 0 and args.subset < len(mids):
         mids = mids.sample(args.subset)
+        if args.bed2 is not None:
+            mids2 = mids2.sample(args.subset)
 
     if args.outdir=='.':
         args.outdir = os.getcwd()
@@ -272,7 +325,7 @@ def main():
         outname = args.outname
 
     if args.by_window:
-        if not bed:
+        if kind != 'bed':
             raise ValueError("Can't make by-window pileups without making combinations")
         if args.local:
             raise ValueError("Can't make local by-window pileups")
@@ -327,22 +380,24 @@ def main():
                 json.dump(outdict, fp)#, sort_keys=True, indent=4)
                 logging.info("Saved individual pileups to %s.json" % os.path.join(args.outdir, outname)[:-4])
     else:
-        loop = pileupsWithControl(mids=mids, filename=args.coolfile,
-                                       pad=pad, nproc=nproc,
-                                       chroms=fchroms, local=args.local,
-                                       minshift=args.minshift,
-                                       maxshift=args.maxshift,
-                                       nshifts=args.nshifts,
-                                       expected=expected,
-                                       mindist=mindist,
-                                       maxdist=maxdist,
-                                       bed=bed,
-                                       anchor=anchor,
-                                       balance=balance,
-                                       cov_norm=args.coverage_norm,
-                                       rescale=args.rescale,
-                                       rescale_pad=args.rescale_pad,
-                                       rescale_size=args.rescale_size)
+        loop = pileupsWithControl(mids=mids, mids2=mids2,
+                                  ordered_mids=args.bed2_ordered,
+                                  filename=args.coolfile,
+                                  pad=pad, nproc=nproc,
+                                  chroms=fchroms, local=args.local,
+                                  minshift=args.minshift,
+                                  maxshift=args.maxshift,
+                                  nshifts=args.nshifts,
+                                  expected=expected,
+                                  mindist=mindist,
+                                  maxdist=maxdist,
+                                  kind=kind,
+                                  anchor=anchor,
+                                  balance=balance,
+                                  cov_norm=args.coverage_norm,
+                                  rescale=args.rescale,
+                                  rescale_pad=args.rescale_pad,
+                                  rescale_size=args.rescale_size)
         try:
             np.savetxt(os.path.join(args.outdir, outname), loop)
         except FileNotFoundError:
@@ -419,7 +474,7 @@ def plotpuppy():
 #    parser.add_argument("--n_rows", type=int, default=0,
 #                    required=False,
 #                    help="""How many rows to use for plotting the data""")
-    parser.add_argument("--output", type=str,
+    parser.add_argument("--output", "-o", type=str,
                     required=False, default='pup.pdf',
                     help="""Where to save the plot""")
     parser.add_argument("pileup_files", type=str,

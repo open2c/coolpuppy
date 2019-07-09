@@ -52,7 +52,8 @@ Some examples to get you started are available here: https://github.com/Phlya/co
 Help message should help you with the details. It is a single command that has a lot of options and can do a lot of things!
 
 ```
-Usage: coolpup.py [-h] [--pad PAD] [--minshift MINSHIFT] [--maxshift MAXSHIFT]
+Usage: coolpup.py [-h] [--bed2 BED2] [--bed2_unordered] [--pad PAD]
+                  [--minshift MINSHIFT] [--maxshift MAXSHIFT]
                   [--nshifts NSHIFTS] [--expected EXPECTED]
                   [--mindist MINDIST] [--maxdist MAXDIST] [--minsize MINSIZE]
                   [--maxsize MAXSIZE] [--excl_chrs EXCL_CHRS]
@@ -75,6 +76,11 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
+  --bed2 BED2           A 3-column bed file. Should be tab-delimited. Will
+                        consider all cis combinations of intervals between
+                        baselist and bed2. (default: None)
+  --bed2_unordered      Whether to only use baselist as left ends, and bed2 as
+                        right ends of regions. (default: True)
   --pad PAD             Padding of the windows around the centres of specified
                         features (i.e. final size of the matrix is 2×pad+res),
                         in kb. Ignored with --rescale, use --rescale_pad
@@ -157,7 +163,7 @@ For flexible plotting, I suggest to use `matplotlib`. However simple plotting ca
 ```
 Usage: plotpup.py [-h] [--cmap CMAP] [--symmetric SYMMETRIC] [--vmin VMIN]
                   [--vmax VMAX] [--scale {linear,log}]
-                  [--cbar_mode {edge,each,single}] [--n_cols N_COLS]
+                  [--cbar_mode {single,edge,each}] [--n_cols N_COLS]
                   [--col_names COL_NAMES] [--row_names ROW_NAMES]
                   [--norm_corners NORM_CORNERS] [--enrichment ENRICHMENT]
                   [--output OUTPUT]
@@ -178,7 +184,7 @@ optional arguments:
   --vmax VMAX           Value for the highest colour (default: None)
   --scale {linear,log}  Whether to use linear or log scaling for mapping
                         colours (default: log)
-  --cbar_mode {edge,each,single}
+  --cbar_mode {single,edge,each}
                         Whether to show a single colorbar, one per row or one
                         for each subplot (default: single)
   --n_cols N_COLS       How many columns to use for plotting the data. If 0,
@@ -198,7 +204,8 @@ optional arguments:
                         pixels. 0 to not show, odd positive number to define
                         the size of the central square whose values are
                         averaged (default: 1)
-  --output OUTPUT       Where to save the plot (default: pup.pdf)
+  --output OUTPUT, -o OUTPUT
+                        Where to save the plot (default: pup.pdf)
   ```
 
 ## Citing coolpup.py

@@ -40,37 +40,68 @@ def filter_bedpe(df, mindist, maxdist, chroms):
         df = df[(df['chr1'].isin(chroms)) & (df['chr2'].isin(chroms))]
     return df
 
-def check_bed_bedpe(df):
-    if np.any(df[['chr2', 'start2', 'end2']].isnull().all()):
-        # If the file has <6 columns, assume bed
-        return 'bed'
-    else:
-        # Else assume bedpe
-        return 'bedpe'
+#def check_bed_bedpe(df):
+#    if np.any(df[['chr2', 'start2', 'end2']].isnull().all()):
+#        # If the file has <6 columns, assume bed
+#        return 'bed'
+#    else:
+#        # Else assume bedpe
+#        return 'bedpe'
 
-def auto_read_bed(f, chroms='all', kind='auto', minsize=0, maxsize=np.inf,
-                                  mindist=0, maxdist=np.inf):
+def auto_read_bed(f,  kind='auto', chroms='all', minsize=0, maxsize=np.inf,
+                                  mindist=0, maxdist=np.inf, stdin=False):
     if kind == 'auto': #Guessing whether it's bed or bedpe style file
-        testdf = pd.read_csv(f, sep='\t',
-                                names=['chr1', 'start1', 'end1',
-                                       'chr2', 'start2', 'end2'],
-                            index_col=False, chunksize = 10).__next__()
-        kind = check_bed_bedpe(testdf)
+        if stdin:
+            row1 = f.__next__().split('\t')
+        else:
+            with open(f, 'r') as fobject:
+                row1 = fobject.readline().split('\t')
+        if len(row1) ==6:
+            filetype = 'bedpe'
+            row1 = [row1[0], int(row1[1]), int(row1[2]),
+                    row1[3], int(row1[4]), int(row1[5])]
+        elif len(row1) == 3:
+            filetype = 'bed'
+            row1 = [row1[0], int(row1[1]), int(row1[2])]
+        else:
+            raise ValueError("""Input bed(pe) file has unexpected number of
+                             columns: got {}, expect 3 (bed) or 6 (bedpe)
+                             """.format(len(row1)))
+#        testdf = pd.read_csv(f, sep='\t',
+#                                names=['chr1', 'start1', 'end1',
+#                                       'chr2', 'start2', 'end2'],
+#                            index_col=False, chunksize = 10).__next__()
+#        kind = check_bed_bedpe(testdf)
 
-    if kind == 'bed':
+    if filetype=='bed' or kind == 'bed':
         filter_func = partial(filter_bed, minsize=minsize, maxsize=maxsize,
                               chroms=chroms)
         names = ['chr', 'start', 'end']
-    else: #bedpe
+        row1 = filter_func(pd.DataFrame([row1], columns=names))
+    elif filetype=='bedpe' or kind =='bedpe': #bedpe
         filter_func = partial(filter_bedpe, mindist=mindist, maxdist=maxdist,
                               chroms=chroms)
         names = ['chr1', 'start1', 'end1', 'chr2', 'start2', 'end2']
-
+        row1 = filter_func(pd.DataFrame([row1], columns=names))
+    else:
+        raise ValueError("""Unsupported input kind: {}.
+                         Expect {} or {}""".format(kind, 'bed', 'bedpe'))
     bases = []
+
+    appended = False
+    if kind == 'auto':
+
+        if row1.shape[0]==1:
+            bases.append(row1)
+            appended = True
+
     for chunk in pd.read_csv(f, sep='\t',
-                            names=names, index_col=False, chunksize = 10**4):
+                            names=names, index_col=False,
+                            chunksize = 10**4):
         bases.append(filter_func(chunk))
     bases = pd.concat(bases)
+    if appended: # Would mean we read it twice when checking and in the first chunk
+        bases = bases.iloc[1:]
     return bases
 
 def bedpe2bed(df, ends=True, how='center'):
@@ -96,8 +127,8 @@ def bedpe2bed(df, ends=True, how='center'):
     return df
 
 
-def get_mids(intervals, resolution, bed=True):
-    if bed:
+def get_mids(intervals, resolution, kind='bed'):
+    if kind=='bed':
         intervals = intervals.sort_values(['chr', 'start'])
         mids = np.round((intervals['end']+intervals['start'])/2).astype(int)
         widths = np.round((intervals['end']-intervals['start'])).astype(int)
@@ -105,7 +136,7 @@ def get_mids(intervals, resolution, bed=True):
                              'Mids':mids,
                              'Bin':mids//resolution,
                              'Pad':widths/2}).drop_duplicates(['chr', 'Bin'])#.drop('Bin', axis=1)
-    else:
+    elif kind=='bedpe':
         intervals = intervals.sort_values(['chr1', 'chr2',
                                            'start1', 'start2'])
         mids1 = np.round((intervals['end1']+intervals['start1'])/2).astype(int)
@@ -122,13 +153,24 @@ def get_mids(intervals, resolution, bed=True):
                              'Pad2':widths2/2},
                             ).drop_duplicates(['chr1', 'chr2',
                                 'Bin1', 'Bin2'])#.drop(['Bin1', 'Bin2'], axis=1)
+    else:
+        raise ValueError("""
+                         kind can only be "bed" or "bedpe"
+                         """)
     return mids
 
-def get_combinations(mids, res, local=False, anchor=None):
-    if local and anchor:
-        raise ValueError("Can't have a local pileup with an anchor")
-    m = mids['Bin'].values.astype(int)
+def get_combinations(mids, res, mids2=None, ordered_mids=True,
+                     local=False, anchor=None):
+    if (local and anchor) or (local and (mids2 is not None)):
+        raise ValueError("""Can't have a local pileup with an anchor or with
+                            two bed files""")
+    m =  mids['Bin'].values.astype(int)
     p = (mids['Pad']//res).values.astype(int)
+
+    if mids2 is not None:
+        m2 =  mids2['Bin'].values.astype(int)
+        p2 = (mids2['Pad']//res).values.astype(int)
+
     if local:
         for i, pi in zip(m, p):
             yield i, i, pi, pi
@@ -137,9 +179,20 @@ def get_combinations(mids, res, local=False, anchor=None):
         anchor_pad = int(round((anchor[2] - anchor[1])/2))
         for i, pi in zip(m, p):
             yield anchor_bin, i, anchor_pad, pi
-    else:
+    elif mids2 is None:
         for i, j in zip(itertools.combinations(m, 2),
                         itertools.combinations(p, 2)):
+            yield list(i)+list(j)
+    elif (mids2 is not None) and ordered_mids:
+        for i, j in zip(itertools.product(m, m2),
+                        itertools.product(p, p2)):
+            if i[1] > i[0]:
+                yield list(i)+list(j)
+    elif (mids2 is not None) and (not ordered_mids):
+        for i, j in itertools.chain(zip(itertools.product(m, m2),
+                                        itertools.product(p, p2)),
+                                    zip(itertools.product(m2, m),
+                                        itertools.product(p2, p))):
             yield list(i)+list(j)
 
 def get_positions_pairs(mids, res):
@@ -231,8 +284,8 @@ def _do_pileups(mids, data, binsize, pad, expected, mindist, maxdist, local,
         if mindist <= abs(endBin - stBin)*binsize < maxdist or local:
             if expected is False:
                 try:
-                    newmap = np.nan_to_num(data[lo_left:hi_left,
-                                                lo_right:hi_right].toarray())
+                    newmap = data[lo_left:hi_left,
+                                  lo_right:hi_right].toarray()
                 except (IndexError, ValueError) as e:
                     continue
             else:
@@ -252,10 +305,10 @@ def _do_pileups(mids, data, binsize, pad, expected, mindist, maxdist, local,
                     newmap = numutils.zoom_array(newmap, (rescale_size,
                                                           rescale_size))
             if rot_flip:
-                newmap = np.rot90(np.flipud(newmap), -1)
+                newmap = np.rot90(np.flipud(newmap), 1)
             elif rot:
                 newmap = np.rot90(newmap, -1)
-            mymap += np.nan_to_num(newmap)
+            mymap = np.nansum([mymap, newmap], axis=0)
             if cov_norm and (expected is False) and (balance is False):
                 new_cov_start = coverage[lo_left:hi_left]
                 new_cov_end = coverage[lo_right:hi_right]
@@ -283,13 +336,26 @@ def _do_pileups(mids, data, binsize, pad, expected, mindist, maxdist, local,
         mymap += np.rot90(np.fliplr(np.triu(mymap, 1)))
     return mymap, n, cov_start, cov_end
 
-def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
+def chrom_mids(chroms, mids, kind):
+    for chrom in chroms:
+        if kind=='bed':
+            yield chrom, mids[mids['chr']==chrom]
+        else:
+            yield chrom, mids[mids['chr1']==chrom]
+
+def pileups(chrommids, c, pad=7, ctrl=False, local=False,
+            two_beds=False, ordered_mids=True,
             minshift=10**5, maxshift=10**6, nshifts=1, expected=False,
-            mindist=0, maxdist=10**9, bed=True, anchor=None,
+            mindist=0, maxdist=10**9, kind='bed', anchor=None,
             balance=True, cov_norm=False,
             rescale=False, rescale_pad=50, rescale_size=41):
-    chrom, mids = chrom_mids
-
+    if two_beds:
+        (chrom1, mids), (chrom2, mids2) = chrommids
+        assert chrom1==chrom2
+        chrom = chrom1
+    else:
+        chrom, mids = chrommids
+        mids2 = None
     mymap = make_outmap(pad, rescale, rescale_size)
     cov_start = np.zeros(mymap.shape[0])
     cov_end = np.zeros(mymap.shape[1])
@@ -318,22 +384,33 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
     else:
         anchor = None
 
-    if bed:
+    if kind=='bed' and not two_beds:
         assert np.all(mids['chr']==chrom)
+    elif kind=='bed' and two_beds:
+        assert np.all(mids['chr']==chrom)
+        assert np.all(mids2['chr']==chrom)
     else:
+        assert kind=='bedpe'
         assert np.all(mids['chr1']==chrom) & np.all(mids['chr1']==chrom)
 
     if ctrl:
-        if bed:
-            mids = controlRegions(get_combinations(mids, c.binsize, local,
-                                                    anchor),
+        if kind == 'bed':
+            mids = controlRegions(get_combinations(mids=mids, res=c.binsize,
+                                                   mids2=mids2,
+                                                   ordered_mids=ordered_mids,
+                                                   local=local,
+                                                   anchor=anchor),
                                    c.binsize, minshift, maxshift, nshifts)
         else:
             mids = controlRegions(get_positions_pairs(mids, c.binsize),
                                    c.binsize, minshift, maxshift, nshifts)
     else:
-        if bed:
-            mids = get_combinations(mids, c.binsize, local, anchor)
+        if kind == 'bed':
+            mids = get_combinations(mids=mids, res=c.binsize,
+                                    mids2=mids2,
+                                    ordered_mids=ordered_mids,
+                                    local=local,
+                                    anchor=anchor)
         else:
             mids = get_positions_pairs(mids, c.binsize)
     mymap, n, cov_start, cov_end = _do_pileups(mids=mids, data=data, pad=pad,
@@ -352,13 +429,6 @@ def pileups(chrom_mids, c, pad=7, ctrl=False, local=False,
     logging.info('%s: %s' % (chrom, n))
     return mymap, n, cov_start, cov_end
 
-def chrom_mids(chroms, mids, bed):
-    for chrom in chroms:
-        if bed:
-            yield chrom, mids[mids['chr']==chrom]
-        else:
-            yield chrom, mids[mids['chr1']==chrom]
-
 def norm_coverage(loop, cov_start, cov_end):
     coverage = np.outer(cov_start, cov_end)
     coverage /= np.nanmean(coverage)
@@ -366,27 +436,39 @@ def norm_coverage(loop, cov_start, cov_end):
     loop[np.isnan(loop)]=0
     return loop
 
-def pileupsWithControl(mids, filename, pad=100, nproc=1, chroms=None,
-                       local=False,
+def pileupsWithControl(mids, filename, mids2=None, pad=100, nproc=1,
+                       ordered_mids=True,
+                       chroms=None, local=False,
                        minshift=100000, maxshift=1000000, nshifts=10,
                        expected=None,
                        mindist=0, maxdist=np.inf,
-                       bed=True, anchor=None, balance=True,
+                       kind='bed', anchor=None, balance=True,
                        cov_norm=False,
                        rescale=False, rescale_pad=1, rescale_size=99):
+    if mids2 is not None:
+        two_beds = True
+    else:
+        two_beds = False
     c = cooler.Cooler(filename)
     if chroms is None:
         chroms = c.chromnames
     p = Pool(nproc)
     #Loops
     f = partial(pileups, c=c, pad=pad, ctrl=False, local=local,
+                two_beds=two_beds, ordered_mids=ordered_mids,
                 minshift=minshift, maxshift=maxshift, nshifts=nshifts,
                 expected=False,
-                mindist=mindist, maxdist=maxdist, bed=bed,
+                mindist=mindist, maxdist=maxdist, kind=kind,
                 anchor=anchor, balance=balance, cov_norm=cov_norm,
                 rescale=rescale, rescale_pad=rescale_pad,
                 rescale_size=rescale_size)
-    chrommids = chrom_mids(chroms, mids, bed)
+    chrommids = chrom_mids(chroms, mids, kind)
+    if mids2 is not None:
+        chrommids2 = chrom_mids(chroms, mids2, 'bed')
+        chrommids = zip(chrommids, chrommids2)
+        two_beds = True
+    else:
+        two_beds = False
     loops, ns, cov_starts, cov_ends = list(zip(*p.map(f, chrommids)))
     loop = np.sum(loops, axis=0)
     n = np.sum(ns)
@@ -398,11 +480,15 @@ def pileupsWithControl(mids, filename, pad=100, nproc=1, chroms=None,
     logging.info('Total number of piled up windows: %s' % n)
     #Controls
     if nshifts>0:
-        chrommids = chrom_mids(chroms, mids, bed)
+        chrommids = chrom_mids(chroms, mids, kind)
+        if mids2 is not None:
+            chrommids2 = chrom_mids(chroms, mids2, 'bed')
+            chrommids = zip(chrommids, chrommids2)
         f = partial(pileups, c=c, pad=pad, ctrl=True, local=local,
+                    two_beds=two_beds, ordered_mids=ordered_mids,
                     expected=False,
                     minshift=minshift, maxshift=maxshift, nshifts=nshifts,
-                    mindist=mindist, maxdist=maxdist, bed=bed,
+                    mindist=mindist, maxdist=maxdist, kind=kind,
                     anchor=anchor, balance=balance, cov_norm=cov_norm,
                     rescale=rescale, rescale_pad=rescale_pad,
                     rescale_size=rescale_size)
@@ -416,14 +502,18 @@ def pileupsWithControl(mids, filename, pad=100, nproc=1, chroms=None,
         ctrl /= n
         loop /= ctrl
     elif expected is not False:
-        chrommids = chrom_mids(chroms, mids, bed)
+        chrommids = chrom_mids(chroms, mids, kind)
+        if mids2 is not None:
+            chrommids2 = chrom_mids(chroms, mids2, 'bed')
+            chrommids = zip(chrommids, chrommids2)
         f = partial(pileups, c=c, pad=pad, ctrl=False, local=local,
-            expected=expected,
-            minshift=minshift, maxshift=maxshift, nshifts=nshifts,
-            mindist=mindist, maxdist=maxdist, bed=bed,
-            anchor=anchor, balance=balance, cov_norm=cov_norm,
-            rescale=rescale, rescale_pad=rescale_pad,
-            rescale_size=rescale_size)
+                    two_beds=two_beds, ordered_mids=ordered_mids,
+                    expected=expected,
+                    minshift=minshift, maxshift=maxshift, nshifts=nshifts,
+                    mindist=mindist, maxdist=maxdist, kind=kind,
+                    anchor=anchor, balance=balance, cov_norm=cov_norm,
+                    rescale=rescale, rescale_pad=rescale_pad,
+                    rescale_size=rescale_size)
         exps, ns, cov_starts, cov_ends = list(zip(*p.map(f, chrommids)))
         exp = np.sum(exps, axis=0)
         n = np.sum(ns)
