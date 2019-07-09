@@ -14,16 +14,18 @@ import cooler
 import pytest
 
 
-amap = np.loadtxt('tests/Scc1-control.10000-10.0K_over_CH12_loops_Rao_10-shifts_dist_100000-inf_unbalanced_covnorm.np.txt')
+amap = np.loadtxt('tests/Scc1-control.10000-10.0K_over_CH12_loops_Rao_10-shifts_unbalanced_covnorm.np.txt')
 amapTAD = np.loadtxt('tests/Scc1-control.10000-10.0K_over_CH12_TADs_Rao_10-shifts_local_rescaled_unbalanced_covnorm.np.txt')
 
 def test_cornerCV():
-    assert np.isclose(cornerCV(amap), 0.0752115185866688)
-    assert np.isclose(cornerCV(amap, 3), 0.07433758192350227)
+#    print(cornerCV(amap), cornerCV(amap, 3))
+    assert np.isclose(cornerCV(amap), 0.1259758924619493)
+    assert np.isclose(cornerCV(amap, 3), 0.12803473187275366)
 
 def test_get_enrichment():
-    assert np.isclose(get_enrichment(amap, 1), 1.6307401942981528)
-    assert np.isclose(get_enrichment(amap, 3), 1.4057840415780747)
+#    print(get_enrichment(amap, 1), get_enrichment(amap, 3))
+    assert np.isclose(get_enrichment(amap, 1), 2.1283263441906985)
+    assert np.isclose(get_enrichment(amap, 3), 1.7313075537950837)
 
 bed = pd.read_csv('tests/test.bed', sep='\t', names=['chr', 'start', 'end'])
 
@@ -52,12 +54,24 @@ def test_get_mids():
     assert np.all(bedpe_mids['Pad1'] == [100, 1000, 150, 1000])
     assert np.all(bedpe_mids['Pad2'] == [100, 1000, 50, 1000])
 
-
+amapbed2 = np.loadtxt('tests/Scc1-control.10000-10.0K_over_Bonev_CTCF+_vs_Bonev_CTCF-dist_210000-800000_unbalanced_covnorm.np.txt')
 def test_pileupsWithControl():
     np.random.seed(0)
     loops = auto_read_bed('tests/CH12_loops_Rao.bed')
     loopmids = get_mids(loops, resolution=10000, kind='bedpe')
     pup = pileupsWithControl(loopmids, 'tests/Scc1-control.10000.cool',
-                             mindist=100000, balance=False, cov_norm=True,
+                             mindist=210000, balance=False, cov_norm=True,
                              kind='bedpe', pad=10)
     assert np.allclose(pup, amap)
+
+    ctcf_left = auto_read_bed('tests/Bonev_CTCF+.bed').sample(1000)
+    ctcf_right = auto_read_bed('tests/Bonev_CTCF-.bed').sample(1000)
+
+    leftmids = get_mids(ctcf_left, resolution=10000, kind='bed')
+    rightmids = get_mids(ctcf_right, resolution=10000, kind='bed')
+
+    pup = pileupsWithControl(leftmids, 'tests/Scc1-control.10000.cool',
+                             mids2=rightmids, ordered_mids=True,
+                             mindist=210000, balance=False, cov_norm=True,
+                             kind='bed', pad=10)
+    assert np.allclose(pup, amapbed2)
