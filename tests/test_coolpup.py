@@ -76,3 +76,11 @@ def test_pileupsWithControl():
                              mindist=210000, balance=False, cov_norm=True,
                              kind='bed', pad=10)
     assert np.allclose(pup, amapbed2)
+
+    np.random.seed(0)
+    loops = auto_read_bed('tests/CH12_loops_Rao_numeric_chroms.bed')
+    loopmids = get_mids(loops, resolution=10000, kind='bedpe')
+    pup = pileupsWithControl(loopmids, 'tests/Scc1-control.10000.numeric_chroms.cool',
+                             mindist=210000, balance=False, cov_norm=True,
+                             kind='bedpe', pad=10)
+    assert np.allclose(pup, amap)
