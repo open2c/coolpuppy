@@ -1,6 +1,7 @@
-from .coolpup import *
-from .plotpup import *
+#from .coolpup import *
+#from .plotpup import *
 from coolpuppy import *
+from coolpuppy import __version__
 import cooler
 import pandas as pd
 import os
@@ -10,6 +11,8 @@ import logging
 import numpy as np
 from multiprocessing import Pool
 import sys
+
+#from ._version.py import __version__
 
 def main():
     parser = argparse.ArgumentParser(
@@ -144,12 +147,15 @@ def main():
                                  'ERROR', 'CRITICAL'],
                         default='INFO',
                         help="Set the logging level.")
+    parser.add_argument("-v", "--version", action='version',
+                        version=__version__)
     args = parser.parse_args()
 
     logging.basicConfig(format='%(message)s',
                         level=getattr(logging, args.logLevel))
 
     logging.info(args)
+
     if args.n_proc==0:
         nproc=-1
     else:
@@ -207,7 +213,7 @@ def main():
 
 
     if args.incl_chrs=='all':
-        incl_chrs = c.chromnames
+        incl_chrs = np.array(c.chromnames).astype(str)
     else:
         incl_chrs = args.incl_chrs.split(',')
 
@@ -231,7 +237,7 @@ def main():
     if anchor:
         fchroms = [anchor[0]]
     else:
-        chroms = c.chromnames
+        chroms = np.array(c.chromnames).astype(str)
         fchroms = []
         for chrom in chroms:
             if chrom not in args.excl_chrs.split(',') and chrom in incl_chrs:
@@ -480,6 +486,8 @@ def plotpuppy():
     parser.add_argument("pileup_files", type=str,
                     nargs='*',
                     help="""All files to plot""")
+    parser.add_argument("-v", "--version", action='version',
+                        version=__version__)
 
     args = parser.parse_args()
 

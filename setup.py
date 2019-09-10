@@ -5,9 +5,19 @@ this_directory = path.abspath(path.dirname(__file__))
 with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
+import re
+VERSIONFILE="coolpuppy/_version.py"
+verstrline = open(VERSIONFILE, "rt").read()
+VSRE = r"^__version__ = ['\"]([^'\"]*)['\"]"
+mo = re.search(VSRE, verstrline, re.M)
+if mo:
+    verstr = mo.group(1)
+else:
+    raise RuntimeError("Unable to find version string in %s." % (VERSIONFILE,))
+
 setup(
       name='coolpuppy',
-      version='0.8.7',
+      version=verstr,
       packages=['coolpuppy'],
       entry_points={
           'console_scripts': ['coolpup.py = coolpuppy.__main__:main',

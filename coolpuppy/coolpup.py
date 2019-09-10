@@ -102,6 +102,12 @@ def auto_read_bed(f,  kind='auto', chroms='all', minsize=0, maxsize=np.inf,
     bases = pd.concat(bases)
     if appended: # Would mean we read it twice when checking and in the first chunk
         bases = bases.iloc[1:]
+    if filetype=='bed' or kind == 'bed':
+        bases['chr'] = bases['chr'].astype(str)
+        bases[['start', 'end']] = bases[['start', 'end']].astype(np.uint64)
+    if filetype=='bedpe' or kind == 'bedpe':
+        bases[['chr1', 'chr2']] = bases[['chr1', 'chr2']].astype(str)
+        bases[['start1', 'end1', 'start2', 'end2']] = bases[['start1', 'end1', 'start2', 'end2']].astype(np.uint64)
     return bases
 
 def bedpe2bed(df, ends=True, how='center'):
