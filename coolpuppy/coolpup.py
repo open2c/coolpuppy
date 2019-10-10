@@ -217,7 +217,10 @@ def prepare_single(item):
     cv5 = cornerCV(amap, 5)
     return list(key)+[n, enr1, enr3, cv3, cv5]
 
-def controlRegions(midcombs, res, minshift=10**5, maxshift=10**6, nshifts=1):
+def controlRegions(midcombs, res, minshift=10**5, maxshift=10**6, nshifts=1,
+                   seed=None):
+    if seed is not None:
+        np.random.seed(seed)
     minbin = minshift//res
     maxbin = maxshift//res
     for start, end, p1, p2 in midcombs:
@@ -354,7 +357,8 @@ def pileups(chrommids, c, pad=7, ctrl=False, local=False,
             minshift=10**5, maxshift=10**6, nshifts=1, expected=False,
             mindist=0, maxdist=10**9, kind='bed', anchor=None,
             balance=True, cov_norm=False,
-            rescale=False, rescale_pad=50, rescale_size=41):
+            rescale=False, rescale_pad=50, rescale_size=41,
+            seed=None):
     if two_beds:
         (chrom1, mids), (chrom2, mids2) = chrommids
         assert chrom1==chrom2
@@ -406,10 +410,12 @@ def pileups(chrommids, c, pad=7, ctrl=False, local=False,
                                                    ordered_mids=ordered_mids,
                                                    local=local,
                                                    anchor=anchor),
-                                   c.binsize, minshift, maxshift, nshifts)
+                                   c.binsize, minshift, maxshift, nshifts,
+                                   seed)
         else:
             mids = controlRegions(get_positions_pairs(mids, c.binsize),
-                                   c.binsize, minshift, maxshift, nshifts)
+                                   c.binsize, minshift, maxshift, nshifts,
+                                   seed)
     else:
         if kind == 'bed':
             mids = get_combinations(mids=mids, res=c.binsize,
@@ -452,8 +458,6 @@ def pileupsWithControl(mids, filename, mids2=None, pad=100, nproc=1,
                        cov_norm=False,
                        rescale=False, rescale_pad=1, rescale_size=99,
                        seed=None):
-    if seed is not None:
-        np.random.seed(seed)
 
     if mids2 is not None:
         two_beds = True
@@ -471,7 +475,7 @@ def pileupsWithControl(mids, filename, mids2=None, pad=100, nproc=1,
                 mindist=mindist, maxdist=maxdist, kind=kind,
                 anchor=anchor, balance=balance, cov_norm=cov_norm,
                 rescale=rescale, rescale_pad=rescale_pad,
-                rescale_size=rescale_size)
+                rescale_size=rescale_size, seed=seed)
     chrommids = chrom_mids(chroms, mids, kind)
     if mids2 is not None:
         chrommids2 = chrom_mids(chroms, mids2, 'bed')
@@ -538,7 +542,8 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
                     expected=False,
                     mindist=0, maxdist=10**9,
                     balance=True, cov_norm=False,
-                    rescale=False, rescale_pad=50, rescale_size=41):
+                    rescale=False, rescale_pad=50, rescale_size=41,
+                    seed=None):
     chrom, mids = chrom_mids
 
     if expected is not False:
@@ -563,7 +568,8 @@ def pileupsByWindow(chrom_mids, c, pad=7, ctrl=False,
         if ctrl:
             current = controlRegions(get_combinations(curmids, c.binsize,
                                                     anchor=(chrom, m, m)),
-                                       c.binsize, minshift, maxshift, nshifts)
+                                       c.binsize, minshift, maxshift, nshifts,
+                                       seed)
         else:
              current = get_combinations(curmids, c.binsize, anchor=(chrom, m, m))
         mymap, n, cov_starts, cov_ends = _do_pileups(mids=current, data=data,
@@ -595,8 +601,6 @@ def pileupsByWindowWithControl(mids, filename, pad=100, nproc=1, chroms=None,
                                cov_norm=False,
                                rescale=False, rescale_pad=1, rescale_size=99,
                                seed=None):
-    if seed is not None:
-        np.random.seed(seed)
     p = Pool(nproc)
     c = cooler.Cooler(filename)
     if chroms is None:
@@ -608,7 +612,8 @@ def pileupsByWindowWithControl(mids, filename, pad=100, nproc=1, chroms=None,
                 mindist=mindist, maxdist=maxdist, balance=balance,
                 cov_norm=False,
                 rescale=rescale, rescale_pad=rescale_pad,
-                rescale_size=rescale_size)
+                rescale_size=rescale_size,
+                seed=seed)
     chrommids = chrom_mids(chroms, mids, True)
     loops = {chrom:lps for chrom, lps in zip(chroms,
                                              p.map(f, chrommids))}
@@ -620,7 +625,8 @@ def pileupsByWindowWithControl(mids, filename, pad=100, nproc=1, chroms=None,
                     mindist=mindist, maxdist=maxdist, balance=balance,
                     cov_norm=cov_norm,
                     rescale=rescale, rescale_pad=rescale_pad,
-                    rescale_size=rescale_size)
+                    rescale_size=rescale_size,
+                    seed=seed)
         chrommids = chrom_mids(chroms, mids, True)
         ctrls = {chrom:lps for chrom, lps in zip(chroms,
                                              p.map(f, chrommids))}
@@ -631,7 +637,8 @@ def pileupsByWindowWithControl(mids, filename, pad=100, nproc=1, chroms=None,
             mindist=mindist, maxdist=maxdist,
             balance=balance, cov_norm=False,
             rescale=rescale, rescale_pad=rescale_pad,
-            rescale_size=rescale_size)
+            rescale_size=rescale_size,
+            seed=seed)
         chrommids = chrom_mids(chroms, mids, True)
         ctrls = {chrom:lps for chrom, lps in zip(chroms,
                                              p.map(f, chrommids))}

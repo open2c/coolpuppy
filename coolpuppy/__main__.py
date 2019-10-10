@@ -318,8 +318,8 @@ def main():
             outname += '_from_%s' % anchor_name
         if args.local:
             outname += '_local'
-            if args.minsize > 0 or args.maxsize < np.inf:
-                outname += '_len_%s-%s' % (args.minsize, args.maxsize)
+            if minsize > 0 or maxsize < np.inf:
+                outname += '_len_%s-%s' % (minsize, maxsize)
         elif args.mindist is not None or args.maxdist is not None:
             outname += '_dist_%s-%s' % (mindist, maxdist)
         if args.rescale:

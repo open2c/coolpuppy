@@ -15,18 +15,18 @@ import pytest
 import subprocess
 
 
-amap = np.loadtxt('tests/Scc1-control.10000-10.0K_over_CH12_loops_Rao_10-shifts_unbalanced_covnorm.np.txt')
+amap = np.loadtxt('tests/Scc1-control.10000-10.0K_over_CH12_loops_Rao_10-shifts_dist_210000-inf_unbalanced_covnorm.np.txt')
 amapTAD = np.loadtxt('tests/Scc1-control.10000-10.0K_over_CH12_TADs_Rao_10-shifts_local_rescaled_unbalanced_covnorm.np.txt')
 
 def test_cornerCV():
 #    print(cornerCV(amap), cornerCV(amap, 3))
-    assert np.isclose(cornerCV(amap), 0.14070012135472076)
-    assert np.isclose(cornerCV(amap, 3), 0.12376974516077772)
+    assert np.isclose(cornerCV(amap), 0.1458657084504096)
+    assert np.isclose(cornerCV(amap, 3), 0.15836641893081616)
 
 def test_get_enrichment():
 #    print(get_enrichment(amap, 1), get_enrichment(amap, 3))
-    assert np.isclose(get_enrichment(amap, 1), 1.9429284832283968)
-    assert np.isclose(get_enrichment(amap, 3), 1.7063003801834205)
+    assert np.isclose(get_enrichment(amap, 1), 2.0709878918199576)
+    assert np.isclose(get_enrichment(amap, 3), 1.732941070459152)
 
 bed = pd.read_csv('tests/test.bed', sep='\t', names=['chr', 'start', 'end'])
 
@@ -60,37 +60,37 @@ amapbed2 = np.loadtxt('tests/Scc1-control.10000-10.0K_over_Bonev_CTCF+_vs_Bonev_
 
 def test___main__():
     # Loops
-    subprocess.run(['coolpup.py', 'tests/Scc1-control.10000.cool',
-                    'tests/CH12_loops_Rao.bed', '--mindist', '210000',
-                    '--unbalanced', '--coverage_norm', '--outdir', 'tests',
-                    '--outname', 'test_loop.txt', '--n_proc', '1',
-                    '--seed', '0'])
+    subprocess.run("""coolpup.py tests/Scc1-control.10000.cool
+                      tests/CH12_loops_Rao.bed --mindist 210000
+                      --unbalanced --coverage_norm --outdir tests
+                      --outname test_loop.txt --n_proc 2
+                      --seed 0""".split())
     assert np.allclose(amap, np.loadtxt('tests/test_loop.txt'))
 
     # Bed2
-    subprocess.run(['coolpup.py', 'tests/Scc1-control.10000.cool',
-                    'tests/Bonev_CTCF+.bed', '--bed2', 'tests/Bonev_CTCF-.bed',
-                    '--mindist', '210000',
-                    '--unbalanced', '--coverage_norm', '--outdir', 'tests',
-                    '--outname', 'test_bed2.txt', '--n_proc', '1',
-                    '--seed', '0'])
+    subprocess.run("""coolpup.py tests/Scc1-control.10000.cool
+                      tests/Bonev_CTCF+.bed --bed2 tests/Bonev_CTCF-.bed
+                      --mindist 210000 --subset 1000
+                      --unbalanced --coverage_norm --outdir tests
+                      --outname test_bed2.txt --n_proc 2
+                      --seed 0""".split())
     assert np.allclose(amapbed2, np.loadtxt('tests/test_bed2.txt'))
 
     # TADs
-    subprocess.run(['coolpup.py', 'tests/Scc1-control.10000.cool',
-                'tests/CH12_TADs_Rao.bed', '--local', '--rescale',
-                '--unbalanced', '--coverage_norm', '--outdir', 'tests',
-                '--outname', 'test_tad.txt', '--n_proc', '1',
-                '--seed', '0'])
+    subprocess.run("""coolpup.py tests/Scc1-control.10000.cool
+                      tests/CH12_TADs_Rao.bed --local --rescale
+                      --unbalanced --coverage_norm --outdir tests
+                      --outname test_tad.txt --n_proc 2
+                      --seed 0""".split())
     assert np.allclose(amapTAD, np.loadtxt('tests/test_tad.txt'))
 
     # Numeric chroms
-    subprocess.run(['coolpup.py', 'tests/Scc1-control.10000.numeric_chroms.cool',
-                    'tests/CH12_loops_Rao_numeric_chroms.bed',
-                    '--mindist', '210000',
-                    '--unbalanced', '--coverage_norm', '--outdir', 'tests',
-                    '--outname', 'test_loop_numeric.txt', '--n_proc', '1',
-                    '--seed', '0'])
+    subprocess.run("""coolpup.py tests/Scc1-control.10000.numeric_chroms.cool
+                      tests/CH12_loops_Rao_numeric_chroms.bed
+                      --mindist 210000
+                      --unbalanced --coverage_norm --outdir tests
+                      --outname test_loop_numeric.txt --n_proc 2
+                      --seed 0""".split())
     assert np.allclose(amap, np.loadtxt('tests/test_loop_numeric.txt'))
 
 #def test_pileupsWithControl():
