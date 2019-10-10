@@ -63,8 +63,8 @@ def test___main__():
     subprocess.run(['coolpup.py', 'tests/Scc1-control.10000.cool',
                     'tests/CH12_loops_Rao.bed', '--mindist', '210000',
                     '--unbalanced', '--coverage_norm', '--outdir', 'tests',
-                    '--outname', 'test_loop.txt',
-                    '--seed', '0', '-l', 'CRITICAL'])
+                    '--outname', 'test_loop.txt', '--n_proc', '1',
+                    '--seed', '0'])
     assert np.allclose(amap, np.loadtxt('tests/test_loop.txt'))
 
     # Bed2
@@ -72,16 +72,16 @@ def test___main__():
                     'tests/Bonev_CTCF+.bed', '--bed2', 'tests/Bonev_CTCF-.bed',
                     '--mindist', '210000',
                     '--unbalanced', '--coverage_norm', '--outdir', 'tests',
-                    '--outname', 'test_bed2.txt',
-                    '--seed', '0', '-l', 'CRITICAL'])
+                    '--outname', 'test_bed2.txt', '--n_proc', '1',
+                    '--seed', '0'])
     assert np.allclose(amapbed2, np.loadtxt('tests/test_bed2.txt'))
 
     # TADs
     subprocess.run(['coolpup.py', 'tests/Scc1-control.10000.cool',
                 'tests/CH12_TADs_Rao.bed', '--local', '--rescale',
                 '--unbalanced', '--coverage_norm', '--outdir', 'tests',
-                '--outname', 'test_tad.txt',
-                '--seed', '0', '-l', 'CRITICAL'])
+                '--outname', 'test_tad.txt', '--n_proc', '1',
+                '--seed', '0'])
     assert np.allclose(amapTAD, np.loadtxt('tests/test_tad.txt'))
 
     # Numeric chroms
@@ -89,8 +89,8 @@ def test___main__():
                     'tests/CH12_loops_Rao_numeric_chroms.bed',
                     '--mindist', '210000',
                     '--unbalanced', '--coverage_norm', '--outdir', 'tests',
-                    '--outname', 'test_loop_numeric.txt',
-                    '--seed', '0', '-l', 'CRITICAL'])
+                    '--outname', 'test_loop_numeric.txt', '--n_proc', '1',
+                    '--seed', '0'])
     assert np.allclose(amap, np.loadtxt('tests/test_loop_numeric.txt'))
 
 #def test_pileupsWithControl():
