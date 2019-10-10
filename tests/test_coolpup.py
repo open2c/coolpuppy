@@ -69,7 +69,7 @@ def test___main__():
 
     # Bed2
     subprocess.run(['coolpup.py', 'tests/Scc1-control.10000.cool',
-                    'tests/Bonev_CTCF+.bed', '--bed2', 'Bonev_CTCF-.bed',
+                    'tests/Bonev_CTCF+.bed', '--bed2', 'tests/Bonev_CTCF-.bed',
                     '--mindist', '210000',
                     '--unbalanced', '--coverage_norm', '--outdir', 'tests',
                     '--outname', 'test_bed2.txt',
