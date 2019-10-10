@@ -142,6 +142,10 @@ def main():
                         help="""Name of the output file. If not set, is
                         generated automatically to include important
                         information.""")
+### Technicalities
+    parser.add_argument("--seed", default=None, type=int, required=False,
+                    help="""Set specific seed value to ensure
+                    reproducibility""")
     parser.add_argument("-l", "--log", dest="logLevel",
                         choices=['DEBUG', 'INFO', 'WARNING',
                                  'ERROR', 'CRITICAL'],
@@ -155,6 +159,9 @@ def main():
                         level=getattr(logging, args.logLevel))
 
     logging.info(args)
+
+    if args.seed is not None:
+        np.random.seed(args.seed)
 
     if args.n_proc==0:
         nproc=-1
@@ -357,7 +364,8 @@ def main():
                                               cov_norm=args.coverage_norm,
                                               rescale=args.rescale,
                                               rescale_pad=args.rescale_pad,
-                                              rescale_size=args.rescale_size)
+                                              rescale_size=args.rescale_size,
+                                              seed=args.seed)
 
         p = Pool(nproc)
         data = p.map(prepare_single, finloops.items())
@@ -403,7 +411,8 @@ def main():
                                   cov_norm=args.coverage_norm,
                                   rescale=args.rescale,
                                   rescale_pad=args.rescale_pad,
-                                  rescale_size=args.rescale_size)
+                                  rescale_size=args.rescale_size,
+                                  seed=args.seed)
         try:
             np.savetxt(os.path.join(args.outdir, outname), loop)
         except FileNotFoundError:

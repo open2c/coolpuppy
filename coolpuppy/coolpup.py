@@ -450,7 +450,11 @@ def pileupsWithControl(mids, filename, mids2=None, pad=100, nproc=1,
                        mindist=0, maxdist=np.inf,
                        kind='bed', anchor=None, balance=True,
                        cov_norm=False,
-                       rescale=False, rescale_pad=1, rescale_size=99):
+                       rescale=False, rescale_pad=1, rescale_size=99,
+                       seed=None):
+    if seed is not None:
+        np.random.seed(seed)
+
     if mids2 is not None:
         two_beds = True
     else:
@@ -589,7 +593,10 @@ def pileupsByWindowWithControl(mids, filename, pad=100, nproc=1, chroms=None,
                                mindist=0, maxdist=np.inf,
                                balance=True,
                                cov_norm=False,
-                               rescale=False, rescale_pad=1, rescale_size=99):
+                               rescale=False, rescale_pad=1, rescale_size=99,
+                               seed=None):
+    if seed is not None:
+        np.random.seed(seed)
     p = Pool(nproc)
     c = cooler.Cooler(filename)
     if chroms is None:
