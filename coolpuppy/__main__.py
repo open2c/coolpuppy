@@ -401,9 +401,10 @@ def main():
             outdict = {'%s:%s-%s' % key : (val[0], val[1].tolist())
                                                for key,val in finloops.items()}
             import json
-            with open(os.path.join(args.outdir, outname)[:-4] + '.json', 'w') as fp:
+            json_path = os.path.join(args.outdir, os.path.splitext(outname)[0]) + '.json'
+            with open(json_path, 'w') as fp:
                 json.dump(outdict, fp)#, sort_keys=True, indent=4)
-                logging.info("Saved individual pileups to %s.json" % os.path.join(args.outdir, outname)[:-4])
+                logging.info("Saved individual pileups to %s" % json_path)
     else:
         loop = pileupsWithControl(mids=mids, mids2=mids2,
                               ordered_mids=args.bed2_ordered,

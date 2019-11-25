@@ -622,7 +622,7 @@ def pileupsByWindowWithControl(mids, filename, pad=100, nproc=1, chroms=None,
                 rescale=rescale, rescale_pad=rescale_pad,
                 rescale_size=rescale_size,
                 seed=seed)
-    chrommids = chrom_mids(chroms, mids, True)
+    chrommids = chrom_mids(chroms, mids, 'bed')
     loops = {chrom:lps for chrom, lps in zip(chroms,
                                              p.map(f, chrommids))}
     #Controls
@@ -635,7 +635,7 @@ def pileupsByWindowWithControl(mids, filename, pad=100, nproc=1, chroms=None,
                     rescale=rescale, rescale_pad=rescale_pad,
                     rescale_size=rescale_size,
                     seed=seed)
-        chrommids = chrom_mids(chroms, mids, True)
+        chrommids = chrom_mids(chroms, mids, 'bed')
         ctrls = {chrom:lps for chrom, lps in zip(chroms,
                                              p.map(f, chrommids))}
     elif expected is not False:
@@ -647,7 +647,7 @@ def pileupsByWindowWithControl(mids, filename, pad=100, nproc=1, chroms=None,
             rescale=rescale, rescale_pad=rescale_pad,
             rescale_size=rescale_size,
             seed=seed)
-        chrommids = chrom_mids(chroms, mids, True)
+        chrommids = chrom_mids(chroms, mids, 'bed')
         ctrls = {chrom:lps for chrom, lps in zip(chroms,
                                              p.map(f, chrommids))}
     p.close()
