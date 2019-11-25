@@ -11,10 +11,12 @@ import logging
 import numpy as np
 from multiprocessing import Pool
 import sys
+import pdb, traceback
 
 #from ._version.py import __version__
 
 def main():
+
     parser = argparse.ArgumentParser(
                       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("coolfile", type=str,
@@ -151,9 +153,19 @@ def main():
                                  'ERROR', 'CRITICAL'],
                         default='INFO',
                         help="Set the logging level.")
+    parser.add_argument("--post_mortem", action='store_true', default=False,
+                        required=False,
+                        help="""Enter debugger if there is an error""")
     parser.add_argument("-v", "--version", action='version',
                         version=__version__)
     args = parser.parse_args()
+
+    if args.post_mortem:
+        def _excepthook(exc_type, value, tb):
+            traceback.print_exception(exc_type, value, tb)
+            print()
+            pdb.pm()
+        sys.excepthook = _excepthook
 
     logging.basicConfig(format='%(message)s',
                         level=getattr(logging, args.logLevel))
@@ -348,24 +360,23 @@ def main():
 #            raise NotImplementedError("""Can't make by-window combinations with
 #                                      coverage normalization - please use
 #                                      balanced data instead""")
-
         finloops = pileupsByWindowWithControl(mids=mids,
-                                              filename=args.coolfile,
-                                              pad=pad,
-                                              nproc=nproc,
-                                              chroms=fchroms,
-                                              minshift=args.minshift,
-                                              maxshift=args.maxshift,
-                                              nshifts=args.nshifts,
-                                              expected=expected,
-                                              mindist=mindist,
-                                              maxdist=maxdist,
-                                              balance=balance,
-                                              cov_norm=args.coverage_norm,
-                                              rescale=args.rescale,
-                                              rescale_pad=args.rescale_pad,
-                                              rescale_size=args.rescale_size,
-                                              seed=args.seed)
+                                          filename=args.coolfile,
+                                          pad=pad,
+                                          nproc=nproc,
+                                          chroms=fchroms,
+                                          minshift=args.minshift,
+                                          maxshift=args.maxshift,
+                                          nshifts=args.nshifts,
+                                          expected=expected,
+                                          mindist=mindist,
+                                          maxdist=maxdist,
+                                          balance=balance,
+                                          cov_norm=args.coverage_norm,
+                                          rescale=args.rescale,
+                                          rescale_pad=args.rescale_pad,
+                                          rescale_size=args.rescale_size,
+                                          seed=args.seed)
 
         p = Pool(nproc)
         data = p.map(prepare_single, finloops.items())
@@ -395,24 +406,24 @@ def main():
                 logging.info("Saved individual pileups to %s.json" % os.path.join(args.outdir, outname)[:-4])
     else:
         loop = pileupsWithControl(mids=mids, mids2=mids2,
-                                  ordered_mids=args.bed2_ordered,
-                                  filename=args.coolfile,
-                                  pad=pad, nproc=nproc,
-                                  chroms=fchroms, local=args.local,
-                                  minshift=args.minshift,
-                                  maxshift=args.maxshift,
-                                  nshifts=args.nshifts,
-                                  expected=expected,
-                                  mindist=mindist,
-                                  maxdist=maxdist,
-                                  kind=kind,
-                                  anchor=anchor,
-                                  balance=balance,
-                                  cov_norm=args.coverage_norm,
-                                  rescale=args.rescale,
-                                  rescale_pad=args.rescale_pad,
-                                  rescale_size=args.rescale_size,
-                                  seed=args.seed)
+                              ordered_mids=args.bed2_ordered,
+                              filename=args.coolfile,
+                              pad=pad, nproc=nproc,
+                              chroms=fchroms, local=args.local,
+                              minshift=args.minshift,
+                              maxshift=args.maxshift,
+                              nshifts=args.nshifts,
+                              expected=expected,
+                              mindist=mindist,
+                              maxdist=maxdist,
+                              kind=kind,
+                              anchor=anchor,
+                              balance=balance,
+                              cov_norm=args.coverage_norm,
+                              rescale=args.rescale,
+                              rescale_pad=args.rescale_pad,
+                              rescale_size=args.rescale_size,
+                              seed=args.seed)
         try:
             np.savetxt(os.path.join(args.outdir, outname), loop)
         except FileNotFoundError:

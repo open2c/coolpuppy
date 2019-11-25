@@ -267,6 +267,7 @@ def get_data(chrom, c, balance, local):
 def _do_pileups(mids, data, binsize, pad, expected, mindist, maxdist, local,
                 balance, cov_norm, rescale, rescale_pad, rescale_size,
                 coverage, anchor):
+    max_right = data.shape[0]
     mymap = make_outmap(pad, rescale, rescale_size)
     cov_start = np.zeros(mymap.shape[0])
     cov_end = np.zeros(mymap.shape[1])
@@ -290,6 +291,8 @@ def _do_pileups(mids, data, binsize, pad, expected, mindist, maxdist, local,
         hi_left = stBin + stPad + 1
         lo_right = endBin - endPad
         hi_right = endBin + endPad + 1
+        if lo_left < 0 or hi_right > max_right:
+            continue
         if mindist <= abs(endBin - stBin)*binsize < maxdist or local:
             if expected is False:
                 try:
@@ -466,7 +469,11 @@ def pileupsWithControl(mids, filename, mids2=None, pad=100, nproc=1,
     c = cooler.Cooler(filename)
     if chroms is None:
         chroms = c.chromnames
-    p = Pool(nproc)
+    if nproc>1:
+        p = Pool(nproc)
+        mymap = p.map
+    else:
+        mymap = map
     #Loops
     f = partial(pileups, c=c, pad=pad, ctrl=False, local=local,
                 two_beds=two_beds, ordered_mids=ordered_mids,
@@ -483,7 +490,7 @@ def pileupsWithControl(mids, filename, mids2=None, pad=100, nproc=1,
         two_beds = True
     else:
         two_beds = False
-    loops, ns, cov_starts, cov_ends = list(zip(*p.map(f, chrommids)))
+    loops, ns, cov_starts, cov_ends = list(zip(*map(f, chrommids)))
     loop = np.sum(loops, axis=0)
     n = np.sum(ns)
     if cov_norm:
@@ -506,7 +513,7 @@ def pileupsWithControl(mids, filename, mids2=None, pad=100, nproc=1,
                     anchor=anchor, balance=balance, cov_norm=cov_norm,
                     rescale=rescale, rescale_pad=rescale_pad,
                     rescale_size=rescale_size)
-        ctrls, ns, cov_starts, cov_ends = list(zip(*p.map(f, chrommids)))
+        ctrls, ns, cov_starts, cov_ends = list(zip(*map(f, chrommids)))
         ctrl = np.sum(ctrls, axis=0)
         n = np.sum(ns)
         if cov_norm:
@@ -528,12 +535,13 @@ def pileupsWithControl(mids, filename, mids2=None, pad=100, nproc=1,
                     anchor=anchor, balance=balance, cov_norm=cov_norm,
                     rescale=rescale, rescale_pad=rescale_pad,
                     rescale_size=rescale_size)
-        exps, ns, cov_starts, cov_ends = list(zip(*p.map(f, chrommids)))
+        exps, ns, cov_starts, cov_ends = list(zip(*map(f, chrommids)))
         exp = np.sum(exps, axis=0)
         n = np.sum(ns)
         exp /= n
         loop /= exp
-    p.close()
+    if nproc>1:
+        p.close()
     loop[~np.isfinite(loop)] = 0
     return loop
 
