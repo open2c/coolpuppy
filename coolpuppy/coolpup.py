@@ -3,12 +3,13 @@ import numpy as np
 import cooler
 import pandas as pd
 import itertools
-from multiprocessing import Pool
+from pathos.multiprocessing import ProcessPool as Pool
 from functools import partial
 import logging
 from scipy import sparse
 from scipy.linalg import toeplitz
 from cooltools import numutils
+from cooltools import snipping
 
 
 def cornerCV(amap, i=4):
@@ -26,240 +27,309 @@ def get_enrichment(amap, n):
     return np.nanmean(amap[c - n // 2 : c + n // 2 + 1, c - n // 2 : c + n // 2 + 1])
 
 
-def filter_bed(df, minsize, maxsize, chroms):
-    length = df["end"] - df["start"]
-    df = df[(length >= minsize) & (length <= maxsize)]
-    if chroms != "all":
-        df = df[df["chr"].isin(chroms)]
-    if not np.all(df["end"] >= df["start"]):
-        raise ValueError("Some ends in the file are smaller than starts")
-    return df
+class BaselistCreator:
+    def __init__(
+        self,
+        baselist,
+        resolution,
+        bed2=None,
+        bed2_ordered=False,
+        pad=100000,
+        chroms="all",
+        minshift=10 ** 5,
+        maxshift=10 ** 6,
+        nshifts=10,
+        mindist=0,
+        maxdist=np.inf,
+        minsize=0,
+        maxsize=np.inf,
+        local=False,
+    ):
+        self.baselist = baselist
+        self.stdin = self.baselist == self.stdin
+        self.resolution = resolution
+        self.bed2 = bed2
+        self.bed2_ordered = bed2_ordered
+        self.pad = pad
+        self.chroms = chroms
+        self.minshift = minshift
+        self.maxshift = maxshift
+        self.nshifts = nshifts
+        self.mindist = mindist
+        self.maxdist = maxdist
+        self.minsize = minsize
+        self.maxsize = maxsize
+        self.local = local
 
+    def filter_bed(self, df):
+        length = df["end"] - df["start"]
+        df = df[(length >= self.minsize) & (length <= self.maxsize)]
+        if self.chroms != "all":
+            df = df[df["chr"].isin(self.chroms)]
+        if not np.all(df["end"] >= df["start"]):
+            raise ValueError("Some ends in the file are smaller than starts")
+        return df
 
-def filter_bedpe(df, mindist, maxdist, chroms):
-    mid1 = np.mean(df[["start1", "end1"]], axis=1)
-    mid2 = np.mean(df[["start2", "end2"]], axis=1)
-    length = mid2 - mid1
-    df = df[(length >= mindist) & (length <= maxdist)]
-    if chroms != "all":
-        df = df[(df["chr1"].isin(chroms)) & (df["chr2"].isin(chroms))]
-    return df
+    def filter_bedpe(self, df):
+        mid1 = np.mean(df[["start1", "end1"]], axis=1)
+        mid2 = np.mean(df[["start2", "end2"]], axis=1)
+        length = mid2 - mid1
+        df = df[(length >= self.mindist) & (length <= self.maxdist)]
+        if self.chroms != "all":
+            df = df[(df["chr1"].isin(self.chroms)) & (df["chr2"].isin(self.chroms))]
+        return df
 
+    # def check_bed_bedpe(df):
+    #    if np.any(df[['chr2', 'start2', 'end2']].isnull().all()):
+    #        # If the file has <6 columns, assume bed
+    #        return 'bed'
+    #    else:
+    #        # Else assume bedpe
+    #        return 'bedpe'
 
-# def check_bed_bedpe(df):
-#    if np.any(df[['chr2', 'start2', 'end2']].isnull().all()):
-#        # If the file has <6 columns, assume bed
-#        return 'bed'
-#    else:
-#        # Else assume bedpe
-#        return 'bedpe'
+    def auto_read_bed(
+        self, file, kind="auto",
+    ):
+        if kind == "auto":  # Guessing whether it's bed or bedpe style file
+            if self.stdin:
+                row1 = file.__next__().split("\t")
+            else:
+                with open(file, "r") as fobject:
+                    row1 = fobject.readline().split("\t")
+            if len(row1) == 6:
+                filetype = "bedpe"
+                row1 = [
+                    row1[0],
+                    int(row1[1]),
+                    int(row1[2]),
+                    row1[3],
+                    int(row1[4]),
+                    int(row1[5]),
+                ]
+            elif len(row1) == 3:
+                filetype = "bed"
+                row1 = [row1[0], int(row1[1]), int(row1[2])]
+            else:
+                raise ValueError(
+                    """Input bed(pe) file has unexpected number of
+                                 columns: got {}, expect 3 (bed) or 6 (bedpe)
+                                 """.format(
+                        len(row1)
+                    )
+                )
+        #        testdf = pd.read_csv(f, sep='\t',
+        #                                names=['chr1', 'start1', 'end1',
+        #                                       'chr2', 'start2', 'end2'],
+        #                            index_col=False, chunksize = 10).__next__()
+        #        kind = check_bed_bedpe(testdf)
 
-
-def auto_read_bed(
-    f,
-    kind="auto",
-    chroms="all",
-    minsize=0,
-    maxsize=np.inf,
-    mindist=0,
-    maxdist=np.inf,
-    stdin=False,
-):
-    if kind == "auto":  # Guessing whether it's bed or bedpe style file
-        if stdin:
-            row1 = f.__next__().split("\t")
-        else:
-            with open(f, "r") as fobject:
-                row1 = fobject.readline().split("\t")
-        if len(row1) == 6:
-            filetype = "bedpe"
-            row1 = [
-                row1[0],
-                int(row1[1]),
-                int(row1[2]),
-                row1[3],
-                int(row1[4]),
-                int(row1[5]),
-            ]
-        elif len(row1) == 3:
-            filetype = "bed"
-            row1 = [row1[0], int(row1[1]), int(row1[2])]
+        if filetype == "bed" or kind == "bed":
+            filter_func = self.filter_bed
+            names = ["chr", "start", "end"]
+            row1 = filter_func(pd.DataFrame([row1], columns=names))
+        elif filetype == "bedpe" or kind == "bedpe":  # bedpe
+            filter_func = self.filter_bedpe
+            names = ["chr1", "start1", "end1", "chr2", "start2", "end2"]
+            row1 = filter_func(pd.DataFrame([row1], columns=names))
         else:
             raise ValueError(
-                """Input bed(pe) file has unexpected number of
-                             columns: got {}, expect 3 (bed) or 6 (bedpe)
-                             """.format(
-                    len(row1)
+                """Unsupported input kind: {}.
+                             Expect {} or {}""".format(
+                    kind, "bed", "bedpe"
                 )
             )
-    #        testdf = pd.read_csv(f, sep='\t',
-    #                                names=['chr1', 'start1', 'end1',
-    #                                       'chr2', 'start2', 'end2'],
-    #                            index_col=False, chunksize = 10).__next__()
-    #        kind = check_bed_bedpe(testdf)
+        bases = []
 
-    if filetype == "bed" or kind == "bed":
-        filter_func = partial(
-            filter_bed, minsize=minsize, maxsize=maxsize, chroms=chroms
-        )
-        names = ["chr", "start", "end"]
-        row1 = filter_func(pd.DataFrame([row1], columns=names))
-    elif filetype == "bedpe" or kind == "bedpe":  # bedpe
-        filter_func = partial(
-            filter_bedpe, mindist=mindist, maxdist=maxdist, chroms=chroms
-        )
-        names = ["chr1", "start1", "end1", "chr2", "start2", "end2"]
-        row1 = filter_func(pd.DataFrame([row1], columns=names))
-    else:
-        raise ValueError(
-            """Unsupported input kind: {}.
-                         Expect {} or {}""".format(
-                kind, "bed", "bedpe"
-            )
-        )
-    bases = []
+        appended = False
+        if kind == "auto":
 
-    appended = False
-    if kind == "auto":
+            if row1.shape[0] == 1:
+                bases.append(row1)
+                appended = True
 
-        if row1.shape[0] == 1:
-            bases.append(row1)
-            appended = True
-
-    for chunk in pd.read_csv(
-        f, sep="\t", names=names, index_col=False, chunksize=10 ** 4
-    ):
-        bases.append(filter_func(chunk))
-    bases = pd.concat(bases)
-    if appended:  # Would mean we read it twice when checking and in the first chunk
-        bases = bases.iloc[1:]
-    if filetype == "bed" or kind == "bed":
-        bases["chr"] = bases["chr"].astype(str)
-        bases[["start", "end"]] = bases[["start", "end"]].astype(np.uint64)
-    if filetype == "bedpe" or kind == "bedpe":
-        bases[["chr1", "chr2"]] = bases[["chr1", "chr2"]].astype(str)
-        bases[["start1", "end1", "start2", "end2"]] = bases[
-            ["start1", "end1", "start2", "end2"]
-        ].astype(np.uint64)
-    return bases
-
-
-def bedpe2bed(df, ends=True, how="center"):
-    # If ends==True, will combine all coordinates from both loop ends into one bed-style df
-    # Else, will convert to long intervals covering the whole loop, for e.g. rescaled averaging
-    # how: center - take center of loop bases; inner or outer
-    if ends:
-        df1 = df[["chr1", "start1", "end1"]]
-        df1.columns = ["chr", "start", "end"]
-        df2 = df[["chr2", "start2", "end2"]]
-        df2.columns = ["chr", "start", "end"]
-        return (
-            pd.concat([df1, df2])
-            .sort_values(["chr", "start", "end"])
-            .reset_index(drop=True)
-        )
-
-    if how == "center":
-        df["start"] = np.mean(df["start1"], df["end1"], axis=0)
-        df["end"] = np.mean(df["start2"], df["end2"], axis=0)
-    elif how == "outer":
-        df = df[["chr1", "start1", "end2"]]
-        df.columns = ["chr", "start", "end"]
-    elif how == "inner":
-        df = df[["chr1", "end1", "start2"]]
-        df.columns = ["chr", "start", "end"]
-    return df
-
-
-def get_mids(intervals, resolution, kind="bed"):
-    if kind == "bed":
-        intervals = intervals.sort_values(["chr", "start"])
-        mids = np.round((intervals["end"] + intervals["start"]) / 2).astype(int)
-        widths = np.round((intervals["end"] - intervals["start"])).astype(int)
-        mids = pd.DataFrame(
-            {
-                "chr": intervals["chr"],
-                "Mids": mids,
-                "Bin": mids // resolution,
-                "Pad": widths / 2,
-            }
-        ).drop_duplicates(
-            ["chr", "Bin"]
-        )  # .drop('Bin', axis=1)
-    elif kind == "bedpe":
-        intervals = intervals.sort_values(["chr1", "chr2", "start1", "start2"])
-        mids1 = np.round((intervals["end1"] + intervals["start1"]) / 2).astype(int)
-        widths1 = np.round((intervals["end1"] - intervals["start1"])).astype(int)
-        mids2 = np.round((intervals["end2"] + intervals["start2"]) / 2).astype(int)
-        widths2 = np.round((intervals["end2"] - intervals["start2"])).astype(int)
-        mids = pd.DataFrame(
-            {
-                "chr1": intervals["chr1"],
-                "Mids1": mids1,
-                "Bin1": mids1 // resolution,
-                "Pad1": widths1 / 2,
-                "chr2": intervals["chr2"],
-                "Mids2": mids2,
-                "Bin2": mids2 // resolution,
-                "Pad2": widths2 / 2,
-            },
-        ).drop_duplicates(
-            ["chr1", "chr2", "Bin1", "Bin2"]
-        )  # .drop(['Bin1', 'Bin2'], axis=1)
-    else:
-        raise ValueError(
-            """
-                         kind can only be "bed" or "bedpe"
-                         """
-        )
-    return mids
-
-
-def get_combinations(
-    mids, res, mids2=None, ordered_mids=True, local=False, anchor=None
-):
-    if (local and anchor) or (local and (mids2 is not None)):
-        raise ValueError(
-            """Can't have a local pileup with an anchor or with
-                            two bed files"""
-        )
-    m = mids["Bin"].values.astype(int)
-    p = (mids["Pad"] // res).values.astype(int)
-
-    if mids2 is not None:
-        m2 = mids2["Bin"].values.astype(int)
-        p2 = (mids2["Pad"] // res).values.astype(int)
-
-    if local:
-        for i, pi in zip(m, p):
-            yield i, i, pi, pi
-    elif anchor:
-        anchor_bin = int((anchor[1] + anchor[2]) / 2 // res)
-        anchor_pad = int(round((anchor[2] - anchor[1]) / 2))
-        for i, pi in zip(m, p):
-            yield anchor_bin, i, anchor_pad, pi
-    elif mids2 is None:
-        for i, j in zip(itertools.combinations(m, 2), itertools.combinations(p, 2)):
-            yield list(i) + list(j)
-    elif (mids2 is not None) and ordered_mids:
-        for i, j in zip(itertools.product(m, m2), itertools.product(p, p2)):
-            if i[1] > i[0]:
-                yield list(i) + list(j)
-    elif (mids2 is not None) and (not ordered_mids):
-        for i, j in itertools.chain(
-            zip(itertools.product(m, m2), itertools.product(p, p2)),
-            zip(itertools.product(m2, m), itertools.product(p2, p)),
+        for chunk in pd.read_csv(
+            file, sep="\t", names=names, index_col=False, chunksize=10 ** 4
         ):
-            yield list(i) + list(j)
+            bases.append(filter_func(chunk))
+        bases = pd.concat(bases)
+        if appended:  # Would mean we read it twice when checking and in the first chunk
+            bases = bases.iloc[1:]
+        if filetype == "bed" or kind == "bed":
+            self.kind = "bed"
+            bases["chr"] = bases["chr"].astype(str)
+            bases[["start", "end"]] = bases[["start", "end"]].astype(np.uint64)
+        if filetype == "bedpe" or kind == "bedpe":
+            self.kind = "bedpe"
+            bases[["chr1", "chr2"]] = bases[["chr1", "chr2"]].astype(str)
+            bases[["start1", "end1", "start2", "end2"]] = bases[
+                ["start1", "end1", "start2", "end2"]
+            ].astype(np.uint64)
+        return bases
+
+    def read_input(self):
+        self.bases = self.auto_read_bed(self.baselist)
+        if self.bed2 is not None:
+            self.bed2 = self.auto_read_bed(self.bed2)
+
+    def bedpe2bed(self, df, ends=True, how="center"):
+        # If ends==True, will combine all coordinates from both loop ends into one bed-style df
+        # Else, will convert to long intervals covering the whole loop, for e.g. rescaled averaging
+        # how: center - take center of loop bases; inner or outer
+        if ends:
+            df1 = df[["chr1", "start1", "end1"]]
+            df1.columns = ["chr", "start", "end"]
+            df2 = df[["chr2", "start2", "end2"]]
+            df2.columns = ["chr", "start", "end"]
+            return (
+                pd.concat([df1, df2])
+                .sort_values(["chr", "start", "end"])
+                .reset_index(drop=True)
+            )
+
+        if how == "center":
+            df["start"] = np.mean(df["start1"], df["end1"], axis=0)
+            df["end"] = np.mean(df["start2"], df["end2"], axis=0)
+        elif how == "outer":
+            df = df[["chr1", "start1", "end2"]]
+            df.columns = ["chr", "start", "end"]
+        elif how == "inner":
+            df = df[["chr1", "end1", "start2"]]
+            df.columns = ["chr", "start", "end"]
+        return df
+
+    def get_mids(self, intervals):
+        if self.kind == "bed":
+            intervals = intervals.sort_values(["chr", "start"])
+            mids = np.round((intervals["end"] + intervals["start"]) / 2).astype(int)
+            widths = np.round((intervals["end"] - intervals["start"])).astype(int)
+            mids = pd.DataFrame(
+                {
+                    "chr": intervals["chr"],
+                    "Mids": mids,
+                    "Bin": mids // self.resolution,
+                    "Pad": widths / 2,
+                }
+            ).drop_duplicates(
+                ["chr", "Bin"]
+            )  # .drop('Bin', axis=1)
+        elif self.kind == "bedpe":
+            intervals = intervals.sort_values(["chr1", "chr2", "start1", "start2"])
+            mids1 = np.round((intervals["end1"] + intervals["start1"]) / 2).astype(int)
+            widths1 = np.round((intervals["end1"] - intervals["start1"])).astype(int)
+            mids2 = np.round((intervals["end2"] + intervals["start2"]) / 2).astype(int)
+            widths2 = np.round((intervals["end2"] - intervals["start2"])).astype(int)
+            mids = pd.DataFrame(
+                {
+                    "chr1": intervals["chr1"],
+                    "Mids1": mids1,
+                    "Bin1": mids1 // self.resolution,
+                    "Pad1": widths1 / 2,
+                    "chr2": intervals["chr2"],
+                    "Mids2": mids2,
+                    "Bin2": mids2 // self.resolution,
+                    "Pad2": widths2 / 2,
+                },
+            ).drop_duplicates(
+                ["chr1", "chr2", "Bin1", "Bin2"]
+            )  # .drop(['Bin1', 'Bin2'], axis=1)
+        else:
+            raise ValueError(
+                """
+                             kind can only be "bed" or "bedpe"
+                             """
+            )
+        return mids
+
+    def get_combinations(
+        self, mids, mids2=None,
+    ):
+        if (self.local and self.anchor) or (self.local and (mids2 is not None)):
+            raise ValueError(
+                """Can't have a local pileup with an anchor or with
+                                two bed files"""
+            )
+        m = mids["Bin"].values.astype(int)
+        p = (mids["Pad"] // self.resolution).values.astype(int)
+
+        if mids2 is not None:
+            m2 = mids2["Bin"].values.astype(int)
+            p2 = (mids2["Pad"] // self.resolution).values.astype(int)
+
+        if self.local:
+            for i, pi in zip(m, p):
+                yield i, i, pi, pi
+        elif self.anchor:
+            anchor_bin = int((self.anchor[1] + self.anchor[2]) / 2 // self.resolution)
+            anchor_pad = int(round((self.anchor[2] - self.anchor[1]) / 2))
+            for i, pi in zip(m, p):
+                yield anchor_bin, i, anchor_pad, pi
+        elif mids2 is None:
+            for i, j in zip(itertools.combinations(m, 2), itertools.combinations(p, 2)):
+                yield list(i) + list(j)
+        elif (mids2 is not None) and self.bed2_ordered:
+            for i, j in zip(itertools.product(m, m2), itertools.product(p, p2)):
+                if i[1] > i[0]:
+                    yield list(i) + list(j)
+        elif (mids2 is not None) and (not self.bed2_ordered):
+            for i, j in itertools.chain(
+                zip(itertools.product(m, m2), itertools.product(p, p2)),
+                zip(itertools.product(m2, m), itertools.product(p2, p)),
+            ):
+                yield list(i) + list(j)
+
+    def get_positions_pairs(self, mids):
+        m1 = mids["Bin1"].astype(int).values
+        m2 = mids["Bin2"].astype(int).values
+        p1 = (mids["Pad1"] // self.resolution).astype(int).values
+        p2 = (mids["Pad2"] // self.resolution).astype(int).values
+        for posdata in zip(m1, m2, p1, p2):
+            yield posdata
+
+    def controlRegions(self, midcombs, seed=None):
+        if seed is not None:
+            np.random.seed(seed)
+        minbin = self.minshift // self.resolution
+        maxbin = self.maxshift // self.resolution
+        for start, end, p1, p2 in midcombs:
+            for i in range(self.nshifts):
+                shift = np.random.randint(minbin, maxbin)
+                sign = np.sign(np.random.random() - 0.5).astype(int)
+                shift *= sign
+                yield start + shift, end + shift, p1, p2
 
 
-def get_positions_pairs(mids, res):
-    m1 = mids["Bin1"].astype(int).values
-    m2 = mids["Bin2"].astype(int).values
-    p1 = (mids["Pad1"] // res).astype(int).values
-    p2 = (mids["Pad2"] // res).astype(int).values
-    for posdata in zip(m1, m2, p1, p2):
-        yield posdata
+class PileUpper:
+    def __init__(
+        self,
+        clr,
+        coordinate_generator,
+        expected=None,
+        chroms=None,
+        anchor=None,
+        by_window=False,
+        save_all=False,
+        local=False,
+        unbalanced=False,
+        coverage_norm=False,
+        rescale=False,
+        rescale_pad=1,
+        rescale_size=99,
+        weight_name="weight",
+        n_proc=1,
+    ):
+        self.clr = clr
+        self.expected = expected
+        self.chroms = chroms
+        self.anchor = anchor
+        self.by_window = by_window
+        self.save_all = save_all
+        self.unbalanced = unbalanced
+        self.coverage_norm = coverage_norm
+        self.rescale = rescale
+        self.rescale_pad - rescale_pad
+        self.rescale_size = rescale_size
+        self.weight_name = weight_name
+        self.n_proc = n_proc
 
 
 def prepare_single(item):
@@ -271,22 +341,7 @@ def prepare_single(item):
     return list(key) + [n, enr1, enr3, cv3, cv5]
 
 
-def controlRegions(
-    midcombs, res, minshift=10 ** 5, maxshift=10 ** 6, nshifts=1, seed=None
-):
-    if seed is not None:
-        np.random.seed(seed)
-    minbin = minshift // res
-    maxbin = maxshift // res
-    for start, end, p1, p2 in midcombs:
-        for i in range(nshifts):
-            shift = np.random.randint(minbin, maxbin)
-            sign = np.sign(np.random.random() - 0.5).astype(int)
-            shift *= sign
-            yield start + shift, end + shift, p1, p2
-
-
-def get_expected_matrix(left_interval, right_interval, expected, local):
+def get_expected_matrix(ExpSnipper, left_interval, right_interval):
     lo_left, hi_left = left_interval
     lo_right, hi_right = right_interval
     exp_lo = lo_right - hi_left + 1

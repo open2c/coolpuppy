@@ -395,16 +395,24 @@ def main():
             if chrom not in args.excl_chrs.split(",") and chrom in incl_chrs:
                 fchroms.append(chrom)
 
-    bases = auto_read_bed(
-        args.baselist,
-        kind="auto",
+    BC = BaselistCreator(
+        baselist=args.baselist,
+        resolution=c.binsize,
+        bed2=args.bed2,
+        bed2_ordered=args.bed2_ordered,
+        pad=args.pad,
         chroms=fchroms,
-        minsize=minsize,
-        maxsize=maxsize,
-        mindist=mindist,
-        maxdist=maxdist,
-        stdin=args.baselist == sys.stdin,
+        minshift=args.minshift,
+        maxshift=args.maxshift,
+        nshifts=args.nshifts,
+        minsize=args.minsize,
+        maxsize=args.maxsize,
+        mindist=args.mindist,
+        maxdist=args.maxdist,
+        local=args.local,
     )
+
+    BC.read_input()
 
     if len(bases.columns) == 3:
         kind = "bed"
