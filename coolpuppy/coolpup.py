@@ -6,6 +6,7 @@ import itertools
 from pathos.multiprocessing import ProcessPool as Pool
 from functools import partial
 import logging
+from natsort import index_natsorted, order_by_index, natsorted
 from scipy import sparse
 from scipy.linalg import toeplitz
 from cooltools import numutils
@@ -34,6 +35,7 @@ class BaselistCreator:
         resolution,
         bed2=None,
         bed2_ordered=False,
+        anchor=False,
         pad=100000,
         chroms="all",
         minshift=10 ** 5,
@@ -44,12 +46,14 @@ class BaselistCreator:
         minsize=0,
         maxsize=np.inf,
         local=False,
+        subset=0,
     ):
         self.baselist = baselist
         self.stdin = self.baselist == self.stdin
         self.resolution = resolution
         self.bed2 = bed2
         self.bed2_ordered = bed2_ordered
+        self.anchor = anchor
         self.pad = pad
         self.chroms = chroms
         self.minshift = minshift
@@ -60,6 +64,7 @@ class BaselistCreator:
         self.minsize = minsize
         self.maxsize = maxsize
         self.local = local
+        self.subset = subset
 
     def filter_bed(self, df):
         length = df["end"] - df["start"]
@@ -78,14 +83,6 @@ class BaselistCreator:
         if self.chroms != "all":
             df = df[(df["chr1"].isin(self.chroms)) & (df["chr2"].isin(self.chroms))]
         return df
-
-    # def check_bed_bedpe(df):
-    #    if np.any(df[['chr2', 'start2', 'end2']].isnull().all()):
-    #        # If the file has <6 columns, assume bed
-    #        return 'bed'
-    #    else:
-    #        # Else assume bedpe
-    #        return 'bedpe'
 
     def auto_read_bed(
         self, file, kind="auto",
@@ -155,21 +152,22 @@ class BaselistCreator:
         if appended:  # Would mean we read it twice when checking and in the first chunk
             bases = bases.iloc[1:]
         if filetype == "bed" or kind == "bed":
-            self.kind = "bed"
+            kind = "bed"
             bases["chr"] = bases["chr"].astype(str)
             bases[["start", "end"]] = bases[["start", "end"]].astype(np.uint64)
         if filetype == "bedpe" or kind == "bedpe":
-            self.kind = "bedpe"
+            kind = "bedpe"
             bases[["chr1", "chr2"]] = bases[["chr1", "chr2"]].astype(str)
             bases[["start1", "end1", "start2", "end2"]] = bases[
                 ["start1", "end1", "start2", "end2"]
             ].astype(np.uint64)
-        return bases
+        return bases, kind
 
-    def read_input(self):
-        self.bases = self.auto_read_bed(self.baselist)
-        if self.bed2 is not None:
-            self.bed2 = self.auto_read_bed(self.bed2)
+    def subset(self, df):
+        if self.subset > 0 and self.subset < len(df):
+            return df.sample(self.subset)
+        else:
+            return df
 
     def bedpe2bed(self, df, ends=True, how="center"):
         # If ends==True, will combine all coordinates from both loop ends into one bed-style df
@@ -197,7 +195,7 @@ class BaselistCreator:
             df.columns = ["chr", "start", "end"]
         return df
 
-    def get_mids(self, intervals):
+    def _get_mids(self, intervals):
         if self.kind == "bed":
             intervals = intervals.sort_values(["chr", "start"])
             mids = np.round((intervals["end"] + intervals["start"]) / 2).astype(int)
@@ -240,20 +238,18 @@ class BaselistCreator:
             )
         return mids
 
-    def get_combinations(
-        self, mids, mids2=None,
-    ):
-        if (self.local and self.anchor) or (self.local and (mids2 is not None)):
+    def get_combinations(self):
+        if (self.local and self.anchor) or (self.local and (self.mids2 is not None)):
             raise ValueError(
                 """Can't have a local pileup with an anchor or with
                                 two bed files"""
             )
-        m = mids["Bin"].values.astype(int)
-        p = (mids["Pad"] // self.resolution).values.astype(int)
+        m = self.mids["Bin"].values.astype(int)
+        p = (self.mids["Pad"] // self.resolution).values.astype(int)
 
-        if mids2 is not None:
-            m2 = mids2["Bin"].values.astype(int)
-            p2 = (mids2["Pad"] // self.resolution).values.astype(int)
+        if self.mids2 is not None:
+            m2 = self.mids2["Bin"].values.astype(int)
+            p2 = (self.mids2["Pad"] // self.resolution).values.astype(int)
 
         if self.local:
             for i, pi in zip(m, p):
@@ -263,46 +259,108 @@ class BaselistCreator:
             anchor_pad = int(round((self.anchor[2] - self.anchor[1]) / 2))
             for i, pi in zip(m, p):
                 yield anchor_bin, i, anchor_pad, pi
-        elif mids2 is None:
+        elif self.mids2 is None:
             for i, j in zip(itertools.combinations(m, 2), itertools.combinations(p, 2)):
                 yield list(i) + list(j)
-        elif (mids2 is not None) and self.bed2_ordered:
+        elif (self.mids2 is not None) and self.bed2_ordered:
             for i, j in zip(itertools.product(m, m2), itertools.product(p, p2)):
                 if i[1] > i[0]:
                     yield list(i) + list(j)
-        elif (mids2 is not None) and (not self.bed2_ordered):
+        elif (self.mids2 is not None) and (not self.bed2_ordered):
             for i, j in itertools.chain(
                 zip(itertools.product(m, m2), itertools.product(p, p2)),
                 zip(itertools.product(m2, m), itertools.product(p2, p)),
             ):
                 yield list(i) + list(j)
 
-    def get_positions_pairs(self, mids):
-        m1 = mids["Bin1"].astype(int).values
-        m2 = mids["Bin2"].astype(int).values
-        p1 = (mids["Pad1"] // self.resolution).astype(int).values
-        p2 = (mids["Pad2"] // self.resolution).astype(int).values
+    def get_positions_pairs(self):
+        m1 = self.mids["Bin1"].astype(int).values
+        m2 = self.mids["Bin2"].astype(int).values
+        p1 = (self.mids["Pad1"] // self.resolution).astype(int).values
+        p2 = (self.mids["Pad2"] // self.resolution).astype(int).values
         for posdata in zip(m1, m2, p1, p2):
             yield posdata
 
-    def controlRegions(self, midcombs, seed=None):
-        if seed is not None:
-            np.random.seed(seed)
+    def control_regions(self):
+        if self.seed is not None:
+            np.random.seed(self.seed)
         minbin = self.minshift // self.resolution
         maxbin = self.maxshift // self.resolution
-        for start, end, p1, p2 in midcombs:
+        if self.kind == "bed":
+            source = self.get_position_pairs()
+        else:
+            source = self.get_combinations()
+        for start, end, p1, p2 in source:
             for i in range(self.nshifts):
                 shift = np.random.randint(minbin, maxbin)
                 sign = np.sign(np.random.random() - 0.5).astype(int)
                 shift *= sign
                 yield start + shift, end + shift, p1, p2
 
+    def process(self):
+        self.bases, self.kind = self.auto_read_bed(self.baselist)
+        if self.bed2 is not None:
+            self.bed2, self.bed2kind = self.auto_read_bed(self.bed2)
+            if self.kind != "bed":
+                raise ValueError(
+                    """Please provide two BED files; baselist doesn't
+                             seem to be one"""
+                )
+            elif self.bed2kind != "bed":
+                raise ValueError(
+                    """Please provide two BED files; bed2 doesn't
+                             seem to be one"""
+                )
+        if self.kind == "bed":
+            basechroms = set(self.bases["chr"])
+            if self.anchor:
+                if self.anchor[0] not in basechroms:
+                    raise ValueError(
+                        """The anchor chromosome is not found in the baselist.
+                           Are they in the same format, e.g. starting with "chr"?
+                           Alternatively, all regions in that chromosome might have
+                           been filtered by some filters."""
+                    )
+                else:
+                    basechroms = [self.anchor[0]]
+        else:
+            if self.anchor:
+                raise ValueError("Can't use anchor with both sides of loops defined")
+            elif self.local:
+                raise ValueError("Can't make local with both sides of loops defined")
+            basechroms = set(self.bases["chr1"]) | set(self.bases["chr2"])
+
+        if self.bed2 is not None:
+            bed2chroms = set(self.bases["chr"])
+            basechroms = basechroms & bed2chroms
+        self.basechroms = natsorted(list(basechroms))
+        self.final_chroms = natsorted(list(set(self.chroms) & basechroms))
+        if len(self.final_chroms) == 0:
+            raise ValueError(
+                """No chromosomes are in common between the coordinate
+                             file/anchor and the cooler file. Are they in the same
+                             format, e.g. starting with "chr"?
+                             Alternatively, all regions might have been filtered
+                             by distance/size filters."""
+            )
+        self.mids = self.subset(self._get_mids(self.bases))
+        if self.bed2:
+            self.mids2 = self.subset(self._get_mids(self.bed2))
+        else:
+            self.mids2 = None
+
+        if self.kind == "bed":
+            self.pos_stream = self.get_combinations()
+        else:
+            self.pos_stream = self.get_position_pairs()
+        self.ctrl_stream = self.control_regions()
+
 
 class PileUpper:
     def __init__(
         self,
         clr,
-        coordinate_generator,
+        BC,
         expected=None,
         chroms=None,
         anchor=None,

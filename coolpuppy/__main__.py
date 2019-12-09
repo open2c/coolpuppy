@@ -400,6 +400,7 @@ def main():
         resolution=c.binsize,
         bed2=args.bed2,
         bed2_ordered=args.bed2_ordered,
+        anchor=args.anchor,
         pad=args.pad,
         chroms=fchroms,
         minshift=args.minshift,
@@ -410,65 +411,10 @@ def main():
         mindist=args.mindist,
         maxdist=args.maxdist,
         local=args.local,
+        subset=args.subset,
     )
 
-    BC.read_input()
-
-    if len(bases.columns) == 3:
-        kind = "bed"
-        basechroms = set(bases["chr"])
-    else:
-        kind = "bedpe"
-        if anchor:
-            raise ValueError("Can't use anchor with both sides of loops defined")
-        elif args.local:
-            raise ValueError("Can't make local with both sides of loops defined")
-        basechroms = set(bases["chr1"]) | set(bases["chr2"])
-
-    if args.bed2 is not None:
-        if kind != "bed":
-            raise ValueError(
-                """Please provide two BED files; baselist doesn't
-                             seem to be one"""
-            )
-        bases2 = auto_read_bed(
-            args.bed2,
-            kind="auto",
-            chroms=fchroms,
-            minsize=minsize,
-            maxsize=maxsize,
-            mindist=mindist,
-            maxdist=maxdist,
-            stdin=False,
-        )
-        if len(bases2.columns) > 3:
-            raise ValueError(
-                """Please provide two BED files; bed2 doesn't seem
-                             to be one"""
-            )
-        bed2chroms = set(bases["chr"])
-        basechroms = basechroms & bed2chroms
-
-    fchroms = natsorted(list(set(fchroms) & basechroms))
-
-    if len(fchroms) == 0:
-        raise ValueError(
-            """No chromosomes are in common between the coordinate
-                         file/anchor and the cooler file. Are they in the same
-                         format, e.g. starting with "chr"?
-                         Alternatively, all regions might have been filtered
-                         by distance/size filters."""
-        )
-
-    mids = get_mids(bases, resolution=c.binsize, kind=kind)
-    if args.bed2 is not None:
-        mids2 = get_mids(bases2, resolution=c.binsize, kind="bed")
-    else:
-        mids2 = None
-    if args.subset > 0 and args.subset < len(mids):
-        mids = mids.sample(args.subset)
-        if args.bed2 is not None:
-            mids2 = mids2.sample(args.subset)
+    BC.process()
 
     if args.outdir == ".":
         args.outdir = os.getcwd()
@@ -516,7 +462,7 @@ def main():
         #                                      coverage normalization - please use
         #                                      balanced data instead""")
         finloops = pileupsByWindowWithControl(
-            mids=mids,
+            mids=BC.mids,
             filename=args.coolfile,
             pad=pad,
             nproc=nproc,
