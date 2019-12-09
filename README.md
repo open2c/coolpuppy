@@ -2,7 +2,7 @@
 [![DOI](https://zenodo.org/badge/147190130.svg)](https://zenodo.org/badge/latestdoi/147190130)
 [![PyPI version](https://badge.fury.io/py/coolpuppy.svg)](https://badge.fury.io/py/coolpuppy)
 [![Build Status](https://travis-ci.org/Phlya/coolpuppy.svg?branch=master)](https://travis-ci.org/Phlya/coolpuppy)
-
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 .**cool** file **p**ile-**up**s with **py**thon.
 
 # Introduction
