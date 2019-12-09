@@ -4,13 +4,16 @@
 
 import numpy as np
 
+
 def norm_cis(amap, i=3):
-    return amap/np.nanmean((amap[0:i, 0:i]+amap[-i:, -i:]))*2
+    return amap / np.nanmean((amap[0:i, 0:i] + amap[-i:, -i:])) * 2
+
 
 def auto_rows_cols(n):
     rows = int(np.ceil(np.sqrt(n)))
-    cols = int(np.ceil(n/rows))
+    cols = int(np.ceil(n / rows))
     return rows, cols
+
 
 def get_min_max(pups, vmin=None, vmax=None, sym=True):
     if vmin is not None and vmax is not None:
@@ -29,5 +32,5 @@ def get_min_max(pups, vmin=None, vmax=None, sym=True):
         vmin = np.nanmin(comb)
     if sym:
         vmax = np.max(np.abs([vmin, vmax]))
-        vmin = 2**-np.log2(vmax)
+        vmin = 2 ** -np.log2(vmax)
     return vmin, vmax
