@@ -19,13 +19,22 @@ def cornerCV(amap, i=4):
     return np.std(corners) / np.mean(corners)
 
 
-# def normCis(amap, i=3):
-#    return amap/np.nanmean((amap[0:i, 0:i]+amap[-i:, -i:]))*2
+def normCis(amap, i=3):
+    return amap / np.nanmean((amap[0:i, 0:i] + amap[-i:, -i:])) * 2
 
 
 def get_enrichment(amap, n):
     c = int(np.floor(amap.shape[0] / 2))
     return np.nanmean(amap[c - n // 2 : c + n // 2 + 1, c - n // 2 : c + n // 2 + 1])
+
+
+def prepare_single(item):
+    key, (n, amap) = item
+    enr1 = get_enrichment(amap, 1)
+    enr3 = get_enrichment(amap, 3)
+    cv3 = cornerCV(amap, 3)
+    cv5 = cornerCV(amap, 5)
+    return list(key) + [n, enr1, enr3, cv3, cv5]
 
 
 class BaselistCreator:
@@ -367,7 +376,7 @@ class PileUpper:
         by_window=False,
         save_all=False,
         local=False,
-        unbalanced=False,
+        balance='weight',
         coverage_norm=False,
         rescale=False,
         rescale_pad=1,
@@ -381,7 +390,7 @@ class PileUpper:
         self.anchor = anchor
         self.by_window = by_window
         self.save_all = save_all
-        self.unbalanced = unbalanced
+        self.balance = balance
         self.coverage_norm = coverage_norm
         self.rescale = rescale
         self.rescale_pad - rescale_pad
@@ -389,14 +398,15 @@ class PileUpper:
         self.weight_name = weight_name
         self.n_proc = n_proc
 
+        if not self.unbalanced:
 
-def prepare_single(item):
-    key, (n, amap) = item
-    enr1 = get_enrichment(amap, 1)
-    enr3 = get_enrichment(amap, 3)
-    cv3 = cornerCV(amap, 3)
-    cv5 = cornerCV(amap, 5)
-    return list(key) + [n, enr1, enr3, cv3, cv5]
+
+        self.CoolSnipper = snipping.CoolerSnipper(
+            self.clr, cooler_opts=dict(balance=self.balance)
+        )
+
+        if self.expected:
+            self.ExpSnipper = snipping.ExpectedSnipper(self.clr, self.expected)
 
 
 def get_expected_matrix(ExpSnipper, left_interval, right_interval):
