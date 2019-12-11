@@ -411,7 +411,7 @@ def main():
         maxdist=maxdist,
         local=args.local,
         subset=args.subset,
-        seed=args.seed
+        seed=args.seed,
     )
 
     BC.process()

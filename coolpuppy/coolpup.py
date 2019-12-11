@@ -511,7 +511,7 @@ class PileUpper:
         self.balance = balance
         self.expected = expected
         self.pad = pad * 1000
-        self.pad_bins = self.pad //self.resolution
+        self.pad_bins = self.pad // self.resolution
         self.anchor = anchor
         self.coverage_norm = coverage_norm
         self.rescale = rescale
