@@ -401,20 +401,33 @@ def main():
         bed2=args.bed2,
         bed2_ordered=args.bed2_ordered,
         anchor=args.anchor,
-        pad=args.pad,
         chroms=fchroms,
         minshift=args.minshift,
         maxshift=args.maxshift,
         nshifts=args.nshifts,
         minsize=args.minsize,
         maxsize=args.maxsize,
-        mindist=args.mindist,
-        maxdist=args.maxdist,
+        mindist=mindist,
+        maxdist=maxdist,
         local=args.local,
         subset=args.subset,
+        seed=args.seed
     )
 
     BC.process()
+
+    PU = PileUpper(
+        clr=c,
+        BC=BC,
+        balance=balance,
+        expected=expected,
+        pad=args.pad,
+        anchor=anchor,
+        coverage_norm=args.coverage_norm,
+        rescale=args.rescale,
+        rescale_pad=args.rescale_pad,
+        rescale_size=args.rescale_size,
+    )
 
     if args.outdir == ".":
         args.outdir = os.getcwd()
@@ -451,7 +464,7 @@ def main():
         outname = args.outname
 
     if args.by_window:
-        if kind != "bed":
+        if BC.kind != "bed":
             raise ValueError("Can't make by-window pileups without making combinations")
         if args.local:
             raise ValueError("Can't make local by-window pileups")
@@ -461,25 +474,7 @@ def main():
         #            raise NotImplementedError("""Can't make by-window combinations with
         #                                      coverage normalization - please use
         #                                      balanced data instead""")
-        finloops = pileupsByWindowWithControl(
-            mids=BC.mids,
-            filename=args.coolfile,
-            pad=pad,
-            nproc=nproc,
-            chroms=fchroms,
-            minshift=args.minshift,
-            maxshift=args.maxshift,
-            nshifts=args.nshifts,
-            expected=expected,
-            mindist=mindist,
-            maxdist=maxdist,
-            balance=balance,
-            cov_norm=args.coverage_norm,
-            rescale=args.rescale,
-            rescale_pad=args.rescale_pad,
-            rescale_size=args.rescale_size,
-            seed=args.seed,
-        )
+        finloops = PU.pileupsByWindowWithControl()
 
         p = Pool(nproc)
         data = p.map(prepare_single, finloops.items())
@@ -526,30 +521,7 @@ def main():
                 json.dump(outdict, fp)  # , sort_keys=True, indent=4)
                 logging.info("Saved individual pileups to %s" % json_path)
     else:
-        loop = pileupsWithControl(
-            mids=mids,
-            mids2=mids2,
-            ordered_mids=args.bed2_ordered,
-            filename=args.coolfile,
-            pad=pad,
-            nproc=nproc,
-            chroms=fchroms,
-            local=args.local,
-            minshift=args.minshift,
-            maxshift=args.maxshift,
-            nshifts=args.nshifts,
-            expected=expected,
-            mindist=mindist,
-            maxdist=maxdist,
-            kind=kind,
-            anchor=anchor,
-            balance=balance,
-            cov_norm=args.coverage_norm,
-            rescale=args.rescale,
-            rescale_pad=args.rescale_pad,
-            rescale_size=args.rescale_size,
-            seed=args.seed,
-        )
+        loop = PU.pileupsWithControl(nproc)
         try:
             np.savetxt(os.path.join(args.outdir, outname), loop)
         except FileNotFoundError:
