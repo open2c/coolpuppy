@@ -2,6 +2,7 @@
 import numpy as np
 import cooler
 import sys
+import warnings
 import pandas as pd
 import itertools
 from multiprocessing import Pool
@@ -46,7 +47,7 @@ def norm_coverage(loop, cov_start, cov_end):
     return loop
 
 
-class BaselistCreator:
+class CoordCreator:
     def __init__(
         self,
         baselist,
@@ -59,7 +60,7 @@ class BaselistCreator:
         minshift=10 ** 5,
         maxshift=10 ** 6,
         nshifts=10,
-        mindist=0,
+        mindist='auto',
         maxdist=np.inf,
         minsize=0,
         maxsize=np.inf,
@@ -73,11 +74,16 @@ class BaselistCreator:
         self.bed2 = bed2
         self.bed2_ordered = bed2_ordered
         self.anchor = anchor
+        self.pad = pad
+        self.pad_bins = pad // self.resolution
         self.chroms = chroms
         self.minshift = minshift
         self.maxshift = maxshift
         self.nshifts = nshifts
-        self.mindist = mindist
+        if mindist == 'auto':
+            self.mindist = 2 * self.pad + 2*self.resolution
+        else:
+            self.mindist = mindist
         self.maxdist = maxdist
         self.minsize = minsize
         self.maxsize = maxsize
@@ -392,15 +398,15 @@ class BaselistCreator:
     def get_combinations_by_window(self, chrom, ctrl=False, mids=None):
         assert self.kind == "bed"
         if mids is None:
-            chrmids = self.filter_func_chrom(self.mids, chrom)
+            chrmids = self.filter_func_chrom(chrom)(self.mids)
         else:
-            chrmids = self.filter_func_chrom(mids, chrom)
+            chrmids = self.filter_func_chrom(chrom)(mids)
         for i, (b, m, p) in chrmids[["Bin", "Mids", "Pad"]].astype(int).iterrows():
-            out_stream = self.BC.get_combinations(
+            out_stream = self.get_combinations(
                 self.filter_func_all, mids=chrmids, anchor=(chrom, m, m)
             )
             if ctrl:
-                out_stream = self.BC.control_regions(self.filter_func_all, out_stream)
+                out_stream = self.CC.control_regions(self.filter_func_all, out_stream)
             yield (m - p, m + p), out_stream
 
     def process(self):
@@ -435,7 +441,6 @@ class BaselistCreator:
             elif self.local:
                 raise ValueError("Can't make local with both sides of loops defined")
             basechroms = set(self.bases["chr1"]) & set(self.bases["chr2"])
-
         if self.bed2 is not None:
             bed2chroms = set(self.bases["chr"])
             basechroms = basechroms & bed2chroms
@@ -494,9 +499,10 @@ class PileUpper:
     def __init__(
         self,
         clr,
-        BC,
+        CC,
         balance="weight",
-        expected=None,
+        expected=False,
+        control=False,
         pad=100000,
         anchor=None,
         coverage_norm=False,
@@ -506,33 +512,44 @@ class PileUpper:
     ):
         self.clr = clr
         self.resolution = self.clr.binsize
-        self.BC = BC
-        self.__dict__.update(self.BC.__dict__)
+        self.CC = CC
+        assert self.resolution==self.CC.resolution
+        self.__dict__.update(self.CC.__dict__)
         self.balance = balance
         self.expected = expected
-        self.pad = pad * 1000
+        self.control=control
+        self.pad = pad
         self.pad_bins = self.pad // self.resolution
         self.anchor = anchor
         self.coverage_norm = coverage_norm
         self.rescale = rescale
         self.rescale_pad = rescale_pad
         self.rescale_size = rescale_size
-
-        self.CoolSnipper = snipping.CoolerSnipper(
-            self.clr, cooler_opts=dict(balance=self.balance)
-        )
-
-        if self.expected:
-            self.ExpSnipper = snipping.ExpectedSnipper(self.clr, self.expected)
+#        self.CoolSnipper = snipping.CoolerSnipper(
+#            self.clr, cooler_opts=dict(balance=self.balance)
+#        )
+        self.matsizes = np.ceil(self.clr.chromsizes/10000).astype(int)
 
         self.chroms = natsorted(
-            list(set(self.BC.final_chroms) & set(self.clr.chromnames))
+            list(set(self.CC.final_chroms) & set(self.clr.chromnames))
         )
+        if self.expected is not False:
+            if self.control:
+                warnings.warn("Can't do both expected and control shifts; defaulting to expected")
+                self.control = False
+            assert isinstance(self.expected, pd.DataFrame)
+            self.ExpSnipper = snipping.ExpectedSnipper(self.clr, self.expected)
+            self.regions = {chrom:cooler.util.parse_region_string(chrom) for chrom in self.chroms}
+            self.expected_selections = {chrom:self.ExpSnipper.select(region, region) for chrom, region in self.regions.items()}
+            self.expected = True
 
-    def get_expected_matrix(self, exp_selection, left_interval, right_interval):
+    def get_expected_matrix(self, chrom, left_interval, right_interval):
         lo_left, hi_left = left_interval
         lo_right, hi_right = right_interval
-        exp_selection_region, exp_selection = exp_selection
+        lo_left *= self.resolution
+        hi_left *= self.resolution
+        lo_right *= self.resolution
+        hi_right *= self.resolution
         #    exp_lo = lo_right - hi_left + 1
         #    exp_hi = hi_right - lo_left
         #    if exp_lo < 0:
@@ -548,7 +565,8 @@ class PileUpper:
         #        i = len(exp_subset) // 2
         #        exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
         exp_matrix = self.ExpSnipper.snip(
-            exp_selection, exp_selection_region, (lo_left, hi_left, lo_right, hi_right)
+            self.expected_selections[chrom], self.regions[chrom], self.regions[chrom],
+            (lo_left, hi_left, lo_right, hi_right)
         )
         return exp_matrix
 
@@ -579,17 +597,10 @@ class PileUpper:
 
         if expected:
             data = None
-            r = cooler.util.parse_region_string(chrom)
-            exp_selection = self.ExpSnipper.select(r, r)
-            logging.info("Doing expected")
+            logging.debug("Doing expected")
         else:
             data = self.get_data(chrom)
-            exp_selection = None
-        if data is None:
-            assert exp_selection is not None
-        else:
-            assert exp_selection is None
-        max_right = data.shape[0]
+        max_right = self.matsizes[chrom]
         mymap = self.make_outmap()
         if self.coverage_norm:
             coverage = self.get_coverage(data)
@@ -618,27 +629,27 @@ class PileUpper:
                 continue
             if (
                 self.mindist <= abs(endBin - stBin) * self.resolution < self.maxdist
-                or self.BC.local
+                or self.CC.local
             ):
-                if not exp_selection:
+                if not expected:
                     try:
                         newmap = data[lo_left:hi_left, lo_right:hi_right].toarray()
                     except (IndexError, ValueError) as e:
                         continue
                 else:
-                    newmap = self.get_expected_matrix(
-                        exp_selection, (lo_left, hi_left), (lo_right, hi_right)
+                    newmap = self.get_expected_matrix(chrom,
+                        (lo_left, hi_left), (lo_right, hi_right)
                     )
-                if (
-                    newmap.shape != mymap.shape and not self.rescale
-                ):  # AFAIK only happens at ends of chroms
-                    height, width = newmap.shape
-                    h, w = mymap.shape
-                    x = w - width
-                    y = h - height
-                    newmap = np.pad(
-                        newmap, [(y, 0), (0, x)], "constant"
-                    )  # Padding to adjust to the right shape
+#                if (
+#                    newmap.shape != mymap.shape and not self.rescale
+#                ):  # AFAIK only happens at ends of chroms
+#                    height, width = newmap.shape
+#                    h, w = mymap.shape
+#                    x = w - width
+#                    y = h - height
+#                    newmap = np.pad(
+#                        newmap, [(y, 0), (0, x)], "constant"
+#                    )  # Padding to adjust to the right shape
                 if self.rescale:
                     if newmap.size == 0:
                         newmap = np.zeros((self.rescale_size, self.rescale_size))
@@ -653,7 +664,7 @@ class PileUpper:
                 mymap = np.nansum([mymap, newmap], axis=0)
                 if (
                     self.coverage_norm
-                    and (exp_selection is None)
+                    and not expected
                     and (self.balance is False)
                 ):
                     new_cov_start = coverage[lo_left:hi_left]
@@ -681,7 +692,7 @@ class PileUpper:
                     cov_start += np.nan_to_num(new_cov_start)
                     cov_end += +np.nan_to_num(new_cov_end)
                 n += 1
-        if self.BC.local:
+        if self.CC.local:
             mymap = np.triu(mymap, 0)
             mymap += np.rot90(np.fliplr(np.triu(mymap, 1)))
         return mymap, n, cov_start, cov_end
@@ -698,12 +709,12 @@ class PileUpper:
             assert chrom == self.anchor[0]
             logging.info("Anchor: %s:%s-%s" % self.anchor)
 
-        filter_func = self.BC.filter_func_chrom(chrom=chrom)
+        filter_func = self.CC.filter_func_chrom(chrom=chrom)
 
         if ctrl:
-            mids = self.BC.control_regions(filter_func)
+            mids = self.CC.control_regions(filter_func)
         else:
-            mids = self.BC.pos_stream(filter_func)
+            mids = self.CC.pos_stream(filter_func)
         mids_row1 = mids.__next__()
         if mids_row1[0] is None:  # Checking if empty selection
             logging.info("Nothing to sum up in chromosome %s" % chrom)
@@ -711,7 +722,7 @@ class PileUpper:
         else:
             mids = itertools.chain([mids_row1], mids)
         mymap, n, cov_start, cov_end = self._do_pileups(
-            mids=mids, chrom=chrom, expected=expected
+            mids=mids, chrom=chrom, expected=expected,
         )
         logging.info("%s: %s" % (chrom, n))
         return mymap, n, cov_start, cov_end
@@ -735,7 +746,14 @@ class PileUpper:
         loop /= n
         logging.info("Total number of piled up windows: %s" % n)
         # Controls
-        if self.nshifts > 0:
+        if self.expected is not False:
+            f = partial(self.pileup_chrom, ctrl=False, expected=True,)
+            exps, ns, cov_starts, cov_ends = list(zip(*map(f, self.chroms)))
+            exp = np.sum(exps, axis=0)
+            n = np.sum(ns)
+            exp /= n
+            loop /= exp
+        elif self.control:
             f = partial(self.pileup_chrom, ctrl=True, expected=False,)
             ctrls, ns, cov_starts, cov_ends = list(zip(*mymap(f, self.chroms)))
             ctrl = np.sum(ctrls, axis=0)
@@ -747,13 +765,6 @@ class PileUpper:
             ctrl /= n
             logging.info("Total number of piled up control windows: %s" % n)
             loop /= ctrl
-        elif self.expected is not False:
-            f = partial(self.pileup_chrom, ctrl=False, expected=self.expected,)
-            exps, ns, cov_starts, cov_ends = list(zip(*map(f, self.chroms)))
-            exp = np.sum(exps, axis=0)
-            n = np.sum(ns)
-            exp /= n
-            loop /= exp
         if nproc > 1:
             p.close()
         loop[~np.isfinite(loop)] = 0
@@ -763,7 +774,7 @@ class PileUpper:
         self, chrom, ctrl=False, expected=False,
     ):
         mymaps = dict()
-        for (start, end), stream in self.BC.get_combinations_by_window(chrom, ctrl):
+        for (start, end), stream in self.CC.get_combinations_by_window(chrom, ctrl):
             mymap, n, cov_starts, cov_ends = self._do_pileups(
                 mids=stream, chrom=chrom, expected=expected,
             )
@@ -772,27 +783,33 @@ class PileUpper:
             else:
                 mymap = self.make_outmap()
             mymaps[(start, end)] = n, mymap
+        logging.info("%s: %s by-window pileups" % (chrom, len(mymaps)))
         return mymaps
 
     def pileupsByWindowWithControl(
-        self, mids, nshifts=10, expected=None, nproc=1,
+        self, nproc=1,
     ):
-        p = Pool(nproc)
+        if nproc > 1:
+            p = Pool(nproc)
+            mymap = p.map
+        else:
+            mymap = map
         # Loops
         f = partial(self.pileupsByWindow, ctrl=False, expected=False,)
-        loops = {chrom: lps for chrom, lps in zip(self.chroms, p.map(f, self.chroms))}
+        loops = {chrom: lps for chrom, lps in zip(self.chroms, mymap(f, self.chroms))}
         # Controls
-        if expected is not False:
-            f = partial(self.pileupsByWindow, ctrl=False, expected=expected,)
+        if self.expected is not False:
+            f = partial(self.pileupsByWindow, ctrl=False, expected=True,)
             ctrls = {
-                chrom: lps for chrom, lps in zip(self.chroms, p.map(f, self.chroms))
+                chrom: lps for chrom, lps in zip(self.chroms, mymap(f, self.chroms))
             }
-        elif nshifts > 0:
+        elif self.control:
             f = partial(self.pileupsByWindow, ctrl=True, expected=False,)
             ctrls = {
-                chrom: lps for chrom, lps in zip(self.chroms, p.map(f, self.chroms))
+                chrom: lps for chrom, lps in zip(self.chroms, mymap(f, self.chroms))
             }
-        p.close()
+        if nproc>1:
+            p.close()
 
         finloops = {}
         for chrom in loops.keys():

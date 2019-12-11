@@ -330,20 +330,21 @@ def main():
         args.baselist = sys.stdin
     if args.bed2 is not None:
         bedname += "_vs_" + os.path.splitext(os.path.basename(args.bed2))[0]
+
+    if args.nshifts > 0:
+        control = True
+
     if args.expected is not None:
         if args.nshifts > 0:
             logging.warning("With specified expected will not use controls")
-            args.nshifts = 0
+            control = False
         if not os.path.isfile(args.expected):
             raise FileExistsError("Expected file doesn't exist")
         expected = pd.read_csv(args.expected, sep="\t", header=0)
     else:
         expected = False
-
-    pad = args.pad * 1000 // c.binsize
-
     if args.mindist is None:
-        mindist = (2 * pad + 2) * c.binsize
+        mindist = 'auto'
     else:
         mindist = args.mindist
 
@@ -395,18 +396,19 @@ def main():
             if chrom not in args.excl_chrs.split(",") and chrom in incl_chrs:
                 fchroms.append(chrom)
 
-    BC = BaselistCreator(
+    CC = CoordCreator(
         baselist=args.baselist,
         resolution=c.binsize,
         bed2=args.bed2,
         bed2_ordered=args.bed2_ordered,
         anchor=args.anchor,
+        pad=args.pad*1000,
         chroms=fchroms,
         minshift=args.minshift,
         maxshift=args.maxshift,
         nshifts=args.nshifts,
-        minsize=args.minsize,
-        maxsize=args.maxsize,
+        minsize=minsize,
+        maxsize=maxsize,
         mindist=mindist,
         maxdist=maxdist,
         local=args.local,
@@ -414,14 +416,15 @@ def main():
         seed=args.seed,
     )
 
-    BC.process()
+    CC.process()
 
     PU = PileUpper(
         clr=c,
-        BC=BC,
+        CC=CC,
         balance=balance,
         expected=expected,
-        pad=args.pad,
+        control=control,
+        pad=args.pad*1000,
         anchor=anchor,
         coverage_norm=args.coverage_norm,
         rescale=args.rescale,
@@ -464,7 +467,7 @@ def main():
         outname = args.outname
 
     if args.by_window:
-        if BC.kind != "bed":
+        if CC.kind != "bed":
             raise ValueError("Can't make by-window pileups without making combinations")
         if args.local:
             raise ValueError("Can't make local by-window pileups")
@@ -474,7 +477,7 @@ def main():
         #            raise NotImplementedError("""Can't make by-window combinations with
         #                                      coverage normalization - please use
         #                                      balanced data instead""")
-        finloops = PU.pileupsByWindowWithControl()
+        finloops = PU.pileupsByWindowWithControl(nproc=nproc)
 
         p = Pool(nproc)
         data = p.map(prepare_single, finloops.items())

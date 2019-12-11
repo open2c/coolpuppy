@@ -109,6 +109,18 @@ def test___main__():
     testamap = np.loadtxt("tests/test_loop_numeric.txt")
     assert np.isclose(get_enrichment(amap, 3), get_enrichment(testamap, 3), 0.1)
 
+def test_by_window():
+    try:
+        clr = cooler.Cooler("GSE93431_UNTR.10kb.cool.HDF5")
+    except OSError:
+        import wget
+        wget.download("ftp://ftp.ncbi.nlm.nih.gov/geo/series/GSE93nnn/GSE93431/suppl/GSE93431_UNTR.10kb.cool.HDF5.gz",
+                      out='tests/')
+        subprocess.run('gzip -d tests/GSE93431_UNTR.10kb.cool.HDF5.gz'.split())
+        clr = cooler.Cooler("tests/GSE93431_UNTR.10kb.cool.HDF5")
+    assert clr.binsize == 10000
+
+
 
 # def test_pileupsWithControl():
 #    loops = auto_read_bed('tests/CH12_loops_Rao.bed')
