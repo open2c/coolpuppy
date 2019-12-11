@@ -36,11 +36,11 @@ bed = pd.read_csv("tests/test.bed", sep="\t", names=["chr", "start", "end"])
 # def test_filter_bed():
 #    assert filter_bed(bed, 1000, 2000, ['chr1']).shape == (1, 3)
 
-#bedpe = pd.read_csv(
+# bedpe = pd.read_csv(
 #    "tests/test.bedpe",
 #    sep="\t",
 #    names=["chr1", "start1", "end1", "chr2", "start2", "end2"],
-#)
+# )
 
 # def test_filter_bedpe():
 #    assert filter_bedpe(bedpe, 100000, 1000000, ['chr3']).shape == (1, 6)
@@ -67,7 +67,12 @@ amapbed2 = np.loadtxt("tests/bed2_ref.np.txt")
 def test___main__():
     # Loops
 
-    for f in 'tests/testing_loop.txt', 'tests/testing_tad.txt', 'tests/testing_bed2.txt', 'tests/testing_loop_numeric':
+    for f in (
+        "tests/testing_loop.txt",
+        "tests/testing_tad.txt",
+        "tests/testing_bed2.txt",
+        "tests/testing_loop_numeric",
+    ):
         try:
             os.remove(f)
         except:
