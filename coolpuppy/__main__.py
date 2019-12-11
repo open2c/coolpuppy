@@ -330,20 +330,21 @@ def main():
         args.baselist = sys.stdin
     if args.bed2 is not None:
         bedname += "_vs_" + os.path.splitext(os.path.basename(args.bed2))[0]
+
+    if args.nshifts > 0:
+        control = True
+
     if args.expected is not None:
         if args.nshifts > 0:
             logging.warning("With specified expected will not use controls")
-            args.nshifts = 0
+            control = False
         if not os.path.isfile(args.expected):
             raise FileExistsError("Expected file doesn't exist")
         expected = pd.read_csv(args.expected, sep="\t", header=0)
     else:
         expected = False
-
-    pad = args.pad * 1000 // c.binsize
-
     if args.mindist is None:
-        mindist = (2 * pad + 2) * c.binsize
+        mindist = "auto"
     else:
         mindist = args.mindist
 
@@ -394,73 +395,43 @@ def main():
         for chrom in chroms:
             if chrom not in args.excl_chrs.split(",") and chrom in incl_chrs:
                 fchroms.append(chrom)
+    if args.anchor is not None:
+        anchor = cooler.util.parse_region_string(args.anchor)
 
-    bases = auto_read_bed(
-        args.baselist,
-        kind="auto",
+    CC = CoordCreator(
+        baselist=args.baselist,
+        resolution=c.binsize,
+        bed2=args.bed2,
+        bed2_ordered=args.bed2_ordered,
+        anchor=anchor,
+        pad=args.pad * 1000,
         chroms=fchroms,
+        minshift=args.minshift,
+        maxshift=args.maxshift,
+        nshifts=args.nshifts,
         minsize=minsize,
         maxsize=maxsize,
         mindist=mindist,
         maxdist=maxdist,
-        stdin=args.baselist == sys.stdin,
+        local=args.local,
+        subset=args.subset,
+        seed=args.seed,
     )
+    CC.process()
 
-    if len(bases.columns) == 3:
-        kind = "bed"
-        basechroms = set(bases["chr"])
-    else:
-        kind = "bedpe"
-        if anchor:
-            raise ValueError("Can't use anchor with both sides of loops defined")
-        elif args.local:
-            raise ValueError("Can't make local with both sides of loops defined")
-        basechroms = set(bases["chr1"]) | set(bases["chr2"])
-
-    if args.bed2 is not None:
-        if kind != "bed":
-            raise ValueError(
-                """Please provide two BED files; baselist doesn't
-                             seem to be one"""
-            )
-        bases2 = auto_read_bed(
-            args.bed2,
-            kind="auto",
-            chroms=fchroms,
-            minsize=minsize,
-            maxsize=maxsize,
-            mindist=mindist,
-            maxdist=maxdist,
-            stdin=False,
-        )
-        if len(bases2.columns) > 3:
-            raise ValueError(
-                """Please provide two BED files; bed2 doesn't seem
-                             to be one"""
-            )
-        bed2chroms = set(bases["chr"])
-        basechroms = basechroms & bed2chroms
-
-    fchroms = natsorted(list(set(fchroms) & basechroms))
-
-    if len(fchroms) == 0:
-        raise ValueError(
-            """No chromosomes are in common between the coordinate
-                         file/anchor and the cooler file. Are they in the same
-                         format, e.g. starting with "chr"?
-                         Alternatively, all regions might have been filtered
-                         by distance/size filters."""
-        )
-
-    mids = get_mids(bases, resolution=c.binsize, kind=kind)
-    if args.bed2 is not None:
-        mids2 = get_mids(bases2, resolution=c.binsize, kind="bed")
-    else:
-        mids2 = None
-    if args.subset > 0 and args.subset < len(mids):
-        mids = mids.sample(args.subset)
-        if args.bed2 is not None:
-            mids2 = mids2.sample(args.subset)
+    PU = PileUpper(
+        clr=c,
+        CC=CC,
+        balance=balance,
+        expected=expected,
+        control=control,
+        pad=args.pad * 1000,
+        anchor=anchor,
+        coverage_norm=args.coverage_norm,
+        rescale=args.rescale,
+        rescale_pad=args.rescale_pad,
+        rescale_size=args.rescale_size,
+    )
 
     if args.outdir == ".":
         args.outdir = os.getcwd()
@@ -497,7 +468,7 @@ def main():
         outname = args.outname
 
     if args.by_window:
-        if kind != "bed":
+        if CC.kind != "bed":
             raise ValueError("Can't make by-window pileups without making combinations")
         if args.local:
             raise ValueError("Can't make local by-window pileups")
@@ -507,25 +478,7 @@ def main():
         #            raise NotImplementedError("""Can't make by-window combinations with
         #                                      coverage normalization - please use
         #                                      balanced data instead""")
-        finloops = pileupsByWindowWithControl(
-            mids=mids,
-            filename=args.coolfile,
-            pad=pad,
-            nproc=nproc,
-            chroms=fchroms,
-            minshift=args.minshift,
-            maxshift=args.maxshift,
-            nshifts=args.nshifts,
-            expected=expected,
-            mindist=mindist,
-            maxdist=maxdist,
-            balance=balance,
-            cov_norm=args.coverage_norm,
-            rescale=args.rescale,
-            rescale_pad=args.rescale_pad,
-            rescale_size=args.rescale_size,
-            seed=args.seed,
-        )
+        finloops = PU.pileupsByWindowWithControl(nproc=nproc)
 
         p = Pool(nproc)
         data = p.map(prepare_single, finloops.items())
@@ -572,30 +525,7 @@ def main():
                 json.dump(outdict, fp)  # , sort_keys=True, indent=4)
                 logging.info("Saved individual pileups to %s" % json_path)
     else:
-        loop = pileupsWithControl(
-            mids=mids,
-            mids2=mids2,
-            ordered_mids=args.bed2_ordered,
-            filename=args.coolfile,
-            pad=pad,
-            nproc=nproc,
-            chroms=fchroms,
-            local=args.local,
-            minshift=args.minshift,
-            maxshift=args.maxshift,
-            nshifts=args.nshifts,
-            expected=expected,
-            mindist=mindist,
-            maxdist=maxdist,
-            kind=kind,
-            anchor=anchor,
-            balance=balance,
-            cov_norm=args.coverage_norm,
-            rescale=args.rescale,
-            rescale_pad=args.rescale_pad,
-            rescale_size=args.rescale_size,
-            seed=args.seed,
-        )
+        loop = PU.pileupsWithControl(nproc)
         try:
             np.savetxt(os.path.join(args.outdir, outname), loop)
         except FileNotFoundError:
