@@ -328,11 +328,10 @@ class CoordCreator:
 
         if mids2 is None:
             mids2 = self.mids2
-        if self.mids2 is not None:
-            mids2 = filter_func(self.mids2)
+        if mids2 is not None:
+            mids2 = filter_func(mids2)
             m2 = mids2["Bin"].values.astype(int)
             p2 = (mids2["Pad"] // self.resolution).values.astype(int)
-
         if self.local:
             for i, pi in zip(m, p):
                 yield i, i, pi, pi
@@ -341,14 +340,14 @@ class CoordCreator:
             anchor_pad = int(round((anchor[2] - anchor[1]) / 2)) // self.resolution
             for i, pi in zip(m, p):
                 yield anchor_bin, i, anchor_pad, pi
-        elif self.mids2 is None:
+        elif mids2 is None:
             for i, j in zip(itertools.combinations(m, 2), itertools.combinations(p, 2)):
                 yield list(i) + list(j)
-        elif (self.mids2 is not None) and self.bed2_ordered:
+        elif (mids2 is not None) and self.bed2_ordered:
             for i, j in zip(itertools.product(m, m2), itertools.product(p, p2)):
                 if i[1] > i[0]:
                     yield list(i) + list(j)
-        elif (self.mids2 is not None) and (not self.bed2_ordered):
+        elif (mids2 is not None) and (not self.bed2_ordered):
             for i, j in itertools.chain(
                 zip(itertools.product(m, m2), itertools.product(p, p2)),
                 zip(itertools.product(m2, m), itertools.product(p2, p)),
@@ -467,8 +466,8 @@ class CoordCreator:
             )
 
         self.mids = self._get_mids(self.bases)
-        if self.bed2:
-            self.mids2 = self.subset(self._get_mids(self.bed2))
+        if self.bed2 is not None:
+            self.mids2 = self._get_mids(self.bed2)
         else:
             self.mids2 = None
         if self.subset > 0:

@@ -13,7 +13,7 @@ from scipy import sparse
 import cooler
 import pytest
 import subprocess
-
+import os
 
 amap = np.loadtxt("tests/loop_ref.np.txt")
 amapTAD = np.loadtxt("tests/tad_ref.np.txt")
@@ -36,11 +36,11 @@ bed = pd.read_csv("tests/test.bed", sep="\t", names=["chr", "start", "end"])
 # def test_filter_bed():
 #    assert filter_bed(bed, 1000, 2000, ['chr1']).shape == (1, 3)
 
-bedpe = pd.read_csv(
-    "tests/test.bedpe",
-    sep="\t",
-    names=["chr1", "start1", "end1", "chr2", "start2", "end2"],
-)
+#bedpe = pd.read_csv(
+#    "tests/test.bedpe",
+#    sep="\t",
+#    names=["chr1", "start1", "end1", "chr2", "start2", "end2"],
+#)
 
 # def test_filter_bedpe():
 #    assert filter_bedpe(bedpe, 100000, 1000000, ['chr3']).shape == (1, 6)
@@ -66,14 +66,21 @@ amapbed2 = np.loadtxt("tests/bed2_ref.np.txt")
 
 def test___main__():
     # Loops
+
+    for f in 'tests/testing_loop.txt', 'tests/testing_tad.txt', 'tests/testing_bed2.txt', 'tests/testing_loop_numeric':
+        try:
+            os.remove(f)
+        except:
+            print(f, "doesn't exist")
+
     subprocess.run(
         """coolpup.py tests/Scc1-control.10000.cool
                       tests/CH12_loops_Rao.bed --mindist 0
                       --unbalanced --coverage_norm --outdir tests
-                      --outname test_loop.txt --n_proc 2
+                      --outname testing_loop.txt --n_proc 2
                       --seed 0""".split()
     )
-    testamap = np.loadtxt("tests/test_loop.txt")
+    testamap = np.loadtxt("tests/testing_loop.txt")
     assert np.isclose(get_enrichment(amap, 3), get_enrichment(testamap, 3), 0.1)
 
     # Bed2
@@ -82,12 +89,12 @@ def test___main__():
                       tests/Bonev_CTCF+.bed --bed2 tests/Bonev_CTCF-.bed
                       --mindist 0 --subset 1000
                       --unbalanced --coverage_norm --outdir tests
-                      --outname test_bed2.txt --n_proc 2
+                      --outname testing_bed2.txt --n_proc 2
                       --seed 0""".split()
     )
     assert np.isclose(
         get_enrichment(amapbed2, 3),
-        get_enrichment(np.loadtxt("tests/test_bed2.txt"), 3),
+        get_enrichment(np.loadtxt("tests/testing_bed2.txt"), 3),
         0.1,
     )
 
@@ -96,13 +103,13 @@ def test___main__():
         """coolpup.py tests/Scc1-control.10000.cool
                       tests/CH12_TADs_Rao.bed --local --rescale
                       --unbalanced --coverage_norm --outdir tests
-                      --outname test_tad.txt --n_proc 2
+                      --outname testing_tad.txt --n_proc 2
                       --seed 0""".split()
     )
 
     assert np.isclose(
         get_local_enrichment(amapTAD),
-        get_local_enrichment(np.loadtxt("tests/test_tad.txt")),
+        get_local_enrichment(np.loadtxt("tests/testing_tad.txt")),
         0.01,
     )
 
@@ -112,10 +119,10 @@ def test___main__():
                       tests/CH12_loops_Rao_numeric_chroms.bed
                       --mindist 0
                       --unbalanced --coverage_norm --outdir tests
-                      --outname test_loop_numeric.txt --n_proc 2
+                      --outname testing_loop_numeric.txt --n_proc 2
                       --seed 0""".split()
     )
-    testamap = np.loadtxt("tests/test_loop_numeric.txt")
+    testamap = np.loadtxt("tests/testing_loop_numeric.txt")
     assert np.isclose(get_enrichment(amap, 3), get_enrichment(testamap, 3), 0.1)
 
 
