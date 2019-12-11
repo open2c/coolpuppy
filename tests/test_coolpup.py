@@ -85,7 +85,11 @@ def test___main__():
                       --outname test_bed2.txt --n_proc 2
                       --seed 0""".split()
     )
-    assert np.allclose(amapbed2, np.loadtxt("tests/test_bed2.txt"), 0.1)
+    assert np.isclose(
+        get_enrichment(amapbed2, 3),
+        get_enrichment(np.loadtxt("tests/test_bed2.txt"), 3),
+        0.1,
+    )
 
     # TADs
     subprocess.run(
@@ -95,7 +99,12 @@ def test___main__():
                       --outname test_tad.txt --n_proc 2
                       --seed 0""".split()
     )
-    assert np.allclose(amapTAD, np.loadtxt("tests/test_tad.txt"), 0.1)
+
+    assert np.isclose(
+        get_local_enrichment(amapTAD),
+        get_local_enrichment(np.loadtxt("tests/test_tad.txt")),
+        0.01,
+    )
 
     # Numeric chroms
     subprocess.run(
@@ -109,17 +118,20 @@ def test___main__():
     testamap = np.loadtxt("tests/test_loop_numeric.txt")
     assert np.isclose(get_enrichment(amap, 3), get_enrichment(testamap, 3), 0.1)
 
-def test_by_window():
-    try:
-        clr = cooler.Cooler("GSE93431_UNTR.10kb.cool.HDF5")
-    except OSError:
-        import wget
-        wget.download("ftp://ftp.ncbi.nlm.nih.gov/geo/series/GSE93nnn/GSE93431/suppl/GSE93431_UNTR.10kb.cool.HDF5.gz",
-                      out='tests/')
-        subprocess.run('gzip -d tests/GSE93431_UNTR.10kb.cool.HDF5.gz'.split())
-        clr = cooler.Cooler("tests/GSE93431_UNTR.10kb.cool.HDF5")
-    assert clr.binsize == 10000
 
+# def test_by_window():
+#    try:
+#        clr = cooler.Cooler("GSE93431_UNTR.10kb.cool.HDF5")
+#    except OSError:
+#        import wget
+#
+#        wget.download(
+#            "ftp://ftp.ncbi.nlm.nih.gov/geo/series/GSE93nnn/GSE93431/suppl/GSE93431_UNTR.10kb.cool.HDF5.gz",
+#            out="tests/",
+#        )
+#        subprocess.run("gzip -d tests/GSE93431_UNTR.10kb.cool.HDF5.gz".split())
+#        clr = cooler.Cooler("tests/GSE93431_UNTR.10kb.cool.HDF5")
+#    assert clr.binsize == 10000
 
 
 # def test_pileupsWithControl():

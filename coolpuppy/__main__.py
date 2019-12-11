@@ -344,7 +344,7 @@ def main():
     else:
         expected = False
     if args.mindist is None:
-        mindist = 'auto'
+        mindist = "auto"
     else:
         mindist = args.mindist
 
@@ -395,14 +395,16 @@ def main():
         for chrom in chroms:
             if chrom not in args.excl_chrs.split(",") and chrom in incl_chrs:
                 fchroms.append(chrom)
+    if args.anchor is not None:
+        anchor = cooler.util.parse_region_string(args.anchor)
 
     CC = CoordCreator(
         baselist=args.baselist,
         resolution=c.binsize,
         bed2=args.bed2,
         bed2_ordered=args.bed2_ordered,
-        anchor=args.anchor,
-        pad=args.pad*1000,
+        anchor=anchor,
+        pad=args.pad * 1000,
         chroms=fchroms,
         minshift=args.minshift,
         maxshift=args.maxshift,
@@ -415,7 +417,6 @@ def main():
         subset=args.subset,
         seed=args.seed,
     )
-
     CC.process()
 
     PU = PileUpper(
@@ -424,7 +425,7 @@ def main():
         balance=balance,
         expected=expected,
         control=control,
-        pad=args.pad*1000,
+        pad=args.pad * 1000,
         anchor=anchor,
         coverage_norm=args.coverage_norm,
         rescale=args.rescale,
