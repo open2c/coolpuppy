@@ -532,14 +532,17 @@ class PileUpper:
         self.rescale = rescale
         self.rescale_pad = rescale_pad
         self.rescale_size = rescale_size
-        #        self.CoolSnipper = snipping.CoolerSnipper(
-        #            self.clr, cooler_opts=dict(balance=self.balance)
-        #        )
+        # self.CoolSnipper = snipping.CoolerSnipper(
+        #     self.clr, cooler_opts=dict(balance=self.balance)
+        # )
         self.matsizes = np.ceil(self.clr.chromsizes / self.resolution).astype(int)
 
         self.chroms = natsorted(
             list(set(self.CC.final_chroms) & set(self.clr.chromnames))
         )
+        self.regions = {
+                chrom: cooler.util.parse_region_string(chrom) for chrom in self.chroms
+            }
         if self.expected is not False:
             if self.control:
                 warnings.warn(
@@ -548,14 +551,26 @@ class PileUpper:
                 self.control = False
             assert isinstance(self.expected, pd.DataFrame)
             self.ExpSnipper = snipping.ExpectedSnipper(self.clr, self.expected)
-            self.regions = {
-                chrom: cooler.util.parse_region_string(chrom) for chrom in self.chroms
-            }
             self.expected_selections = {
                 chrom: self.ExpSnipper.select(region, region)
                 for chrom, region in self.regions.items()
             }
             self.expected = True
+
+    # def get_matrix(self, matrix, chrom, left_interval, right_interval):
+    #     lo_left, hi_left = left_interval
+    #     lo_right, hi_right = right_interval
+    #     lo_left *= self.resolution
+    #     hi_left *= self.resolution
+    #     lo_right *= self.resolution
+    #     hi_right *= self.resolution
+    #     matrix = self.CoolSnipper.snip(
+    #         matrix,
+    #         self.regions[chrom],
+    #         self.regions[chrom],
+    #         (lo_left, hi_left, lo_right, hi_right),
+    #     )
+    #     return matrix
 
     def get_expected_matrix(self, chrom, left_interval, right_interval):
         lo_left, hi_left = left_interval
@@ -564,20 +579,6 @@ class PileUpper:
         hi_left *= self.resolution
         lo_right *= self.resolution
         hi_right *= self.resolution
-        #    exp_lo = lo_right - hi_left + 1
-        #    exp_hi = hi_right - lo_left
-        #    if exp_lo < 0:
-        #        exp_subset = expected[0:exp_hi]
-        #        #        if local:
-        #        exp_subset = np.pad(exp_subset, (-exp_lo, 0), mode="reflect")
-        #        #        else:
-        #        #            exp_subset = np.pad(exp_subset, (-exp_lo, 0), mode='constant')
-        #        i = len(exp_subset) // 2
-        #        exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
-        #    else:
-        #        exp_subset = expected[exp_lo:exp_hi]
-        #        i = len(exp_subset) // 2
-        #        exp_matrix = toeplitz(exp_subset[i::-1], exp_subset[i:])
         exp_matrix = self.ExpSnipper.snip(
             self.expected_selections[chrom],
             self.regions[chrom],
@@ -615,7 +616,7 @@ class PileUpper:
             data = None
             logging.debug("Doing expected")
         else:
-            data = self.get_data(chrom)
+            data = self.get_data(chrom)#self.CoolSnipper.select(self.regions[chrom], self.regions[chrom])
         max_right = self.matsizes[chrom]
         mymap = self.make_outmap()
         if self.coverage_norm:
@@ -667,7 +668,7 @@ class PileUpper:
                 #                        newmap, [(y, 0), (0, x)], "constant"
                 #                    )  # Padding to adjust to the right shape
                 if self.rescale:
-                    if newmap.size == 0:
+                    if newmap.size == 0 or np.all(np.isnan(newmap)):
                         newmap = np.zeros((self.rescale_size, self.rescale_size))
                     else:
                         newmap = numutils.zoom_array(
