@@ -221,9 +221,11 @@ Ilya M. Flyamer, Robert S. Illingworth, Wendy A. Bickmore
 https://www.biorxiv.org/content/10.1101/586537v3
 
 ## This tool has been used in the following publications
+McLaughlin, K. et al. DNA Methylation Directs Polycomb-Dependent 3D Genome Re-organization in Naive Pluripotency. Cell Reports 29, 1974-1985.e6 (2019).
 
-**DNA methylation directs polycomb-dependent 3D genome re- organisation in naive pluripotency**
+https://www.cell.com/cell-reports/abstract/S2211-1247(19)31331-2
 
-Katy A McLaughlin, Ilya M Flyamer, John P Thomson, Heidi K Mjoseng, Ruchi Shukla, Iain Williamson, Graeme R Grimes, Robert S Illingworth, Ian R Adams, Sari Pennings, Richard R Meehan, Wendy A Bickmore
 
-https://www.biorxiv.org/content/10.1101/527309v1
+Boyle, S. et al. A Central Role for Canonical PRC1 in Shaping the 3D Nuclear Landscape. bioRxiv 2019.12.15.876771 (2019). doi:10.1101/2019.12.15.876771
+
+https://www.biorxiv.org/content/10.1101/2019.12.15.876771v2
