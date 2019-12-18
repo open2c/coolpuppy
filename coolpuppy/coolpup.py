@@ -516,6 +516,7 @@ class PileUpper:
         rescale=False,
         rescale_pad=1,
         rescale_size=99,
+        ignore_diags=2,
     ):
         self.clr = clr
         self.resolution = self.clr.binsize
@@ -532,6 +533,7 @@ class PileUpper:
         self.rescale = rescale
         self.rescale_pad = rescale_pad
         self.rescale_size = rescale_size
+        self.ignore_diags = ignore_diags
         # self.CoolSnipper = snipping.CoolerSnipper(
         #     self.clr, cooler_opts=dict(balance=self.balance)
         # )
@@ -596,10 +598,10 @@ class PileUpper:
     def get_data(self, region):
         logging.debug("Loading data")
         data = self.clr.matrix(sparse=True, balance=self.balance).fetch(region)
-        #    if local:
-        data = data.tocsr()
-        #    else:
-        #        data = sparse.triu(data, 2).tocsr()
+        if self.local:
+            data = data.tocsr()
+        else:
+            data = sparse.triu(data, self.ignore_diags).tocsr()
         return data
 
     def get_coverage(self, data):
