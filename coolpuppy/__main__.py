@@ -333,6 +333,8 @@ def main():
 
     if args.nshifts > 0:
         control = True
+    else:
+        control = False
 
     if args.expected is not None:
         if args.nshifts > 0:
