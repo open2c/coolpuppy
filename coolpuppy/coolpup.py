@@ -16,21 +16,88 @@ from cooltools import snipping
 
 
 def cornerCV(amap, i=4):
+    """Get coefficient of variation for upper left and lower right corners of a pileup
+    to estimate how noisy it is
+
+    Parameters
+    ----------
+    amap : 2D array
+        Pileup.
+    i : int, optional
+        How many bins to use from each upper left and lower right corner: final corner
+        shape is i^2.
+        The default is 4.
+
+    Returns
+    -------
+    CV : float
+        Coefficient of variation for the corner pixels.
+
+    """
     corners = np.concatenate((amap[0:i, 0:i], amap[-i:, -i:]))
     corners = corners[np.isfinite(corners)]
     return np.std(corners) / np.mean(corners)
 
 
 def normCis(amap, i=3):
+    """Normalize the pileup by mean of pixels from upper left and lower right corners
+
+    Parameters
+    ----------
+    amap : 2D array
+        Pileup.
+    i : int, optional
+        How many bins to use from each upper left and lower right corner: final corner
+        shape is i^2.
+        The default is 3.
+
+    Returns
+    -------
+    amap : 2D array
+        Normalized pileup.
+
+    """
     return amap / np.nanmean((amap[0:i, 0:i] + amap[-i:, -i:])) * 2
 
 
 def get_enrichment(amap, n):
+    """Get values from the center of a pileup for a square with side *n*
+
+    Parameters
+    ----------
+    amap : 2D array
+        Pileup.
+    n : int
+        Side of the central square to use.
+
+    Returns
+    -------
+    enrichment : float
+        Mean of the pixels in the central square.
+
+    """
     c = int(np.floor(amap.shape[0] / 2))
     return np.nanmean(amap[c - n // 2 : c + n // 2 + 1, c - n // 2 : c + n // 2 + 1])
 
 
 def get_local_enrichment(amap, pad=1):
+    """Get values from the central part of a pileup for a square, ignoring padding
+
+    Parameters
+    ----------
+    amap : 2D array
+        Pileup.
+    pad : int
+        Relative padding used, i.e. if 1 the central third is used, if 2 the central
+        fifth is used.
+        The default is 1.
+
+    Returns
+    -------
+    enrichment : float
+        Mean of the pixels in the central square.
+
+    """
     c = amap.shape[0] / (pad * 2 + 1)
     assert int(c) == c
     c = int(c)
@@ -38,6 +105,19 @@ def get_local_enrichment(amap, pad=1):
 
 
 def prepare_single(item):
+    """Generate enrichment and corner CV, reformat into a list
+
+    Parameters
+    ----------
+    item : tuple
+        Key, (n, pileup).
+
+    Returns
+    -------
+    list
+        Concatenated list of key, n, enrichment1, enrichment3, cv3, cv5.
+
+    """
     key, (n, amap) = item
     enr1 = get_enrichment(amap, 1)
     enr3 = get_enrichment(amap, 3)
@@ -47,6 +127,23 @@ def prepare_single(item):
 
 
 def norm_coverage(loop, cov_start, cov_end):
+    """Normalize a pileup by coverage arrays
+
+    Parameters
+    ----------
+    loop : 2D array
+        Pileup.
+    cov_start : 1D array
+        Accumulated coverage of the left side of the pileup.
+    cov_end : 1D array
+        Accumulated coverage of the bottom side of the pileup.
+
+    Returns
+    -------
+    loop : 2D array
+        Normalized pileup.
+
+    """
     coverage = np.outer(cov_start, cov_end)
     coverage /= np.nanmean(coverage)
     loop /= coverage
@@ -543,8 +640,8 @@ class PileUpper:
             list(set(self.CC.final_chroms) & set(self.clr.chromnames))
         )
         self.regions = {
-                chrom: cooler.util.parse_region_string(chrom) for chrom in self.chroms
-            }
+            chrom: cooler.util.parse_region_string(chrom) for chrom in self.chroms
+        }
         if self.expected is not False:
             if self.control:
                 warnings.warn(
@@ -575,6 +672,23 @@ class PileUpper:
     #     return matrix
 
     def get_expected_matrix(self, chrom, left_interval, right_interval):
+        """Generate expected matrix for a region
+
+        Parameters
+        ----------
+        chrom : str
+            Chromosome name.
+        left_interval : tuple
+            Tuple of (lo_left, hi_left) bin IDs in the chromosome.
+        right_interval : tuple
+            Tuple of (lo_right, hi_right) bin IDs in the chromosome.
+
+        Returns
+        -------
+        exp_matrix : array
+            Array of expected values for the selected coordinates.
+
+        """
         lo_left, hi_left = left_interval
         lo_right, hi_right = right_interval
         lo_left *= self.resolution
@@ -590,12 +704,35 @@ class PileUpper:
         return exp_matrix
 
     def make_outmap(self,):
+        """Generate zero-filled array of the right shape
+
+        Returns
+        -------
+        outmap: array
+            Array of zeros of correct shape.
+
+        """
         if self.rescale:
-            return np.zeros((self.rescale_size, self.rescale_size))
+            outmap = np.zeros((self.rescale_size, self.rescale_size))
         else:
-            return np.zeros((2 * self.pad_bins + 1, 2 * self.pad_bins + 1))
+            outmap = np.zeros((2 * self.pad_bins + 1, 2 * self.pad_bins + 1))
+        return outmap
 
     def get_data(self, region):
+        """Get sparse data for a region
+
+        Parameters
+        ----------
+        region : tuple or str
+            Region for which to load the data. Either tuple of (chr, start, end), or
+            string with chromosome name.
+
+        Returns
+        -------
+        data : csr
+            Sparse csr matrix for the corresponding region.
+
+        """
         logging.debug("Loading data")
         data = self.clr.matrix(sparse=True, balance=self.balance).fetch(region)
         if self.local:
@@ -605,6 +742,20 @@ class PileUpper:
         return data
 
     def get_coverage(self, data):
+        """Get total coverage profile for upper triangular data
+
+        Parameters
+
+        ----------
+        data : array_like
+            2D array with upper triangular data.
+
+        Returns
+        -------
+        coverage : array
+            1D array of coverage.
+
+        """
         coverage = np.nan_to_num(np.ravel(np.sum(data, axis=0))) + np.nan_to_num(
             np.ravel(np.sum(data, axis=1))
         )
@@ -618,7 +769,9 @@ class PileUpper:
             data = None
             logging.debug("Doing expected")
         else:
-            data = self.get_data(chrom)#self.CoolSnipper.select(self.regions[chrom], self.regions[chrom])
+            data = self.get_data(
+                chrom
+            )  # self.CoolSnipper.select(self.regions[chrom], self.regions[chrom])
         max_right = self.matsizes[chrom]
         mymap = self.make_outmap()
         if self.coverage_norm:
@@ -653,7 +806,7 @@ class PileUpper:
                 if not expected:
                     try:
                         newmap = data[lo_left:hi_left, lo_right:hi_right].toarray()
-                    except (IndexError, ValueError) as e:
+                    except (IndexError, ValueError):
                         continue
                 else:
                     newmap = self.get_expected_matrix(
@@ -716,6 +869,30 @@ class PileUpper:
     def pileup_chrom(
         self, chrom, expected=False, ctrl=False,
     ):
+        """
+
+        Parameters
+        ----------
+        chrom : str
+            Chromosome name.
+        expected : bool, optional
+            Whether to create pileup of expected values. The default is False.
+        ctrl : bool, optional
+            Whether to pileup randomly shifted control regions. The default is False.
+
+
+        Returns
+        -------
+        pileup : 2D array
+            Pileup for the specified chromosome.
+        n : int
+            How many ROIs were piled up.
+        cov_start : 1D array
+            Accumulated coverage of the left side of the pileup.
+        cov_end : 1D array
+            Accumulated coverage of the bottom side of the pileup.
+
+        """
 
         mymap = self.make_outmap()
         cov_start = np.zeros(mymap.shape[0])
@@ -744,6 +921,21 @@ class PileUpper:
         return mymap, n, cov_start, cov_end
 
     def pileupsWithControl(self, nproc=1):
+        """Perform pileups across all chromosomes and applies required
+        normalization
+
+        Parameters
+        ----------
+        nproc : int, optional
+            How many cores to use. Sends a whole chromosome per process.
+            The default is 1.
+
+        Returns
+        -------
+        loop : 2D array
+            Normalized pileup.
+
+        """
 
         if nproc > 1:
             p = Pool(nproc)
@@ -787,31 +979,72 @@ class PileUpper:
         return loop
 
     def pileupsByWindow(
-        self, chrom, ctrl=False, expected=False,
+        self, chrom, expected=False, ctrl=False,
     ):
-        mymaps = dict()
+        """Creates pileups for each window against the rest for a chromosome
+
+        Parameters
+        ----------
+        chrom : str
+            Chromosome name.
+        expected : bool, optional
+            Whether to create pileup of expected values. The default is False.
+        ctrl : bool, optional
+            Whether to pileup randomly shifted control regions. The default is False.
+
+
+        Returns
+        -------
+        pileups : dict
+            Keys are tuples of (start, end) coordinates.
+            Values are tuples of (n, pileup)
+                n : int
+                    How many ROIs were piled up.
+                pileup : 2D array
+                    Pileup for the region
+        """
+        pileups = dict()
         for (start, end), stream in self.CC.get_combinations_by_window(chrom, ctrl):
-            mymap, n, cov_starts, cov_ends = self._do_pileups(
+            pileup, n, cov_starts, cov_ends = self._do_pileups(
                 mids=stream, chrom=chrom, expected=expected,
             )
             if n > 0:
-                mymap = mymap / n
+                pileup = pileup / n
             else:
-                mymap = self.make_outmap()
-            mymaps[(start, end)] = n, mymap
-        l = len(mymaps)
+                pileup = self.make_outmap()
+            pileups[(start, end)] = n, pileup
+        n_pileups = len(pileups)
         if expected:
             kind = "expected"
         elif ctrl:
             kind = "control"
         else:
             kind = ""
-        logging.info(f"{chrom}: {l} {kind} by-window pileups")
-        return mymaps
+        logging.info(f"{chrom}: {n_pileups} {kind} by-window pileups")
+        return pileups
 
     def pileupsByWindowWithControl(
         self, nproc=1,
     ):
+        """Perform by-window pileups across all chromosomes and applies required
+        normalization
+
+        Parameters
+        ----------
+        nproc : int, optional
+            How many cores to use. Sends a whole chromosome per process.
+            The default is 1.
+
+        Returns
+        -------
+        finloops : dict
+            Keys are tuples of (chrom, start, end) coordinates.
+            Values are tuples of (n, pileup)
+                n : int
+                    How many ROIs were piled up.
+                pileup : 2D array
+                    Pileup for the region
+        """
         if nproc > 1:
             p = Pool(nproc)
             mymap = p.map
