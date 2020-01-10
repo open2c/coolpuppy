@@ -427,8 +427,6 @@ def main():
         balance=balance,
         expected=expected,
         control=control,
-        pad=args.pad * 1000,
-        anchor=anchor,
         coverage_norm=args.coverage_norm,
         rescale=args.rescale,
         rescale_pad=args.rescale_pad,

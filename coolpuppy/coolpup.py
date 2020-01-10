@@ -172,6 +172,74 @@ class CoordCreator:
         subset=0,
         seed=None,
     ):
+        """Generator of coordinate pairs for pileups.
+
+        Parameters
+        ----------
+        baselist : str
+            Path to a bed- or bedpe-style file with coordinates.
+        resolution : int
+            Data resolution.
+        bed2 : str, optional
+            Path to a second bed-style file with coordinates. If specified,
+            interactions between baselist and bed2 are used.
+            The default is None.
+        bed2_ordered : bool, optional
+            Whether interactions always have coordinates from baselist on the left and
+            from bed2 on the bottom. If False, all interactions will be considered
+            irrespective of order.
+            The default is True.
+        anchor : tuple of (str, int, int), optional
+            Coordinates (chr, start, end) of an anchor region used to create
+            interactions with baselist. Anchor is on the left of the final pileup.
+            The default is False.
+        pad : int, optional
+            Paddin around the central bin, in bp. For example, with 5000 bp resolution
+            and 100000 pad, final pileup is 205000×205000 bp.
+            The default is 100000.
+        chroms : str or list, optional
+            Which chromosomes to use for pileups. Have to be in a list even for a
+            single chromosome, e.g. ['chr1'].
+            The default is "all"
+        minshift : int, optional
+            Minimal shift applied when generating random controls, in bp.
+            The default is 10 ** 5.
+        maxshift : int, optional
+            Maximal shift applied when generating random controls, in bp.
+            The default is 10 ** 6.
+        nshifts : int, optional
+            How many shifts to generate per region of interest. Does not take chromosome
+            boundaries into account
+            The default is 10.
+        mindist : int, optional
+            Shortest interactions to consider. Uses midpoints of regions of interest.
+            "auto" selects it to avoid the two shortest diagonals of the matrix, i.e.
+            2 * pad + 2 * resolution
+            The default is "auto".
+        maxdist : int, optional
+            Longest interactions to consider.
+            The default is np.inf.
+        minsize : int, optional
+            Shortest regions to consider. Only applies to bed files.
+            The default is 0.
+        maxsize : int, optional
+            Longest regions to consider. Only applies to bed files.
+            The default is np.inf.
+        local : bool, optional
+            Whether to generate local coordinates, i.e. on-diagonal.
+            The default is False.
+        subset : int, optional
+            What subset of the coordinate files to use. 0 or negative to use all.
+            The default is 0.
+        seed : int, optional
+            Seed for np.random to make it reproducible.
+            The default is None.
+
+        Returns
+        -------
+        Object that generates coordinates for pileups required for PileUpper.
+
+        """
         self.baselist = baselist
         self.stdin = self.baselist == sys.stdin
         self.resolution = resolution
@@ -607,14 +675,53 @@ class PileUpper:
         balance="weight",
         expected=False,
         control=False,
-        pad=100000,
-        anchor=None,
         coverage_norm=False,
         rescale=False,
         rescale_pad=1,
         rescale_size=99,
         ignore_diags=2,
     ):
+        """Creates pileups
+
+
+        Parameters
+        ----------
+        clr : cool
+            Cool file with Hi-C data.
+        CC : CoordCreator
+            CoordCreator object with correct settings.
+        balance : bool or str, optional
+            Whether to use balanced data, and which column to use as weights.
+            The default is "weight".
+        expected : DataFrame, optional
+            If using expected, pandas DataFrame with chromosome-wide expected.
+            The default is False.
+        control : bool, optional
+            Whehter to use randomly shifted controls.
+            The default is False.
+        coverage_norm : bool, optional
+            Whether to normalize final the final pileup by accumulated coverage as an
+            alternative to balancing. Useful for single-cell hi-C data.
+            The default is False.
+        rescale : bool, optional
+            Whether to use real sizes of all ROIs and rescale them to the same shape
+            The default is False.
+        rescale_pad : float, optional
+            Fraction of ROI size added on each end when extracting snippets, if rescale.
+            The default is 1.
+        rescale_size : int, optional
+            Final shape of rescaled pileups. E.g. if 99, pileups will be squares of
+            99×99 pixels.
+            The default is 99.
+        ignore_diags : int, optional
+            How many diagonals to ignore to avoid short-distance artefacts.
+            The default is 2.
+
+        Returns
+        -------
+        Object that generates pileups.
+
+        """
         self.clr = clr
         self.resolution = self.clr.binsize
         self.CC = CC
@@ -623,9 +730,7 @@ class PileUpper:
         self.balance = balance
         self.expected = expected
         self.control = control
-        self.pad = pad
         self.pad_bins = self.pad // self.resolution
-        self.anchor = anchor
         self.coverage_norm = coverage_norm
         self.rescale = rescale
         self.rescale_pad = rescale_pad
