@@ -12,7 +12,6 @@
 #
 import os
 import sys
-import subprocess
 sys.path.insert(0, os.path.abspath('.'))
 
 
@@ -37,6 +36,18 @@ extensions = ['sphinx.ext.autodoc',
 		      'nbsphinx',
 		      'sphinx.ext.mathjax',
               'sphinx.ext.napoleon'
+]
+
+autodoc_mock_imports = [
+    'cooltools',
+    # 'numpy',
+    'scipy',
+    'scipy'
+    'cython',
+    'matplotlib',
+    'pandas',
+    'h5py',
+    'cooler',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -71,4 +82,3 @@ def skip(app, what, name, obj, would_skip, options):
 
 def setup(app):
     app.connect("autodoc-skip-member", skip)
-	subprocess.call('pip install Cython')
