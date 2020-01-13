@@ -61,7 +61,7 @@ html_static_path = ['_static']
 
 add_module_names = True
 
-
+master_doc = 'index'
 
 def skip(app, what, name, obj, would_skip, options):
     if name == "__init__":
