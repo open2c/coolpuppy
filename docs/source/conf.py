@@ -44,6 +44,7 @@ autodoc_mock_imports = [
     'scipy',
     'scipy'
     'Cython',
+    'cython',
     'matplotlib',
     'pandas',
     'h5py',
