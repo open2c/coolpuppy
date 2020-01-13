@@ -1,4 +1,4 @@
-Cython
+cython
 cooler
 numpy
 pandas
