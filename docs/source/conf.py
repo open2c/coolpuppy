@@ -42,9 +42,7 @@ autodoc_mock_imports = [
     'cooltools',
     # 'numpy',
     'scipy',
-    'scipy'
     'Cython',
-    'cython',
     'matplotlib',
     'pandas',
     'h5py',
