@@ -12,6 +12,7 @@
 #
 import os
 import sys
+import subprocess
 sys.path.insert(0, os.path.abspath('.'))
 
 
@@ -70,3 +71,4 @@ def skip(app, what, name, obj, would_skip, options):
 
 def setup(app):
     app.connect("autodoc-skip-member", skip)
+	subprocess.call('pip install Cython')
