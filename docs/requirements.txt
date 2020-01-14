@@ -3,3 +3,4 @@ ipykernel
 nbsphinx
 Cython
 sphinx-argparse
+natsort
