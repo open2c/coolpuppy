@@ -15,9 +15,7 @@ import pdb, traceback
 
 # from ._version.py import __version__
 
-
-def main():
-
+def parse_args_coolpuppy():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
@@ -289,6 +287,10 @@ def main():
         help="""Enter debugger if there is an error""",
     )
     parser.add_argument("-v", "--version", action="version", version=__version__)
+    return parser
+
+def main():
+    parser = parse()
     args = parser.parse_args()
 
     if args.post_mortem:
@@ -537,26 +539,9 @@ def main():
         finally:
             logging.info("Saved output to %s" % os.path.join(args.outdir, outname))
 
-
-def plotpuppy():
-    import matplotlib
-
-    matplotlib.use("Agg")
-    from matplotlib.colors import LogNorm, Normalize
-    from matplotlib.ticker import FormatStrFormatter
-    from mpl_toolkits.axes_grid1 import ImageGrid
-    import matplotlib.pyplot as plt
-    import matplotlib as mpl
-    import matplotlib.font_manager as font_manager
-    from itertools import product
-
-    font_path = "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf"
-    font_prop = font_manager.FontProperties(fname=font_path)
-    mpl.rcParams["svg.fonttype"] = u"none"
-    mpl.rcParams["pdf.fonttype"] = 42
-
+def parse_args_plotpuppy():
     parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
         "--cmap",
@@ -654,7 +639,26 @@ def plotpuppy():
         "pileup_files", type=str, nargs="*", help="""All files to plot"""
     )
     parser.add_argument("-v", "--version", action="version", version=__version__)
+    return parser
 
+def plotpuppy():
+    import matplotlib
+
+    matplotlib.use("Agg")
+    from matplotlib.colors import LogNorm, Normalize
+    from matplotlib.ticker import FormatStrFormatter
+    from mpl_toolkits.axes_grid1 import ImageGrid
+    import matplotlib.pyplot as plt
+    import matplotlib as mpl
+    import matplotlib.font_manager as font_manager
+    from itertools import product
+
+    font_path = "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf"
+    font_prop = font_manager.FontProperties(fname=font_path)
+    mpl.rcParams["svg.fonttype"] = u"none"
+    mpl.rcParams["pdf.fonttype"] = 42
+
+    parser = parse_args_plotpuppy()
     args = parser.parse_args()
 
     pups = [np.loadtxt(f) for f in args.pileup_files]

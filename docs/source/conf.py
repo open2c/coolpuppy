@@ -35,7 +35,8 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.githubpages',
               'nbsphinx',
               'sphinx.ext.mathjax',
-              'sphinx.ext.napoleon'
+              'sphinx.ext.napoleon',
+              'sphinxarg.ext'
 ]
 
 autodoc_mock_imports = [
