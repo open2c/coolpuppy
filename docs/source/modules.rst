@@ -5,4 +5,4 @@ coolpuppy
    :maxdepth: 4
 
    coolpuppy
-..   coolpup_py_cli
+   coolpup_py_cli
