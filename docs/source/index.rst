@@ -3,7 +3,7 @@ Welcome to coolpup.py's documentation!
 
 Coolpup.py is a tool to perform pileup analysis of Hi-C data.
 
-.. image:: ../../loop_quant.png
+.. image:: ../../loop_quant.svg
    :width: 800
    :alt: Schematic of pileup algorithm
 
