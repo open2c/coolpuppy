@@ -1,6 +1,5 @@
 sphinx>=1.4
 ipykernel
 nbsphinx
-Cython
 sphinx-argparse
 natsort

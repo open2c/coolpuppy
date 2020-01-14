@@ -850,7 +850,6 @@ class PileUpper:
         """Get total coverage profile for upper triangular data
 
         Parameters
-
         ----------
         data : array_like
             2D array with upper triangular data.
@@ -1103,10 +1102,10 @@ class PileUpper:
         pileups : dict
             Keys are tuples of (start, end) coordinates.
             Values are tuples of (n, pileup)
-                n : int
-                    How many ROIs were piled up.
-                pileup : 2D array
-                    Pileup for the region
+            n : int
+            How many ROIs were piled up.
+            pileup : 2D array
+            Pileup for the region
         """
         pileups = dict()
         for (start, end), stream in self.CC.get_combinations_by_window(chrom, ctrl):
@@ -1145,10 +1144,10 @@ class PileUpper:
         finloops : dict
             Keys are tuples of (chrom, start, end) coordinates.
             Values are tuples of (n, pileup)
-                n : int
-                    How many ROIs were piled up.
-                pileup : 2D array
-                    Pileup for the region
+            n : int
+            How many ROIs were piled up.
+            pileup : 2D array
+            Pileup for the region
         """
         if nproc > 1:
             p = Pool(nproc)
