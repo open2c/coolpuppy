@@ -14,7 +14,7 @@ if mo:
     verstr = mo.group(1)
 else:
     raise RuntimeError("Unable to find version string in %s." % (VERSIONFILE,))
-
+zip_safe=False
 setup(
       name='coolpuppy',
       version=verstr,
