@@ -35,5 +35,6 @@ setup(
         "Programming Language :: Python",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
-    ]
+    ],
+    zip_safe=False
 )
