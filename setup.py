@@ -1,5 +1,5 @@
 from setuptools import setup
-
+import os
 from os import path
 this_directory = path.abspath(path.dirname(__file__))
 with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
@@ -15,6 +15,13 @@ if mo:
 else:
     raise RuntimeError("Unable to find version string in %s." % (VERSIONFILE,))
 
+on_rtd = os.environ.get('READTHEDOCS') == 'True'
+if on_rtd:
+    INSTALL_REQUIRES = []
+else:
+    INSTALL_REQUIRES = ['Cython', 'numpy', 'cooler', 'pandas', 'natsort',
+                        'scipy', 'cooltools']
+
 setup(
       name='coolpuppy',
       version=verstr,
@@ -22,8 +29,7 @@ setup(
       entry_points={
           'console_scripts': ['coolpup.py = coolpuppy.__main__:main',
                               'plotpup.py = coolpuppy.__main__:plotpuppy']},
-      install_requires=['Cython', 'numpy', 'cooler', 'pandas', 'natsort',
-                        'scipy', 'cooltools'],
+      install_requires=INSTALL_REQUIRES,
       description='A versatile tool to perform pile-up analysis on Hi-C data in .cool format.',
       long_description=long_description,
       long_description_content_type='text/markdown',
