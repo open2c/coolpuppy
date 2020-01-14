@@ -47,6 +47,7 @@ autodoc_mock_imports = [
     'pandas',
     'h5py',
     'cooler',
+    'pysam'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
