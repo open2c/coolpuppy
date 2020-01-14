@@ -290,7 +290,7 @@ def parse_args_coolpuppy():
     return parser
 
 def main():
-    parser = parse()
+    parser = parse_args_coolpuppy()
     args = parser.parse_args()
 
     if args.post_mortem:
