@@ -3,3 +3,4 @@ ipykernel
 nbsphinx
 sphinx-argparse
 natsort
+sphinxcontrib-programoutput

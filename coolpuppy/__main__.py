@@ -24,21 +24,21 @@ def parse_args_coolpuppy():
         "baselist",
         type=str,
         help="""A 3-column bed file or a 6-column double-bed
-                        file (i.e. chr1,start1,end1,chr2,start2,end2).
-                        Should be tab-delimited.
-                        With a bed file, will consider all cis combinations
-                        of intervals. To pileup features along the diagonal
-                        instead, use the --local argument.
-                        Can be piped in via stdin, then use "-".""",
+                file (i.e. chr1,start1,end1,chr2,start2,end2).
+                Should be tab-delimited.
+                With a bed file, will consider all cis combinations
+                of intervals. To pileup features along the diagonal
+                instead, use the --local argument.
+                Can be piped in via stdin, then use "-".""",
     )
     ##### Extra arguments
     parser.add_argument(
         "--bed2",
         type=str,
         help="""A 3-column bed file.
-                        Should be tab-delimited.
-                        Will consider all cis combinations of intervals
-                        between baselist and bed2.""",
+                Should be tab-delimited.
+                Will consider all cis combinations of intervals
+                between baselist and bed2.""",
         required=False,
     )
     parser.add_argument(
@@ -46,7 +46,7 @@ def parse_args_coolpuppy():
         action="store_false",
         dest="bed2_ordered",
         help="""Whether to only use baselist as left ends,
-                        and bed2 as right ends of regions.""",
+                and bed2 as right ends of regions.""",
         required=False,
     )
     parser.set_defaults(bed_ordered=True)
@@ -56,9 +56,9 @@ def parse_args_coolpuppy():
         type=int,
         required=False,
         help="""Padding of the windows around the centres of
-                        specified features (i.e. final size of the matrix is
-                        2×pad+res), in kb.
-                        Ignored with --rescale, use --rescale_pad instead.""",
+                specified features (i.e. final size of the matrix is
+                2×pad+res), in kb.
+                Ignored with --rescale, use --rescale_pad instead.""",
     )
     ### Control of controls
     parser.add_argument(
@@ -67,7 +67,7 @@ def parse_args_coolpuppy():
         type=int,
         required=False,
         help="""Shortest distance for randomly shifting
-                        coordinates when creating controls""",
+                coordinates when creating controls""",
     )
     parser.add_argument(
         "--maxshift",
@@ -75,7 +75,7 @@ def parse_args_coolpuppy():
         type=int,
         required=False,
         help="""Longest distance for randomly shifting
-                        coordinates when creating controls""",
+                coordinates when creating controls""",
     )
     parser.add_argument(
         "--nshifts",
@@ -83,7 +83,7 @@ def parse_args_coolpuppy():
         type=int,
         required=False,
         help="""Number of control regions per averaged
-                        window""",
+                window""",
     )
     parser.add_argument(
         "--expected",
@@ -91,8 +91,8 @@ def parse_args_coolpuppy():
         type=str,
         required=False,
         help="""File with expected (output of
-                        cooltools compute-expected). If None, don't use expected
-                        and use randomly shifted controls""",
+                cooltools compute-expected). If None, don't use expected
+                and use randomly shifted controls""",
     )
     ### Filtering
     parser.add_argument(
@@ -100,7 +100,7 @@ def parse_args_coolpuppy():
         type=int,
         required=False,
         help="""Minimal distance of intersections to use. If
-                        not specified, uses 2*pad+2 (in bins) as mindist""",
+                not specified, uses 2*pad+2 (in bins) as mindist""",
     )
     parser.add_argument(
         "--maxdist",
@@ -113,14 +113,14 @@ def parse_args_coolpuppy():
         type=int,
         required=False,
         help="""Minimal length of features to use for local
-                        analysis""",
+                analysis""",
     )
     parser.add_argument(
         "--maxsize",
         type=int,
         required=False,
         help="""Maximal length of features to use for local
-                        analysis""",
+                analysis""",
     )
     parser.add_argument(
         "--excl_chrs",
@@ -135,7 +135,7 @@ def parse_args_coolpuppy():
         type=str,
         required=False,
         help="""Include these chromosomes; default is all.
-                        excl_chrs overrides this.""",
+                excl_chrs overrides this.""",
     )
     parser.add_argument(
         "--subset",
@@ -143,9 +143,9 @@ def parse_args_coolpuppy():
         type=int,
         required=False,
         help="""Take a random sample of the bed file - useful
-                        for files with too many featuers to run as is, i.e.
-                        some repetitive elements. Set to 0 or lower to keep all
-                        data.""",
+                for files with too many featuers to run as is, i.e.
+                some repetitive elements. Set to 0 or lower to keep all
+                data.""",
     )
     ### Modes of action
     parser.add_argument(
@@ -154,8 +154,8 @@ def parse_args_coolpuppy():
         type=str,
         required=False,
         help="""A UCSC-style coordinate to use as an anchor to
-                        create intersections with coordinates in the baselist
-                        """,
+                create intersections with coordinates in the baselist
+                """,
     )
     parser.add_argument(
         "--by_window",
@@ -163,9 +163,9 @@ def parse_args_coolpuppy():
         default=False,
         required=False,
         help="""Create a pile-up for each coordinate in the
-                        baselist. Will save a master-table with coordinates,
-                        their enrichments and cornerCV, which is reflective of
-                        noisiness""",
+                baselist. Will save a master-table with coordinates,
+                their enrichments and cornerCV, which is reflective of
+                noisiness""",
     )
     parser.add_argument(
         "--save_all",
@@ -173,7 +173,7 @@ def parse_args_coolpuppy():
         default=False,
         required=False,
         help="""If by-window, save all individual pile-ups in a
-                        separate json file""",
+                separate json file""",
     )
     parser.add_argument(
         "--local",
@@ -181,22 +181,22 @@ def parse_args_coolpuppy():
         default=False,
         required=False,
         help="""Create local pileups, i.e. along the
-                        diagonal""",
+                diagonal""",
     )
     parser.add_argument(
         "--unbalanced",
         action="store_true",
         required=False,
         help="""Do not use balanced data.
-                        Useful for single-cell Hi-C data together with
-                        --coverage_norm, not recommended otherwise.""",
+                Useful for single-cell Hi-C data together with
+                --coverage_norm, not recommended otherwise.""",
     )
     parser.add_argument(
         "--coverage_norm",
         action="store_true",
         required=False,
         help="""If --unbalanced, also add coverage
-                        normalization based on chromosome marginals""",
+                normalization based on chromosome marginals""",
     )
     ### Rescaling
     parser.add_argument(
@@ -205,16 +205,15 @@ def parse_args_coolpuppy():
         default=False,
         required=False,
         help="""Do not use centres of features and pad, and
-                        rather use the actual feature sizes and rescale
-                        pileups to the same shape and size""",
+                rather use the actual feature sizes and rescale
+                pileups to the same shape and size""",
     )
     parser.add_argument(
         "--rescale_pad",
         default=1.0,
         required=False,
         type=float,
-        help="""If --rescale, padding in fraction of feature
-                        length""",
+        help="""If --rescale, padding in fraction of feature length""",
     )
     parser.add_argument(
         "--rescale_size",
@@ -222,9 +221,9 @@ def parse_args_coolpuppy():
         default=99,
         required=False,
         help="""If --rescale, this is used to determine the
-                        final size of the pileup, i.e. it will be size×size. Due
-                        to technical limitation in the current implementation,
-                        has to be an odd number""",
+                final size of the pileup, i.e. it will be size×size. Due
+                to technical limitation in the current implementation,
+                has to be an odd number""",
     )
 
     parser.add_argument(
@@ -232,8 +231,7 @@ def parse_args_coolpuppy():
         default="weight",
         type=str,
         required=False,
-        help="""Name of the norm to use for getting balanced
-                        data""",
+        help="""Name of the norm to use for getting balanced data""",
     )
     parser.add_argument(
         "--n_proc",
@@ -241,9 +239,9 @@ def parse_args_coolpuppy():
         type=int,
         required=False,
         help="""Number of processes to use. Each process works
-                        on a separate chromosome, so might require quite a bit
-                        more memory, although the data are always stored as
-                        sparse matrices""",
+                on a separate chromosome, so might require quite a bit
+                more memory, although the data are always stored as
+                sparse matrices""",
     )
     ### Output
     parser.add_argument(
@@ -259,8 +257,8 @@ def parse_args_coolpuppy():
         type=str,
         required=False,
         help="""Name of the output file. If not set, is
-                        generated automatically to include important
-                        information.""",
+                generated automatically to include important
+                information.""",
     )
     ### Technicalities
     parser.add_argument(
@@ -268,8 +266,7 @@ def parse_args_coolpuppy():
         default=None,
         type=int,
         required=False,
-        help="""Set specific seed value to ensure
-                    reproducibility""",
+        help="""Set specific seed value to ensure reproducibility""",
     )
     parser.add_argument(
         "-l",
