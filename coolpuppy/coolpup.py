@@ -165,9 +165,9 @@ class CoordCreator:
         maxshift=10 ** 6,
         nshifts=10,
         mindist="auto",
-        maxdist=np.inf,
+        maxdist=None,
         minsize=0,
-        maxsize=np.inf,
+        maxsize=None,
         local=False,
         subset=0,
         seed=None,
@@ -218,13 +218,13 @@ class CoordCreator:
             The default is "auto".
         maxdist : int, optional
             Longest interactions to consider.
-            The default is np.inf.
+            The default is None.
         minsize : int, optional
             Shortest regions to consider. Only applies to bed files.
             The default is 0.
         maxsize : int, optional
             Longest regions to consider. Only applies to bed files.
-            The default is np.inf.
+            The default is None.
         local : bool, optional
             Whether to generate local coordinates, i.e. on-diagonal.
             The default is False.
@@ -256,9 +256,15 @@ class CoordCreator:
             self.mindist = 2 * self.pad + 2 * self.resolution
         else:
             self.mindist = mindist
-        self.maxdist = maxdist
+        if maxdist is None:
+            self.maxdist = np.inf
+        else:
+            self.maxdist = maxdist
         self.minsize = minsize
-        self.maxsize = maxsize
+        if maxsize is None:
+            self.maxsize = np.inf
+        else:
+            self.maxsize = maxsize
         self.local = local
         self.subset = subset
         self.seed = seed
