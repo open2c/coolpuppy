@@ -26,6 +26,7 @@ def parse_args_coolpuppy():
         help="""A 3-column bed file or a 6-column double-bed file
                 i.e. chr1,start1,end1,chr2,start2,end2.
                 Should be tab-delimited.
+
                 With a bed file, will consider all cis combinations
                 of intervals. To pileup features along the diagonal
                 instead, use the ``--local`` argument.
