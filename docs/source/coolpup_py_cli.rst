@@ -8,7 +8,7 @@ coolpup.py command
 ------------------
 
 .. argparse::
-   :filename: ../coolpuppy/__main__.py
+   :module: coolpuppy.__main__
    :func: parse_args_coolpuppy
    :prog: coolpup.py
 
@@ -16,6 +16,6 @@ plotpup.py command
 ------------------
 
 .. argparse::
-   :filename: ../coolpuppy/__main__.py
+   :module: coolpuppy.__main__
    :func: parse_args_plotpuppy
    :prog: plotpup.py
