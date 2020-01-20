@@ -1,6 +1,8 @@
 coolpup.py CLI
 ==============
 
+Use ``coolpup.py`` command to perform pileups, and ``plotpup.py`` to visualize them.
+
 Submodules
 ----------
 
