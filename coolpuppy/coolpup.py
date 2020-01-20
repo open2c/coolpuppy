@@ -182,24 +182,25 @@ class CoordCreator:
             Data resolution.
         bed2 : str, optional
             Path to a second bed-style file with coordinates. If specified,
-            interactions between baselist and bed2 are used.
-            The default is None.
+            interactions between ``baselist`` and ``bed2`` are used.
+            The default is ``None``.
         bed2_ordered : bool, optional
-            Whether interactions always have coordinates from baselist on the left and
-            from bed2 on the bottom. If False, all interactions will be considered
+            Whether interactions always have coordinates from ``baselist`` on the left and
+            from ``bed2`` on the bottom. If False, all interactions will be considered
             irrespective of order.
-            The default is True.
+            The default is ``True``.
         anchor : tuple of (str, int, int), optional
             Coordinates (chr, start, end) of an anchor region used to create
-            interactions with baselist. Anchor is on the left of the final pileup.
+            interactions with ``baselist`` (bp). Anchor is on the left of the final
+            pileup.
             The default is False.
         pad : int, optional
-            Paddin around the central bin, in bp. For example, with 5000 bp resolution
+            Padding around the central bin, in bp. For example, with 5000 bp resolution
             and 100000 pad, final pileup is 205000×205000 bp.
             The default is 100000.
         chroms : str or list, optional
             Which chromosomes to use for pileups. Have to be in a list even for a
-            single chromosome, e.g. ['chr1'].
+            single chromosome, e.g. ``['chr1']``.
             The default is "all"
         minshift : int, optional
             Minimal shift applied when generating random controls, in bp.
@@ -232,7 +233,7 @@ class CoordCreator:
             What subset of the coordinate files to use. 0 or negative to use all.
             The default is 0.
         seed : int, optional
-            Seed for np.random to make it reproducible.
+            Seed for ``np.random`` to make it reproducible.
             The default is None.
 
         Returns
