@@ -12,6 +12,7 @@
 #
 import os
 import sys
+import mock
 sys.path.insert(0, os.path.abspath('../..'))
 sys.path.insert(0, os.path.abspath('..'))
 
@@ -37,21 +38,39 @@ extensions = ['sphinx.ext.autodoc',
               'nbsphinx',
               'sphinx.ext.mathjax',
               'sphinx.ext.napoleon',
-              'sphinxarg.ext'
-]
+              'sphinxarg.ext',
+              'm2r',
+              ]
 
-autodoc_mock_imports = [
-    'cooltools',
-    'numpy',
-    'scipy',
-    'Cython',
-    'matplotlib',
-    'pandas',
-    'h5py',
-    'cooler',
-    'pysam',
-    'natsort'
-]
+
+MOCK_MODULES = ['cooltools',
+                'numpy',
+                'scipy',
+                'scipy.linalg',
+                'Cython',
+                'matplotlib',
+                'pandas',
+                'h5py',
+                'cooler',
+                'pysam',
+                'natsort',
+                ]
+
+for mod_name in MOCK_MODULES:
+    sys.modules[mod_name] = mock.Mock()
+
+# autodoc_mock_imports = [
+#     'cooltools',
+#     'numpy',
+#     'scipy',
+#     'Cython',
+#     'matplotlib',
+#     'pandas',
+#     'h5py',
+#     'cooler',
+#     'pysam',
+#     'natsort'
+# ]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -85,3 +104,5 @@ def skip(app, what, name, obj, would_skip, options):
 
 def setup(app):
     app.connect("autodoc-skip-member", skip)
+
+source_suffix = ['.rst', '.md']

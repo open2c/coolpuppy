@@ -6,3 +6,4 @@ scipy
 cooltools
 matplotlib
 natsort
+m2r
