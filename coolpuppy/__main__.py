@@ -29,6 +29,7 @@ def parse_args_coolpuppy():
                 With a bed file, will consider all cis combinations
                 of intervals. To pileup features along the diagonal
                 instead, use the ``--local`` argument.
+
                 Can be piped in via stdin, then use "-"
                 """,
     )
