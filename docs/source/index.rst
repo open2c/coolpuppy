@@ -8,8 +8,9 @@ Welcome to coolpup.py's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   modules.rst
    coolpup_py_cli.rst
+   modules.rst
+
 
 
 Indices and tables
