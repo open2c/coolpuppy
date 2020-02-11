@@ -71,11 +71,17 @@ Ilya M. Flyamer, Robert S. Illingworth, Wendy A. Bickmore
 https://www.biorxiv.org/content/10.1101/586537v3
 
 ## This tool has been used in the following publications
-McLaughlin, K. et al. DNA Methylation Directs Polycomb-Dependent 3D Genome Re-organization in Naive Pluripotency. Cell Reports 29, 1974-1985.e6 (2019).
+McLaughlin, K., Flyamer, I.M., Thomson, J.P., Mjoseng, H.K., Shukla, R., Williamson, I., Grimes, G.R., Illingworth, R.S., Adams, I.R., Pennings, S., et al. (2019). DNA Methylation Directs Polycomb-Dependent 3D Genome Re-organization in Naive Pluripotency. Cell Reports 29, 1974-1985.e6.
 
 https://www.cell.com/cell-reports/abstract/S2211-1247(19)31331-2
 
 
-Boyle, S. et al. A Central Role for Canonical PRC1 in Shaping the 3D Nuclear Landscape. bioRxiv 2019.12.15.876771 (2019). doi:10.1101/2019.12.15.876771
+Boyle, S., Flyamer, I.M., Williamson, I., Sengupta, D., Bickmore, W.A., and Illingworth, R.S. (2019). A Central Role for Canonical PRC1 in Shaping the 3D Nuclear Landscape. BioRxiv 2019.12.15.876771.
 
 https://www.biorxiv.org/content/10.1101/2019.12.15.876771v2
+
+
+Rhodes, J.D.P., Feldmann, A., Hernández-Rodríguez, B., Díaz, N., Brown, J.M., Fursova, N.A., Blackledge, N.P., Prathapan, P., Dobrinic, P., Huseyin, M.K., et al. (2020). Cohesin Disrupts Polycomb-Dependent Chromosome Interactions in Embryonic Stem Cells. Cell Reports 30, 820-835.e10.
+
+https://www.sciencedirect.com/science/article/pii/S2211124719317140?via%3Dihub
+
