@@ -10,6 +10,7 @@ Welcome to coolpup.py's documentation!
 
    coolpup_py_cli.rst
    modules.rst
+   Examples/snHi-C_Examples.ipynb
 
 
 
