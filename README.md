@@ -50,7 +50,7 @@ to get the latest version from GitHub. This will make `coolpup.py` callable in y
 
 ## Usage
 
-Some examples to get you started are available here: [Examples](https://github.com/Phlya/coolpuppy/blob/master/docs/Examples.ipynb)
+Some examples to get you started are available here: [Examples](https://coolpuppy.readthedocs.io/en/latest/Examples/snHi-C_Examples.html)
 
 Docs are available here: [Docs](https://coolpuppy.readthedocs.io/en/latest/index.html)
 
