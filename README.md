@@ -23,8 +23,10 @@ Abdennur, N., and Mirny, L. (2019). Cooler: scalable storage for Hi-C data and o
 
 This is the idea of how pileups work to check whether certain regions tend to interacts with each other:
 
-![Pileup schematic](https://github.com/Phlya/coolpuppy/blob/master/loop_quant.png?sanitize=true)
-
+<img src="loop_quant.png"
+     alt="Pileup schematic"
+     width="1000px"/>
+     
 What's not shown here is normalization to the expected values. This can be done in two ways: either using a provided file with expected values of interactions at different distances (output of `cooltools compute-expected`), or directly from Hi-C data by dividing the pileups over randomly shifted control regions. If neither expected normalization approach is used (just set `--nshifts 0`), this becomes essentially identical to the APA approach (Rao et al., 2014), which can be used for averaging strongly interacting regions, e.g. annotated loops. For weaker interactors, decay of contact probability with distance can hide any focal enrichment that could be observed otherwise.
 
 `coolpup.py` is particularly well suited performance-wise for analysing huge numbers of potential interactions, since it loads whole chromosomes into memory one by one (or in parallel to speed it up) to extract small submatrices quickly. Having to read everything into memory makes it relatively slow for small numbers of loops, but performance doesn't decrease until you reach a huge number of interactions.
