@@ -1,6 +1,1 @@
-sphinx>=1.4
-ipykernel
-nbsphinx
-sphinx-argparse
-natsort
-sphinxcontrib-programoutput
+m2r
