@@ -1,8 +1,7 @@
 Welcome to coolpup.py's documentation!
 ======================================
 
-..
-    mdinclude:: ../../README.md
+.. mdinclude:: ../../README.md
 
 .. toctree::
    :maxdepth: 2
