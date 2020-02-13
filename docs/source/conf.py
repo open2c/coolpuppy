@@ -107,4 +107,4 @@ def setup(app):
     app.add_stylesheet('my_theme.css')
 
 source_suffix = ['.rst', '.md', '.ipynb']
-html_favicon = 'source/favicon.png'
+html_favicon = 'favicon.png'
