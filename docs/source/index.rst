@@ -7,6 +7,7 @@ Welcome to coolpup.py's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   walkthrough.md
    coolpup_py_cli.rst
    modules.rst
    Examples/snHi-C_Examples.ipynb
