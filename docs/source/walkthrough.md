@@ -19,7 +19,7 @@ combine them with Hi-C data and check whether these regions are often found in p
 we find intersections of all peaks in the Hi-C matrix (with some padding around the peak), and average them. If the peaks often interact,
 we will detect an enrichment in the center of the average matrix:
 
-<img src="https://raw.githubusercontent.com/Phlya/coolpuppy/master/docs/source/figs/new_grid_loop_quant.png" alt="Grid averaging" width="300px"/>
+<img src="https://raw.githubusercontent.com/Phlya/coolpuppy/master/docs/source/figs/new_grid_loop_quant.png" alt="Grid averaging" width="400px"/>
 
 
 Here is a real example:
