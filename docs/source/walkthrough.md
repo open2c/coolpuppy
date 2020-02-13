@@ -25,7 +25,7 @@ Here I averaged all (intra-chromosomal) interactions between highly enriched ChI
 
 What is important, is that in the center we see higher values than on the edges: this means that regions bound by RING1B tend to stick together more, than expected! The actual value in the central pixel is displayed on top left for reference.
 
-This analysis is the default mode when coolpup.py is run with a .bed file, e.g. ``coolpup.py my_hic_data.cool my_protein_peaks.bed`` (with optional ``--expected my_hic_data_expected.tsv`` - see details below).
+This analysis is the default mode when coolpup.py is run with a .bed file, e.g. `coolpup.py my_hic_data.cool my_protein_peaks.bed` (with optional `--expected my_hic_data_expected.tsv` - see details below).
 
 ## Pile-ups of predefined regions pairs, e.g. loops
 
@@ -40,4 +40,4 @@ And here is a real example of CTCF-associated loops in ES cells:
 
 Comparing with the previous example, you can clearly see that if you average loops that have been previously identified you, of course, get much higher enrichment of interactions, than if you are looking for a tendency of some regions to interact.
 
-This analysis is performed with coolpup.py when instead of a bed file you provide a .bedpe file, so simply ``coolpup.py my_hic_data.cool my_loops.bedpe`` (with optional ``--expected my_hic_data_expected.tsv`` - see details below). bedpe is a simple tab-separated 6-column file with chrom1, start1, end1, chrom2, start2, end2.
+This analysis is performed with coolpup.py when instead of a bed file you provide a .bedpe file, so simply `coolpup.py my_hic_data.cool my_loops.bedpe` (with optional `--expected my_hic_data_expected.tsv` - see details below). bedpe is a simple tab-separated 6-column file with chrom1, start1, end1, chrom2, start2, end2.

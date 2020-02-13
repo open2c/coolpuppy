@@ -52,7 +52,9 @@ to get the latest version from GitHub. This will make `coolpup.py` callable in y
 
 Some examples to get you started are available here: [Examples](https://coolpuppy.readthedocs.io/en/latest/Examples/snHi-C_Examples.html)
 
-Docs are available here: [Docs](https://coolpuppy.readthedocs.io/en/latest/index.html)
+A guide walkthrough to pile-up analysis is available here (WIP): [Walkthrough](https://coolpuppy.readthedocs.io/en/latest/walkthrough.html)
+
+Docs for the command line interface are available here: [CLI docs](https://coolpuppy.readthedocs.io/en/latest/coolpup_py_cli.html)
 
 Currently, `coolpup.py` doesn't support inter-chromosomal pileups, but this is an addition that is planned for the future.
 
@@ -68,20 +70,23 @@ Until it has been published in a peer-reviewed journal, please cite our preprint
 
 Ilya M. Flyamer, Robert S. Illingworth, Wendy A. Bickmore
 
-https://www.biorxiv.org/content/10.1101/586537v3
+[https://www.biorxiv.org/content/10.1101/586537v3](https://www.biorxiv.org/content/10.1101/586537v3)
 
 ## This tool has been used in the following publications
+
+*Please let me know if I've missed any and you'd like your paper ot be mentioned here!*
+
 McLaughlin, K., Flyamer, I.M., Thomson, J.P., Mjoseng, H.K., Shukla, R., Williamson, I., Grimes, G.R., Illingworth, R.S., Adams, I.R., Pennings, S., et al. (2019). DNA Methylation Directs Polycomb-Dependent 3D Genome Re-organization in Naive Pluripotency. Cell Reports 29, 1974-1985.e6.
 
-https://www.cell.com/cell-reports/abstract/S2211-1247(19)31331-2
+[https://www.sciencedirect.com/science/article/pii/S2211124719313312?via%3Dihub](https://www.sciencedirect.com/science/article/pii/S2211124719313312?via%3Dihub)
 
 
 Boyle, S., Flyamer, I.M., Williamson, I., Sengupta, D., Bickmore, W.A., and Illingworth, R.S. (2019). A Central Role for Canonical PRC1 in Shaping the 3D Nuclear Landscape. BioRxiv 2019.12.15.876771.
 
-https://www.biorxiv.org/content/10.1101/2019.12.15.876771v2
+[https://www.biorxiv.org/content/10.1101/2019.12.15.876771v2](https://www.biorxiv.org/content/10.1101/2019.12.15.876771v2)
 
 
 Rhodes, J.D.P., Feldmann, A., Hernández-Rodríguez, B., Díaz, N., Brown, J.M., Fursova, N.A., Blackledge, N.P., Prathapan, P., Dobrinic, P., Huseyin, M.K., et al. (2020). Cohesin Disrupts Polycomb-Dependent Chromosome Interactions in Embryonic Stem Cells. Cell Reports 30, 820-835.e10.
 
-https://www.sciencedirect.com/science/article/pii/S2211124719317140?via%3Dihub
+[https://www.sciencedirect.com/science/article/pii/S2211124719317140?via%3Dihub](https://www.sciencedirect.com/science/article/pii/S2211124719317140?via%3Dihub)
 
