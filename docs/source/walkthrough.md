@@ -4,7 +4,7 @@ Coolpup.py is a tool for pileup analysis. But what are pile-ups?
 
 If you don't know, you might have seen average ChIP-seq or ATAC-seq profiles which look something like this:
 
-<img src="https://raw.githubusercontent.com/Phlya/coolpuppy/master/docs/source/figs/chip_profile.png" alt="ChIP profile" width="600px"/>
+![ChIP profile](https://raw.githubusercontent.com/Phlya/coolpuppy/master/docs/source/figs/chip_profile.png)
 
 Pile-ups in Hi-C are essentially the same as average profiles, but in 2 dimensions, since
 Hi-C data is a a matrix, not a linear track!
@@ -19,12 +19,11 @@ combine them with Hi-C data and check whether these regions are often found in p
 we find intersections of all peaks in the Hi-C matrix (with some padding around the peak), and average them. If the peaks often interact,
 we will detect an enrichment in the center of the average matrix:
 
-<img src="https://raw.githubusercontent.com/Phlya/coolpuppy/master/docs/source/figs/new_grid_loop_quant.png" alt="Grid averaging" width="400px"/>
-
+![Grid averaging](https://raw.githubusercontent.com/Phlya/coolpuppy/master/docs/source/figs/new_grid_loop_quant.png)
 
 Here is a real example:
 
-<img src="https://raw.githubusercontent.com/Phlya/coolpuppy/master/docs/source/figs/example_pileup.png" alt="Example pileup" width="400px"/>
+![Example pileup](https://raw.githubusercontent.com/Phlya/coolpuppy/master/docs/source/figs/example_pileup.png)
 
 Here I averaged all (intra-chromosomal) interactions between highly enriched ChIP-seq peaks of RING1B in mouse ES cells.
 I added 100 kbp padding to each bin containing the peak, and since I used 5 kbp resolution Hi-C data,
