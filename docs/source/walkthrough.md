@@ -12,7 +12,7 @@ Hi-C data is a a matrix, not a linear track!
 Therefore instead of a linear plot, pileups are usually represented as heatmaps - by mapping
 values of different pixels in the average matrix to specific colours.
 
-## Interactions between a set of regions
+## Pile-ups of interactions between a set of regions
 
 For example, we can again start with ChIP-seq peaks, but instead of averaging ChIP-seq data around them,
 combine them with Hi-C data and check whether these regions are often found in proximity to each other. The algorithm is simple:
@@ -34,3 +34,10 @@ grey colour corresponds to 1 - no enrichment or depletion, while red and blue co
 
 What is important, is that in the center we see higher values than on the edges: this means that regions
 bound by RING1B tend to stick together more, than expected! The actual value in the central pixel is displayed on top left for reference.
+
+This analysis is the default mode when coolpup.py is run with a .bed file, e.g.
+``coolpup.py my_hic_data.cool my_protein_peaks.bed`` (with optional ``--expected my_hic_data_expected.tsv`` - see details below)
+
+## Pile-ups of predefined regions pairs, e.g. loops
+
+A similar
