@@ -24,7 +24,7 @@ we will detect an enrichment in the center of the average matrix:
 
 Here is a real example:
 
-<img src="https://raw.githubusercontent.com/Phlya/coolpuppy/master/docs/source/figs/example_pileup.png" alt="Example pileup" width="600px"/>
+<img src="https://raw.githubusercontent.com/Phlya/coolpuppy/master/docs/source/figs/example_pileup.png" alt="Example pileup" width="400px"/>
 
 Here I averaged all (intra-chromosomal) interactions between highly enriched ChIP-seq peaks of RING1B in mouse ES cells.
 I added 100 kbp padding to each bin containing the peak, and since I used 5 kbp resolution Hi-C data,
