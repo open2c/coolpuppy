@@ -13,7 +13,7 @@ Therefore instead of a linear plot, pileups are usually represented as heatmaps 
 
 ## Pile-ups of interactions between a set of regions
 
-For example, we can again start with ChIP-seq peaks, but instead of averaging ChIP-seq data around them, combine them with Hi-C data and check whether these regions are often found in proximity to each other. The algorithm is simple: we find intersections of all peaks in the Hi-C matrix (with some padding around the peak), and average them. If the peaks often interact, we will detect an enrichment in the center of the average matrix:
+For example, we can again start with ChIP-seq peaks, but instead of averaging ChIP-seq data around them, combine them with Hi-C data and check whether these regions are often found in proximity to each other. The algorithm is simple: we find intersections of all peaks in the Hi-C matrix (with some padding around the peak), and average them. If the peaks often interact, we will detect an enrichment in the centre of the average matrix:
 
 ![Grid averaging](figs/new_grid_loop_quant.png)
 
@@ -32,7 +32,7 @@ This analysis is the default mode when coolpup.py is run with a .bed file, e.g. 
 A similar approach is based on averaging predefined 2D regions corresponding to interactions of specific pairs of regions. A typical example would be averaging loop annotations. This is very useful to quantify global perturbations of loop strength (e.g. annotate loops in WT, compare their strength in WT vs KO of an architectural protein), or to quantify them in data that are too sparse, such as single-cell Hi-C.
 The algorithm is very simple:
 
-![Grid averaging](figs/loop_quant.png)
+![Loop averaging](figs/loop_quant.png)
 
 And here is a real example of CTCF-associated loops in ES cells:
 
@@ -41,3 +41,24 @@ And here is a real example of CTCF-associated loops in ES cells:
 Comparing with the previous example, you can clearly see that if you average loops that have been previously identified you, of course, get much higher enrichment of interactions, than if you are looking for a tendency of some regions to interact.
 
 This analysis is performed with coolpup.py when instead of a bed file you provide a .bedpe file, so simply `coolpup.py my_hic_data.cool my_loops.bedpe` (with optional `--expected my_hic_data_expected.tsv` - see details below). bedpe is a simple tab-separated 6-column file with chrom1, start1, end1, chrom2, start2, end2.
+
+## Local pileups
+
+A very similar approach can be used to quantify local properties in Hi-C maps, such as insulation. Valleys of insulation score can be identified (e.g. using `cooltools diamond-insulation`), or another way of identifying potential TAD boundaries can be used. Then regions around their positions can be averaged, and this can be used to visualize and quantify insulation in the same or another sample:
+
+![Boundary averaging](figs/local_quant_borders.png)
+
+Here is an example of averaged insulation score valleys in mouse ES cells:
+
+![Example loop pileup](figs/example_local_pileup.png)
+
+One can easily observe that these regions on average indeed have some insulating properties, and moreover the stripes emanating from the boundaries are very clear - they are a combination of real stripes found on edges of TADs in many cases, and loops found at different distances from the boundary in different TADs.
+
+Average insulation can be quantiifed by dividing signal in two red squares (top left and bottom right corners) by the signal in the more blue squares (top right and bottom left corners), and here it is shown in the top left corner.
+
+This analysis is very easily performed using coolpup.py: simply run `coolpup.py coolpup.py my_hic_data.cool my_insulating_regions.bed --local` (with optional `--expected my_hic_data_expected.tsv` - see details below; note that for local analyses in my experience random shift controls work better).
+
+### Rescaled pileups
+
+![Local rescaled averaging](figs/local_quant_tads.png)
+
