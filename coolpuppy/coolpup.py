@@ -29,10 +29,6 @@ def save_array_with_header(array, header, filename):
     filename : string
         Name of file to save array and metadata into.
 
-    Returns
-    -------
-    None.
-
     """
     header = yaml.dump(header).strip()
     np.savetxt(filename, array, header=header)
