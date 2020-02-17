@@ -1,6 +1,11 @@
 Welcome to coolpup.py's documentation!
 ======================================
 
+Project homepage with code and issues is on `GitHub <https://github.com/Phlya/coolpuppy>`_.
+
+Please feel free to report any problems or contribute.
+
+
 .. mdinclude:: ../../README.md
 
 .. toctree::
