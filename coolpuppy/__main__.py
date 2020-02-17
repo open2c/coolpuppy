@@ -520,15 +520,15 @@ def main():
                 json.dump(outdict, fp)  # , sort_keys=True, indent=4)
                 logging.info("Saved individual pileups to %s" % json_path)
     else:
-        loop = PU.pileupsWithControl(nproc)
+        pup = PU.pileupsWithControl(nproc)
         try:
-            np.savetxt(os.path.join(args.outdir, outname), loop)
+            save_array_with_header(pup, vars(args), os.path.join(args.outdir, outname))
         except FileNotFoundError:
             try:
                 os.mkdir(args.outdir)
             except FileExistsError:
                 pass
-            np.savetxt(os.path.join(args.outdir, outname), loop)
+            save_array_with_header(pup, vars(args), os.path.join(args.outdir, outname))
         finally:
             logging.info("Saved output to %s" % os.path.join(args.outdir, outname))
 
@@ -649,7 +649,7 @@ def plotpuppy():
     parser = parse_args_plotpuppy()
     args = parser.parse_args()
 
-    pups = [np.loadtxt(f) for f in args.pileup_files]
+    pups = [load_array_with_header(f)['data'] for f in args.pileup_files]
 
     if args.norm_corners > 0:
         pups = [norm_cis(pup) for pup in pups]

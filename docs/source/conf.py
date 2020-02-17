@@ -54,6 +54,7 @@ MOCK_MODULES = ['cooltools',
                 'cooler',
                 'pysam',
                 'natsort',
+                'yaml'
                 ]
 
 for mod_name in MOCK_MODULES:

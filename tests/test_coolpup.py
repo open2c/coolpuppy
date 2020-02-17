@@ -71,7 +71,7 @@ def test___main__():
         "tests/testing_loop.txt",
         "tests/testing_tad.txt",
         "tests/testing_bed2.txt",
-        "tests/testing_loop_numeric",
+        "tests/testing_loop_numeric.txt",
     ):
         try:
             os.remove(f)

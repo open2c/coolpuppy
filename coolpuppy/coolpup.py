@@ -13,6 +13,58 @@ from scipy import sparse
 from scipy.linalg import toeplitz
 from cooltools import numutils
 from cooltools import snipping
+import yaml
+import io
+
+
+def save_array_with_header(array, header, filename):
+    """Save a numpy array with a YAML header generated from a dictionary
+
+    Parameters
+    ----------
+    array : np.array
+        Array to save.
+    header : dict
+        Dictionaty to save into the header.
+    filename : string
+        Name of file to save array and metadata into.
+
+    Returns
+    -------
+    None.
+
+    """
+    header = yaml.dump(header).strip()
+    np.savetxt(filename, array, header=header)
+
+
+def load_array_with_header(filename):
+    """Load array from files generated using `save_array_with_header`.
+    They are simple txt files with an optional header in the first lines, commented
+    using "# ". If uncommented, the header is in YAML.
+
+    Parameters
+    ----------
+    filename : string
+        File to load from.
+
+    Returns
+    -------
+    data : dict
+        Dictionary with information from the header. Access the associated data in an
+        array using data['data'].
+
+    """
+    with open(filename) as f:
+        read_data = f.read()
+
+    lines = read_data.split('\n')
+    header = '\n'.join([line[2:] for line in lines if line.startswith('# ')])
+    metadata = yaml.load(header)
+    data = '\n'.join([line for line in lines if not line.startswith('# ')])
+    with io.StringIO(data) as f:
+        metadata['data'] = np.loadtxt(f)
+    return metadata
 
 
 def cornerCV(amap, i=4):
