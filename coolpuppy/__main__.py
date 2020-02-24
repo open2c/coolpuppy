@@ -652,11 +652,14 @@ def plotpuppy():
     pups = [load_array_with_header(f)['data'] for f in args.pileup_files]
 
     if args.norm_corners > 0:
-        pups = [norm_cis(pup) for pup in pups]
+        pups = [normCis(pup) for pup in pups]
+
 
     n = len(pups)
     if args.n_cols == 0:
         n_rows, n_cols = auto_rows_cols(n)
+
+
 
     elif args.n_cols < n:
         n_rows = int(round(n / args.n_cols))
@@ -721,19 +724,19 @@ def plotpuppy():
     else:
         norm = Normalize
 
-    if args.cbar_mode == "single":
-        vmin, vmax = get_min_max(pups, args.vmin, args.vmax, sym=sym)
-    elif args.cbar_mode == "edge":
-        colorscales = [get_min_max(row, args.vmin, args.vmax, sym=sym) for row in pups]
-    elif args.cbar_mode == "each":
-        grid.cbar_axes = np.asarray(grid.cbar_axes).reshape((n_rows, n_cols))
-
     n_grid = n_rows * n_cols
     extra = [None for i in range(n_grid - len(pups))]
     pupsarray = np.empty(n_rows * n_cols, dtype=object)
     for i, pup in enumerate(pups + extra):
         pupsarray[i] = pup
     pups = pupsarray.reshape((n_rows, n_cols))
+
+    if args.cbar_mode == "single":
+        vmin, vmax = get_min_max(pups, args.vmin, args.vmax, sym=sym)
+    elif args.cbar_mode == "edge":
+        colorscales = [get_min_max(row, args.vmin, args.vmax, sym=sym) for row in pups]
+    elif args.cbar_mode == "each":
+        grid.cbar_axes = np.asarray(grid.cbar_axes).reshape((n_rows, n_cols))
 
     cbs = []
 
@@ -772,8 +775,8 @@ def plotpuppy():
             else:
                 axarr[i, j].axis("off")
                 grid.cbar_axes[i, j].axis("off")
-        if args.cbar_mode == "edge":
-            cbs.append(plt.colorbar(m, cax=grid.cbar_axes[i]))
+            if args.cbar_mode == "edge":
+                cbs.append(plt.colorbar(m, cax=grid.cbar_axes[i]))
 
     if args.col_names is not None:
         for i, name in enumerate(args.col_names):

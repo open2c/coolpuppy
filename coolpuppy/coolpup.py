@@ -56,7 +56,7 @@ def load_array_with_header(filename):
 
     lines = read_data.split('\n')
     header = '\n'.join([line[2:] for line in lines if line.startswith('# ')])
-    metadata = yaml.load(header)
+    metadata = yaml.load(header, Loader=yaml.FullLoader)
     data = '\n'.join([line for line in lines if not line.startswith('# ')])
     with io.StringIO(data) as f:
         metadata['data'] = np.loadtxt(f)
