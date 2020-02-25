@@ -30,6 +30,7 @@ setup(
           'console_scripts': ['coolpup.py = coolpuppy.__main__:main',
                               'plotpup.py = coolpuppy.__main__:plotpuppy']},
       install_requires=INSTALL_REQUIRES,
+      python_requires='>=3.6',
       description='A versatile tool to perform pile-up analysis on Hi-C data in .cool format.',
       long_description=long_description,
       long_description_content_type='text/markdown',

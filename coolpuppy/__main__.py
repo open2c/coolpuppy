@@ -432,21 +432,21 @@ def main():
         args.outdir = os.getcwd()
 
     if args.outname == "auto":
-        outname = "%s-%sK_over_%s" % (coolname, c.binsize / 1000, bedname)
-        if args.nshifts > 0:
-            outname += "_%s-shifts" % args.nshifts
+        outname = f"{coolname}-{c.binsize / 1000}K_over_{bedname}"
+        if args.nshifts > 0 and args.expected is None:
+            outname += f"_{args.nshifts}-shifts"
         if args.expected is not None:
             outname += "_expected"
         if args.nshifts <= 0 and args.expected is None:
             outname += "_noNorm"
         if anchor:
-            outname += "_from_%s" % anchor_name
+            outname += f"_from_{anchor_name}"
         if args.local:
             outname += "_local"
             if minsize > 0 or maxsize < np.inf:
-                outname += "_len_%s-%s" % (minsize, maxsize)
+                outname += f"_len_{minsize}-{maxsize}"
         elif args.mindist is not None or args.maxdist is not None:
-            outname += "_dist_%s-%s" % (mindist, maxdist)
+            outname += f"_dist_mindist-maxdist"
         if args.rescale:
             outname += "_rescaled"
         if args.unbalanced:
@@ -454,9 +454,9 @@ def main():
         if args.coverage_norm:
             outname += "_covnorm"
         if args.subset > 0:
-            outname += "_subset-%s" % args.subset
+            outname += f"_subset-{args.subset}"
         if args.by_window:
-            outname = "Enrichment_%s.txt" % outname
+            outname = f"Enrichment_{outname}.txt"
         else:
             outname += ".np.txt"
     else:
@@ -503,7 +503,7 @@ def main():
             data.to_csv(os.path.join(args.outdir, outname), sep="\t", index=False)
         finally:
             logging.info(
-                "Saved enrichment table to %s" % os.path.join(args.outdir, outname)
+                f"Saved enrichment table to {os.path.join(args.outdir, outname)}"
             )
 
         if args.save_all:
@@ -518,7 +518,7 @@ def main():
             )
             with open(json_path, "w") as fp:
                 json.dump(outdict, fp)  # , sort_keys=True, indent=4)
-                logging.info("Saved individual pileups to %s" % json_path)
+                logging.info(f"Saved individual pileups to {json_path}")
     else:
         pup = PU.pileupsWithControl(nproc)
         try:
@@ -530,7 +530,7 @@ def main():
                 pass
             save_array_with_header(pup, vars(args), os.path.join(args.outdir, outname))
         finally:
-            logging.info("Saved output to %s" % os.path.join(args.outdir, outname))
+            logging.info(f"Saved output to {os.path.join(args.outdir, outname)}")
 
 def parse_args_plotpuppy():
     parser = argparse.ArgumentParser(
@@ -677,9 +677,9 @@ def plotpuppy():
 
     if args.col_names != None and n_cols != len(args.col_names):
         raise ValueError(
-            """Number of column names is not equal to number of
-                         columns! You specified %s columns and %s column
-                         names"""
+            f"""Number of column names is not equal to number of
+                columns! You specified {ncols} columns and {len(args.col_names)}
+                column names"""
             % (n_cols, len(args.col_names))
         )
     if args.row_names is not None and n_rows != len(args.row_names):

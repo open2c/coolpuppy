@@ -1058,7 +1058,7 @@ class PileUpper:
 
         if self.anchor:
             assert chrom == self.anchor[0]
-            logging.info("Anchor: %s:%s-%s" % self.anchor)
+            logging.info(f"Anchor: {chrom}:{self.anchor[1]}-{self.anchor[2]}")
 
         filter_func = self.CC.filter_func_chrom(chrom=chrom)
 
@@ -1068,14 +1068,14 @@ class PileUpper:
             mids = self.CC.pos_stream(filter_func)
         mids_row1 = mids.__next__()
         if mids_row1[0] is None:  # Checking if empty selection
-            logging.info("Nothing to sum up in chromosome %s" % chrom)
+            logging.info(f"Nothing to sum up in chromosome {chrom}")
             return self.make_outmap(), 0, cov_start, cov_end
         else:
             mids = itertools.chain([mids_row1], mids)
         mymap, n, cov_start, cov_end = self._do_pileups(
             mids=mids, chrom=chrom, expected=expected,
         )
-        logging.info("%s: %s" % (chrom, n))
+        logging.info(f"{chrom}: {n}")
         return mymap, n, cov_start, cov_end
 
     def pileupsWithControl(self, nproc=1):
@@ -1110,7 +1110,7 @@ class PileUpper:
             cov_end = np.sum(cov_starts, axis=0)
             loop = norm_coverage(loop, cov_start, cov_end)
         loop /= n
-        logging.info("Total number of piled up windows: %s" % n)
+        logging.info(f"Total number of piled up windows: {n}")
         # Controls
         if self.expected is not False:
             f = partial(self.pileup_chrom, ctrl=False, expected=True,)
@@ -1129,7 +1129,7 @@ class PileUpper:
                 cov_end = np.sum(cov_starts, axis=0)
                 ctrl = norm_coverage(ctrl, cov_start, cov_end)
             ctrl /= n
-            logging.info("Total number of piled up control windows: %s" % n)
+            logging.info(f"Total number of piled up control windows: {n}")
             loop /= ctrl
         if nproc > 1:
             p.close()
