@@ -2,10 +2,11 @@ language: python
 python:
   - "3.6"
   - "3.7"
+  - "3.8"
 # command to install dependencies
 install:
   - pip install Cython
-  - pip install https://github.com/mirnylab/cooltools/archive/master.zip
+  - pip install cooltools
   - pip install .
 # command to run tests
 script:
