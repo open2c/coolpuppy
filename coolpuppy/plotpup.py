@@ -5,6 +5,7 @@
 import numpy as np
 
 
+
 def auto_rows_cols(n):
     """Automatically determines number of rows and cols for n pileups
 
@@ -31,8 +32,8 @@ def get_min_max(pups, vmin=None, vmax=None, sym=True):
 
     Parameters
     ----------
-    pups : list
-        List of numpy arrays conaining pileups.
+    pups : np.array
+        Numpy array of numpy arrays conaining pileups.
     vmin : float, optional
         Force certain minimal colour. The default is None.
     vmax : float, optional
@@ -51,10 +52,7 @@ def get_min_max(pups, vmin=None, vmax=None, sym=True):
     if vmin is not None and vmax is not None:
         return vmin, vmax
     else:
-        comb = []
-        for pup in pups:
-            comb = np.append(comb, pup.flatten())
-        comb = np.asarray(comb)
+        comb = np.concatenate([pup.ravel() for pup in pups.ravel()])
     if vmin is None and vmax is None:
         vmax = np.nanmax(comb)
         vmin = np.nanmin(comb)
