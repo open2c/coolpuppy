@@ -11,8 +11,7 @@ import logging
 from natsort import index_natsorted, order_by_index, natsorted
 from scipy import sparse
 from scipy.linalg import toeplitz
-from cooltools import numutils
-from cooltools import snipping
+from cooltools import numutils, snipping
 import yaml
 import io
 
@@ -359,12 +358,9 @@ class CoordCreator:
                 row1 = [row1[0], int(row1[1]), int(row1[2])]
             else:
                 raise ValueError(
-                    """Input bed(pe) file has unexpected number of
-                                 columns: got {}, expect 3 (bed) or 6 (bedpe)
-                                 """.format(
-                        len(row1)
-                    )
-                )
+                    f"""Input bed(pe) file has unexpected number of
+                        columns: got {len(row1)}, expect 3 (bed) or 6 (bedpe)
+                        """)
 
         if filetype == "bed" or kind == "bed":
             filter_func = self.filter_bed
@@ -376,11 +372,9 @@ class CoordCreator:
             row1 = filter_func(pd.DataFrame([row1], columns=names))
         else:
             raise ValueError(
-                """Unsupported input kind: {}.
-                             Expect {} or {}""".format(
-                    kind, "bed", "bedpe"
-                )
-            )
+                f"""Unsupported input kind: {kind}.
+                             Expect bed or bedpe"""
+                             )
         bases = []
 
         appended = False
@@ -1114,7 +1108,7 @@ class PileUpper:
         # Controls
         if self.expected is not False:
             f = partial(self.pileup_chrom, ctrl=False, expected=True,)
-            exps, ns, cov_starts, cov_ends = list(zip(*map(f, self.chroms)))
+            exps, ns, cov_starts, cov_ends = list(zip(*mymap(f, self.chroms)))
             exp = np.sum(exps, axis=0)
             n = np.sum(ns)
             exp /= n
