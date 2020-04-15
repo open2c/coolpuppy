@@ -446,7 +446,7 @@ def main():
             if minsize > 0 or maxsize < np.inf:
                 outname += f"_len_{minsize}-{maxsize}"
         elif args.mindist is not None or args.maxdist is not None:
-            outname += f"_dist_mindist-maxdist"
+            outname += f"_dist_{mindist}-{maxdist}"
         if args.rescale:
             outname += "_rescaled"
         if args.unbalanced:
