@@ -1101,7 +1101,7 @@ class PileUpper:
         n = np.sum(ns)
         if self.coverage_norm:
             cov_start = np.sum(cov_starts, axis=0)
-            cov_end = np.sum(cov_starts, axis=0)
+            cov_end = np.sum(cov_ends, axis=0)
             loop = norm_coverage(loop, cov_start, cov_end)
         loop /= n
         logging.info(f"Total number of piled up windows: {n}")
@@ -1120,7 +1120,7 @@ class PileUpper:
             n = np.sum(ns)
             if self.coverage_norm:
                 cov_start = np.sum(cov_starts, axis=0)
-                cov_end = np.sum(cov_starts, axis=0)
+                cov_end = np.sum(cov_ends, axis=0)
                 ctrl = norm_coverage(ctrl, cov_start, cov_end)
             ctrl /= n
             logging.info(f"Total number of piled up control windows: {n}")
