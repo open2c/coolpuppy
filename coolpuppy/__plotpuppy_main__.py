@@ -7,7 +7,13 @@ Created on Mon Mar 23 14:05:06 2020
 """
 # from coolpuppy import *
 from coolpuppy import __version__
-from coolpuppy import norm_cis, load_array_with_header, get_enrichment, get_min_max
+from coolpuppy import (
+    norm_cis,
+    load_array_with_header,
+    get_enrichment,
+    get_min_max,
+    auto_rows_cols,
+)
 
 import numpy as np
 
