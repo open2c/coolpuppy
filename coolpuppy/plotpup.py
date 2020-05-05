@@ -1,9 +1,6 @@
-#!/usr/bin/env python
-
 # -*- coding: utf-8 -*-
 
 import numpy as np
-
 
 
 def auto_rows_cols(n):

@@ -19,10 +19,10 @@ amap = np.loadtxt("tests/loop_ref.np.txt")
 amapTAD = np.loadtxt("tests/tad_ref.np.txt")
 
 
-def test_cornerCV():
+def test_corner_cv():
     #    print(cornerCV(amap), cornerCV(amap, 3))
-    assert np.isclose(cornerCV(amap), 0.06115726119405872)
-    assert np.isclose(cornerCV(amap, 3), 0.061661417258013565)
+    assert np.isclose(corner_cv(amap), 0.06115726119405872)
+    assert np.isclose(corner_cv(amap, 3), 0.061661417258013565)
 
 
 def test_get_enrichment():

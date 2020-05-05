@@ -5,13 +5,14 @@ Created on Mon Mar 23 14:05:06 2020
 
 @author: ilya
 """
-from coolpuppy import *
+# from coolpuppy import *
 from coolpuppy import __version__
-from coolpuppy import normCis, load_array_with_header, get_enrichment, get_min_max
+from coolpuppy import norm_cis, load_array_with_header, get_enrichment, get_min_max
 
 import numpy as np
 
 import matplotlib
+
 matplotlib.use("Agg")
 
 from matplotlib.colors import LogNorm, Normalize
@@ -25,10 +26,9 @@ from itertools import product
 import argparse
 
 
-
 def parse_args_plotpuppy():
     parser = argparse.ArgumentParser(
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
         "--cmap",
@@ -130,24 +130,22 @@ def parse_args_plotpuppy():
     parser.add_argument("-v", "--version", action="version", version=__version__)
     return parser
 
+
 def main():
-    mpl.rcParams["svg.fonttype"] = u"none"
+    mpl.rcParams["svg.fonttype"] = "none"
     mpl.rcParams["pdf.fonttype"] = 42
 
     parser = parse_args_plotpuppy()
     args = parser.parse_args()
 
-    pups = [load_array_with_header(f)['data'] for f in args.pileup_files]
+    pups = [load_array_with_header(f)["data"] for f in args.pileup_files]
 
     if args.norm_corners > 0:
-        pups = [normCis(pup) for pup in pups]
-
+        pups = [norm_cis(pup) for pup in pups]
 
     n = len(pups)
     if args.n_cols == 0:
         n_rows, n_cols = auto_rows_cols(n)
-
-
 
     elif args.n_cols < n:
         n_rows = int(round(n / args.n_cols))

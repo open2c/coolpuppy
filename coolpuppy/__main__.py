@@ -1,5 +1,4 @@
-# from .coolpup import *
-# from .plotpup import *
+# -*- coding: utf-8 -*-
 from coolpuppy import *
 from coolpuppy import __version__
 import cooler
@@ -14,6 +13,7 @@ import sys
 import pdb, traceback
 
 # from ._version.py import __version__
+
 
 def parse_args_coolpuppy():
     parser = argparse.ArgumentParser(
@@ -163,7 +163,7 @@ def parse_args_coolpuppy():
         help="""Perform by-window pile-ups.
                 Create a pile-up for each coordinate in the baselist.
                 Will save a master-table with coordinates, their enrichments and
-                cornerCV, which is reflective of noisiness""",
+                corner coefficient of variation, which is reflective of noisiness""",
     )
     parser.add_argument(
         "--save_all",
@@ -281,6 +281,7 @@ def parse_args_coolpuppy():
     )
     parser.add_argument("-v", "--version", action="version", version=__version__)
     return parser
+
 
 def main():
     parser = parse_args_coolpuppy()

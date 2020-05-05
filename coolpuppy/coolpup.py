@@ -53,16 +53,16 @@ def load_array_with_header(filename):
     with open(filename) as f:
         read_data = f.read()
 
-    lines = read_data.split('\n')
-    header = '\n'.join([line[2:] for line in lines if line.startswith('# ')])
+    lines = read_data.split("\n")
+    header = "\n".join([line[2:] for line in lines if line.startswith("# ")])
     metadata = yaml.load(header, Loader=yaml.FullLoader)
-    data = '\n'.join([line for line in lines if not line.startswith('# ')])
+    data = "\n".join([line for line in lines if not line.startswith("# ")])
     with io.StringIO(data) as f:
-        metadata['data'] = np.loadtxt(f)
+        metadata["data"] = np.loadtxt(f)
     return metadata
 
 
-def cornerCV(amap, i=4):
+def corner_cv(amap, i=4):
     """Get coefficient of variation for upper left and lower right corners of a pileup
     to estimate how noisy it is
 
@@ -86,7 +86,7 @@ def cornerCV(amap, i=4):
     return np.std(corners) / np.mean(corners)
 
 
-def normCis(amap, i=3):
+def norm_cis(amap, i=3):
     """Normalize the pileup by mean of pixels from upper left and lower right corners
 
     Parameters
@@ -168,8 +168,8 @@ def prepare_single(item):
     key, (n, amap) = item
     enr1 = get_enrichment(amap, 1)
     enr3 = get_enrichment(amap, 3)
-    cv3 = cornerCV(amap, 3)
-    cv5 = cornerCV(amap, 5)
+    cv3 = corner_cv(amap, 3)
+    cv5 = corner_cv(amap, 5)
     return list(key) + [n, enr1, enr3, cv3, cv5]
 
 
@@ -245,7 +245,7 @@ class CoordCreator:
             and 100000 pad, final pileup is 205000×205000 bp.
             The default is 100000.
         chroms : str or list, optional
-            Which chromosomes to use for pileups. Have to be in a list even for a
+            Which chromosomes to use for pileups. Has to be in a list even for a
             single chromosome, e.g. ['chr1'].
             The default is "all"
         minshift : int, optional
@@ -360,7 +360,8 @@ class CoordCreator:
                 raise ValueError(
                     f"""Input bed(pe) file has unexpected number of
                         columns: got {len(row1)}, expect 3 (bed) or 6 (bedpe)
-                        """)
+                        """
+                )
 
         if filetype == "bed" or kind == "bed":
             filter_func = self.filter_bed
@@ -374,7 +375,7 @@ class CoordCreator:
             raise ValueError(
                 f"""Unsupported input kind: {kind}.
                              Expect bed or bedpe"""
-                             )
+            )
         bases = []
 
         appended = False
@@ -517,7 +518,7 @@ class CoordCreator:
 
     def filter_func_region(self, region):
         if self.kind == "bed":
-            return partial(self._filter_func_region, region=region)
+            return partial(self._filter_func_region, region)
         else:
             return partial(self._filter_func_pairs_region, region)
 
@@ -887,11 +888,10 @@ class PileUpper:
 
         """
         logging.debug("Loading data")
-        data = self.clr.matrix(sparse=True, balance=self.balance).fetch(region)
-        if self.local:
-            data = data.tocsr()
-        else:
-            data = sparse.triu(data, self.ignore_diags).tocsr()
+        data = self.clr.matrix(sparse=True, balance=self.balance).fetch(region).tocsr()
+        if not self.local:
+            for diag in range(self.ignore_diags):
+                data.setdiag(np.nan, diag)
         return data
 
     def get_coverage(self, data):
@@ -930,6 +930,7 @@ class PileUpper:
             coverage = self.get_coverage(data)
         cov_start = np.zeros(mymap.shape[0])
         cov_end = np.zeros(mymap.shape[1])
+        num = np.zeros_like(mymap)
         n = 0
         for stBin, endBin, stPad, endPad in mids:
             rot_flip = False
@@ -1012,11 +1013,12 @@ class PileUpper:
                         )
                     cov_start += np.nan_to_num(new_cov_start)
                     cov_end += +np.nan_to_num(new_cov_end)
+                num += np.isfinite(mymap).astype(int)
                 n += 1
         if self.CC.local:
             mymap = np.triu(mymap, 0)
             mymap += np.rot90(np.fliplr(np.triu(mymap, 1)))
-        return mymap, n, cov_start, cov_end
+        return mymap, num, cov_start, cov_end, n
 
     def pileup_chrom(
         self, chrom, expected=False, ctrl=False,
@@ -1066,11 +1068,11 @@ class PileUpper:
             return self.make_outmap(), 0, cov_start, cov_end
         else:
             mids = itertools.chain([mids_row1], mids)
-        mymap, n, cov_start, cov_end = self._do_pileups(
+        mymap, num, cov_start, cov_end, n = self._do_pileups(
             mids=mids, chrom=chrom, expected=expected,
         )
         logging.info(f"{chrom}: {n}")
-        return mymap, n, cov_start, cov_end
+        return mymap, num, cov_start, cov_end, n
 
     def pileupsWithControl(self, nproc=1):
         """Perform pileups across all chromosomes and applies required
@@ -1096,33 +1098,34 @@ class PileUpper:
             mymap = map
         # Loops
         f = partial(self.pileup_chrom, ctrl=False, expected=False,)
-        loops, ns, cov_starts, cov_ends = list(zip(*mymap(f, self.chroms)))
+        loops, nums, cov_starts, cov_ends, ns = list(zip(*mymap(f, self.chroms)))
         loop = np.sum(loops, axis=0)
         n = np.sum(ns)
+        num = np.sum(nums, axis=0)
         if self.coverage_norm:
             cov_start = np.sum(cov_starts, axis=0)
             cov_end = np.sum(cov_starts, axis=0)
             loop = norm_coverage(loop, cov_start, cov_end)
-        loop /= n
+        loop /= num
         logging.info(f"Total number of piled up windows: {n}")
         # Controls
         if self.expected is not False:
             f = partial(self.pileup_chrom, ctrl=False, expected=True,)
-            exps, ns, cov_starts, cov_ends = list(zip(*mymap(f, self.chroms)))
+            exps, nums, cov_starts, cov_ends, ns = list(zip(*mymap(f, self.chroms)))
             exp = np.sum(exps, axis=0)
-            n = np.sum(ns)
-            exp /= n
+            num = np.sum(nums, axis=0)
+            exp /= num
             loop /= exp
         elif self.control:
             f = partial(self.pileup_chrom, ctrl=True, expected=False,)
-            ctrls, ns, cov_starts, cov_ends = list(zip(*mymap(f, self.chroms)))
+            ctrls, numss, cov_starts, cov_ends, ns = list(zip(*mymap(f, self.chroms)))
             ctrl = np.sum(ctrls, axis=0)
-            n = np.sum(ns)
+            num = np.sum(nums, axis=0)
             if self.coverage_norm:
                 cov_start = np.sum(cov_starts, axis=0)
                 cov_end = np.sum(cov_starts, axis=0)
                 ctrl = norm_coverage(ctrl, cov_start, cov_end)
-            ctrl /= n
+            ctrl /= num
             logging.info(f"Total number of piled up control windows: {n}")
             loop /= ctrl
         if nproc > 1:
@@ -1157,11 +1160,13 @@ class PileUpper:
         """
         pileups = dict()
         for (start, end), stream in self.CC.get_combinations_by_window(chrom, ctrl):
-            pileup, n, cov_starts, cov_ends = self._do_pileups(
+            pileup, nums, cov_starts, cov_ends, ns = self._do_pileups(
                 mids=stream, chrom=chrom, expected=expected,
             )
+            n = np.sum(ns)
+            num = np.sum(nums, axis=0)
             if n > 0:
-                pileup = pileup / n
+                pileup = pileup / num
             else:
                 pileup = self.make_outmap()
             pileups[(start, end)] = n, pileup
