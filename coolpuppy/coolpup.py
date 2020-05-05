@@ -55,7 +55,10 @@ def load_array_with_header(filename):
 
     lines = read_data.split("\n")
     header = "\n".join([line[2:] for line in lines if line.startswith("# ")])
-    metadata = yaml.load(header, Loader=yaml.FullLoader)
+    if len(header) > 0:
+        metadata = yaml.load(header, Loader=yaml.FullLoader)
+    else:
+        metadata = {}
     data = "\n".join([line for line in lines if not line.startswith("# ")])
     with io.StringIO(data) as f:
         metadata["data"] = np.loadtxt(f)
@@ -1118,7 +1121,7 @@ class PileUpper:
             loop /= exp
         elif self.control:
             f = partial(self.pileup_chrom, ctrl=True, expected=False,)
-            ctrls, numss, cov_starts, cov_ends, ns = list(zip(*mymap(f, self.chroms)))
+            ctrls, nums, cov_starts, cov_ends, ns = list(zip(*mymap(f, self.chroms)))
             ctrl = np.sum(ctrls, axis=0)
             num = np.sum(nums, axis=0)
             if self.coverage_norm:

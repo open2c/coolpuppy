@@ -15,8 +15,8 @@ import pytest
 import subprocess
 import os
 
-amap = np.loadtxt("tests/loop_ref.np.txt")
-amapTAD = np.loadtxt("tests/tad_ref.np.txt")
+amap = load_array_with_header("tests/loop_ref.np.txt")['data']
+amapTAD = load_array_with_header("tests/tad_ref.np.txt")['data']
 
 
 def test_corner_cv():
@@ -61,7 +61,7 @@ bed = pd.read_csv("tests/test.bed", sep="\t", names=["chr", "start", "end"])
 #    assert np.all(bedpe_mids['Pad1'] == [100, 1000, 150, 1000])
 #    assert np.all(bedpe_mids['Pad2'] == [100, 1000, 50, 1000])
 
-amapbed2 = np.loadtxt("tests/bed2_ref.np.txt")
+amapbed2 = load_array_with_header("tests/bed2_ref.np.txt")['data']
 
 
 def test___main__():
@@ -85,7 +85,7 @@ def test___main__():
                       --outname testing_loop.txt --n_proc 2
                       --seed 0""".split()
     )
-    testamap = np.loadtxt("tests/testing_loop.txt")
+    testamap = load_array_with_header("tests/testing_loop.txt")['data']
     assert np.isclose(get_enrichment(amap, 3), get_enrichment(testamap, 3), 0.1)
 
     # Bed2
@@ -127,7 +127,7 @@ def test___main__():
                       --outname testing_loop_numeric.txt --n_proc 2
                       --seed 0""".split()
     )
-    testamap = np.loadtxt("tests/testing_loop_numeric.txt")
+    testamap = load_array_with_header("tests/testing_loop_numeric.txt")['data']
     assert np.isclose(get_enrichment(amap, 3), get_enrichment(testamap, 3), 0.1)
 
 
