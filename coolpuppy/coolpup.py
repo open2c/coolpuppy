@@ -891,11 +891,12 @@ class PileUpper:
 
         """
         logging.debug("Loading data")
-        data = self.clr.matrix(sparse=True, balance=self.balance).fetch(region).tocsr()
+        data = self.clr.matrix(sparse=True, balance=self.balance).fetch(region)
+        data = sparse.triu(data)
         if not self.local:
             for diag in range(self.ignore_diags):
                 data.setdiag(np.nan, diag)
-        return data
+        return data.tocsr()
 
     def get_coverage(self, data):
         """Get total coverage profile for upper triangular data
