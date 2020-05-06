@@ -20,13 +20,13 @@ amapTAD = load_array_with_header("tests/tad_ref.np.txt")['data']
 
 
 def test_corner_cv():
-    assert np.isclose(corner_cv(amap), 0.060777286503692976)
-    assert np.isclose(corner_cv(amap, 3), 0.062080146134680415)
+    assert np.isclose(corner_cv(amap), 0.06402256144363466)
+    assert np.isclose(corner_cv(amap, 3), 0.06687246748037583)
 
 
 def test_get_enrichment():
-    assert np.isclose(get_enrichment(amap, 1), 1.6128625843435316)
-    assert np.isclose(get_enrichment(amap, 3), 1.3966220044881281)
+    assert np.isclose(get_enrichment(amap, 1), 1.7988016831397438)
+    assert np.isclose(get_enrichment(amap, 3), 1.4364442129281982)
 
 
 bed = pd.read_csv("tests/test.bed", sep="\t", names=["chr", "start", "end"])
