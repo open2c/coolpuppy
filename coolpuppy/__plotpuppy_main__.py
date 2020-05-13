@@ -3,7 +3,7 @@
 """
 Created on Mon Mar 23 14:05:06 2020
 
-@author: ilya
+@author: Ilya Flyamer
 """
 # from coolpuppy import *
 from coolpuppy import __version__

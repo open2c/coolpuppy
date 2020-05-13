@@ -323,7 +323,8 @@ def main():
         bedname = os.path.splitext(os.path.basename(args.baselist))[0]
     else:
         bedname = "stdin"
-        args.baselist = sys.stdin
+        baselist = sys.stdin
+        args.baselist = 'stdin'
     if args.bed2 is not None:
         bedname += "_vs_" + os.path.splitext(os.path.basename(args.bed2))[0]
 
@@ -397,7 +398,7 @@ def main():
         anchor = cooler.util.parse_region_string(args.anchor)
 
     CC = CoordCreator(
-        baselist=args.baselist,
+        baselist=baselist,
         resolution=c.binsize,
         bed2=args.bed2,
         bed2_ordered=args.bed2_ordered,

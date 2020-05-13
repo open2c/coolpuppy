@@ -1069,7 +1069,7 @@ class PileUpper:
         mids_row1 = mids.__next__()
         if mids_row1[0] is None:  # Checking if empty selection
             logging.info(f"Nothing to sum up in chromosome {chrom}")
-            return self.make_outmap(), 0, cov_start, cov_end
+            return mymap, mymap, cov_start, cov_end, 0
         else:
             mids = itertools.chain([mids_row1], mids)
         mymap, num, cov_start, cov_end, n = self._do_pileups(
@@ -1125,6 +1125,7 @@ class PileUpper:
             ctrls, nums, cov_starts, cov_ends, ns = list(zip(*mymap(f, self.chroms)))
             ctrl = np.sum(ctrls, axis=0)
             num = np.sum(nums, axis=0)
+            n = np.sum(ns)
             if self.coverage_norm:
                 cov_start = np.sum(cov_starts, axis=0)
                 cov_end = np.sum(cov_ends, axis=0)
