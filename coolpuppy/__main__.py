@@ -321,6 +321,7 @@ def main():
     coolname = os.path.splitext(os.path.basename(c.filename))[0]
     if args.baselist != "-":
         bedname = os.path.splitext(os.path.basename(args.baselist))[0]
+        baselist = args.baselist
     else:
         bedname = "stdin"
         baselist = sys.stdin
