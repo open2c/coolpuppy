@@ -858,6 +858,7 @@ class PileUpper:
             self.regions[chrom],
             (lo_left, hi_left, lo_right, hi_right),
         )
+        diag = hi_left - lo_right
         return exp_matrix
 
     def make_outmap(self,):
@@ -956,6 +957,7 @@ class PileUpper:
             hi_right = endBin + endPad + 1
             if lo_left < 0 or hi_right > max_right:
                 continue
+            diag = hi_left - lo_right
             if (
                 self.mindist <= abs(endBin - stBin) * self.resolution < self.maxdist
                 or self.CC.local
@@ -979,6 +981,10 @@ class PileUpper:
                 #                    newmap = np.pad(
                 #                        newmap, [(y, 0), (0, x)], "constant"
                 #                    )  # Padding to adjust to the right shape
+                
+                ignore_indices = np.tril_indices_from(newmap, diag-(stPad*2+1)-1+self.ignore_diags)
+                newmap[ignore_indices] = np.nan
+                
                 if self.rescale:
                     if newmap.size == 0 or np.all(np.isnan(newmap)):
                         newmap = np.zeros((self.rescale_size, self.rescale_size))
