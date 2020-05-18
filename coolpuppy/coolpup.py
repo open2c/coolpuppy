@@ -894,7 +894,7 @@ class PileUpper:
         data = self.clr.matrix(sparse=True, balance=self.balance).fetch(region)
         data = sparse.triu(data)
         if not self.local:
-            for diag in range(self.ignore_diags):
+            for diag in range(-self.CC.pad_bins, self.ignore_diags):
                 data.setdiag(np.nan, diag)
         return data.tocsr()
 
