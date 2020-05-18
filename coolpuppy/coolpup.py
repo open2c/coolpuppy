@@ -894,7 +894,7 @@ class PileUpper:
         data = self.clr.matrix(sparse=True, balance=self.balance).fetch(region)
         data = sparse.triu(data)
         if not self.local:
-            for diag in range(-self.CC.pad_bins, self.ignore_diags):
+            for diag in range(-self.CC.pad_bins-2, self.ignore_diags):
                 data.setdiag(np.nan, diag)
         return data.tocsr()
 
@@ -1017,7 +1017,7 @@ class PileUpper:
                         )
                     cov_start += np.nan_to_num(new_cov_start)
                     cov_end += +np.nan_to_num(new_cov_end)
-                num += np.isfinite(mymap).astype(int)
+                num += np.isfinite(newmap).astype(int)
                 n += 1
         if self.CC.local:
             mymap = np.triu(mymap, 0)
