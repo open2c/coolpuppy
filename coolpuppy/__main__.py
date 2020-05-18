@@ -110,6 +110,13 @@ def parse_args_coolpuppy():
         help="""Maximal distance of interactions to use""",
     )
     parser.add_argument(
+        "--ignore_diags",
+        type=int,
+        default=2,
+        required=False,
+        help="""How many diagonals to ignore""",
+    )
+    parser.add_argument(
         "--minsize",
         type=int,
         required=False,
@@ -429,6 +436,7 @@ def main():
         rescale=args.rescale,
         rescale_pad=args.rescale_pad,
         rescale_size=args.rescale_size,
+        ignore_diags=args.ignore_diags,
     )
 
     if args.outdir == ".":

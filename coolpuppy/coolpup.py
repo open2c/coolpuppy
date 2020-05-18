@@ -894,7 +894,7 @@ class PileUpper:
         data = self.clr.matrix(sparse=True, balance=self.balance).fetch(region)
         data = sparse.triu(data)
         if not self.local:
-            for diag in range(-self.CC.pad_bins-2, self.ignore_diags):
+            for diag in range(-self.CC.pad_bins-5, self.ignore_diags): #No idea why 5 and not 2
                 data.setdiag(np.nan, diag)
         return data.tocsr()
 
@@ -1021,7 +1021,7 @@ class PileUpper:
                 n += 1
         if self.CC.local:
             mymap = np.triu(mymap, 0)
-            mymap += np.rot90(np.fliplr(np.triu(mymap, 1)))
+            mymap += np.triu(mymap, 1).T
         return mymap, num, cov_start, cov_end, n
 
     def pileup_chrom(
