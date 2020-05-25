@@ -575,7 +575,7 @@ class CoordCreator:
         if mids is None:
             mids = self.mids
         mids = filter_func(mids)
-        if not len(mids) > 1:
+        if not len(mids) >= 1:
             logging.debug("Empty selection")
             yield None, None
         m = mids["Bin"].astype(int).values
@@ -587,7 +587,7 @@ class CoordCreator:
         if mids is None:
             mids = self.mids
         mids = filter_func(mids)
-        if not len(mids) > 1:
+        if not len(mids) >= 1:
             logging.debug("Empty selection")
             yield None, None, None, None
         m1 = mids["Bin1"].astype(int).values
