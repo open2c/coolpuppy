@@ -80,7 +80,7 @@ def test___main__():
         """coolpup.py tests/Scc1-control.10000.cool
                       tests/CH12_loops_Rao.bed --mindist 0
                       --unbalanced --coverage_norm --outdir tests
-                      --outname testing_loop.txt --n_proc 2
+                      --outname testing_loop.txt --ignore_diags 0 --n_proc 2
                       --seed 0""".split()
     )
     testamap = load_array_with_header("tests/testing_loop.txt")['data']

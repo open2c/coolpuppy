@@ -858,7 +858,6 @@ class PileUpper:
             self.regions[chrom],
             (lo_left, hi_left, lo_right, hi_right),
         )
-        diag = hi_left - lo_right
         return exp_matrix
 
     def make_outmap(self,):
@@ -894,9 +893,6 @@ class PileUpper:
         logging.debug("Loading data")
         data = self.clr.matrix(sparse=True, balance=self.balance).fetch(region)
         data = sparse.triu(data)
-        if not self.local:
-            for diag in range(-self.CC.pad_bins-5, self.ignore_diags): #No idea why 5 and not 2
-                data.setdiag(np.nan, diag)
         return data.tocsr()
 
     def get_coverage(self, data):
@@ -958,76 +954,72 @@ class PileUpper:
             if lo_left < 0 or hi_right > max_right:
                 continue
             diag = hi_left - lo_right
-            if (
-                self.mindist <= abs(endBin - stBin) * self.resolution < self.maxdist
-                or self.CC.local
-            ):
-                if not expected:
-                    try:
-                        newmap = data[lo_left:hi_left, lo_right:hi_right].toarray()
-                    except (IndexError, ValueError):
-                        continue
-                else:
-                    newmap = self.get_expected_matrix(
-                        chrom, (lo_left, hi_left), (lo_right, hi_right)
-                    )
-                #                if (
-                #                    newmap.shape != mymap.shape and not self.rescale
-                #                ):  # AFAIK only happens at ends of chroms
-                #                    height, width = newmap.shape
-                #                    h, w = mymap.shape
-                #                    x = w - width
-                #                    y = h - height
-                #                    newmap = np.pad(
-                #                        newmap, [(y, 0), (0, x)], "constant"
-                #                    )  # Padding to adjust to the right shape
-                
+            if not expected:
+                try:
+                    newmap = data[lo_left:hi_left, lo_right:hi_right].toarray()
+                except (IndexError, ValueError):
+                    continue
+            else:
+                newmap = self.get_expected_matrix(
+                    chrom, (lo_left, hi_left), (lo_right, hi_right)
+                )
+            #                if (
+            #                    newmap.shape != mymap.shape and not self.rescale
+            #                ):  # AFAIK only happens at ends of chroms
+            #                    height, width = newmap.shape
+            #                    h, w = mymap.shape
+            #                    x = w - width
+            #                    y = h - height
+            #                    newmap = np.pad(
+            #                        newmap, [(y, 0), (0, x)], "constant"
+            #                    )  # Padding to adjust to the right shape
+            newmap = newmap.astype(float)
+            if not self.local:
                 ignore_indices = np.tril_indices_from(newmap, diag-(stPad*2+1)-1+self.ignore_diags)
                 newmap[ignore_indices] = np.nan
-                
-                if self.rescale:
-                    if newmap.size == 0 or np.all(np.isnan(newmap)):
-                        newmap = np.zeros((self.rescale_size, self.rescale_size))
-                    else:
-                        newmap = numutils.zoom_array(
-                            newmap, (self.rescale_size, self.rescale_size)
-                        )
-                if rot_flip:
-                    newmap = np.rot90(np.flipud(newmap), 1)
-                elif rot:
-                    newmap = np.rot90(newmap, -1)
+            else:
+                mymap = np.triu(mymap, 0)
+                mymap += np.triu(mymap, 1).T                
+            if self.rescale:
+                if newmap.size == 0 or np.all(np.isnan(newmap)):
+                    newmap = np.zeros((self.rescale_size, self.rescale_size))
+                else:
+                    newmap = numutils.zoom_array(
+                        newmap, (self.rescale_size, self.rescale_size)
+                    )
+            if rot_flip:
+                newmap = np.rot90(np.flipud(newmap), 1)
+            elif rot:
+                newmap = np.rot90(newmap, -1)
 
-                mymap = np.nansum([mymap, newmap], axis=0)
-                if self.coverage_norm and not expected and (self.balance is False):
-                    new_cov_start = coverage[lo_left:hi_left]
-                    new_cov_end = coverage[lo_right:hi_right]
-                    if self.rescale:
-                        if len(new_cov_start) == 0:
-                            new_cov_start = np.zeros(self.rescale_size)
-                        if len(new_cov_end) == 0:
-                            new_cov_end = np.zeros(self.rescale_size)
-                        new_cov_start = numutils.zoom_array(
-                            new_cov_start, (self.rescale_size,)
-                        )
-                        new_cov_end = numutils.zoom_array(
-                            new_cov_end, (self.rescale_size,)
-                        )
-                    else:
-                        l = len(new_cov_start)
-                        r = len(new_cov_end)
-                        new_cov_start = np.pad(
-                            new_cov_start, (mymap.shape[0] - l, 0), "constant"
-                        )
-                        new_cov_end = np.pad(
-                            new_cov_end, (0, mymap.shape[1] - r), "constant"
-                        )
-                    cov_start += np.nan_to_num(new_cov_start)
-                    cov_end += +np.nan_to_num(new_cov_end)
-                num += np.isfinite(newmap).astype(int)
-                n += 1
-        if self.CC.local:
-            mymap = np.triu(mymap, 0)
-            mymap += np.triu(mymap, 1).T
+            mymap = np.nansum([mymap, newmap], axis=0)
+            if self.coverage_norm and not expected and (self.balance is False):
+                new_cov_start = coverage[lo_left:hi_left]
+                new_cov_end = coverage[lo_right:hi_right]
+                if self.rescale:
+                    if len(new_cov_start) == 0:
+                        new_cov_start = np.zeros(self.rescale_size)
+                    if len(new_cov_end) == 0:
+                        new_cov_end = np.zeros(self.rescale_size)
+                    new_cov_start = numutils.zoom_array(
+                        new_cov_start, (self.rescale_size,)
+                    )
+                    new_cov_end = numutils.zoom_array(
+                        new_cov_end, (self.rescale_size,)
+                    )
+                else:
+                    l = len(new_cov_start)
+                    r = len(new_cov_end)
+                    new_cov_start = np.pad(
+                        new_cov_start, (mymap.shape[0] - l, 0), "constant"
+                    )
+                    new_cov_end = np.pad(
+                        new_cov_end, (0, mymap.shape[1] - r), "constant"
+                    )
+                cov_start += np.nan_to_num(new_cov_start)
+                cov_end += +np.nan_to_num(new_cov_end)
+            num += np.isfinite(newmap).astype(int)
+            n += 1
         return mymap, num, cov_start, cov_end, n
 
     def pileup_chrom(
