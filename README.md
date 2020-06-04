@@ -64,13 +64,13 @@ For flexible plotting, I suggest to use `matplotlib` or another library. However
 
 ## Citing coolpup.py
 
-Until it has been published in a peer-reviewed journal, please cite our preprint
-
 **Coolpup.py - a versatile tool to perform pile-up analysis of Hi-C data**
 
 Ilya M. Flyamer, Robert S. Illingworth, Wendy A. Bickmore
 
-[https://www.biorxiv.org/content/10.1101/586537v3](https://www.biorxiv.org/content/10.1101/586537v3)
+[https://academic.oup.com/bioinformatics/article/36/10/2980/5719023](https://academic.oup.com/bioinformatics/article/36/10/2980/5719023)
+
+doi: 10.1093/bioinformatics/btaa073
 
 ## This tool has been used in the following publications
 
@@ -83,7 +83,9 @@ McLaughlin, K., Flyamer, I.M., Thomson, J.P., Mjoseng, H.K., Shukla, R., William
 
 Boyle, S., Flyamer, I.M., Williamson, I., Sengupta, D., Bickmore, W.A., and Illingworth, R.S. (2019). A Central Role for Canonical PRC1 in Shaping the 3D Nuclear Landscape. BioRxiv 2019.12.15.876771.
 
-[https://www.biorxiv.org/content/10.1101/2019.12.15.876771v2](https://www.biorxiv.org/content/10.1101/2019.12.15.876771v2)
+[http://genesdev.cshlp.org/content/early/2020/05/21/gad.336487.120.abstract](http://genesdev.cshlp.org/content/early/2020/05/21/gad.336487.120.abstract)
+
+doi: 10.1101/gad.336487.120
 
 
 Rhodes, J.D.P., Feldmann, A., Hernández-Rodríguez, B., Díaz, N., Brown, J.M., Fursova, N.A., Blackledge, N.P., Prathapan, P., Dobrinic, P., Huseyin, M.K., et al. (2020). Cohesin Disrupts Polycomb-Dependent Chromosome Interactions in Embryonic Stem Cells. Cell Reports 30, 820-835.e10.
