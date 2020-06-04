@@ -86,8 +86,6 @@ Boyle, S., Flyamer, I.M., Williamson, I., Sengupta, D., Bickmore, W.A., and Illi
 
 [http://genesdev.cshlp.org/content/early/2020/05/21/gad.336487.120.abstract](http://genesdev.cshlp.org/content/early/2020/05/21/gad.336487.120.abstract)
 
-doi: 10.1101/gad.336487.120
-
 
 Rhodes, J.D.P., Feldmann, A., Hernández-Rodríguez, B., Díaz, N., Brown, J.M., Fursova, N.A., Blackledge, N.P., Prathapan, P., Dobrinic, P., Huseyin, M.K., et al. (2020). Cohesin Disrupts Polycomb-Dependent Chromosome Interactions in Embryonic Stem Cells. Cell Reports 30, 820-835.e10.
 
