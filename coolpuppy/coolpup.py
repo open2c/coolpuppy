@@ -697,16 +697,12 @@ class CoordCreator:
         else:
             self.pos_stream = self.get_position_pairs_stream
 
-    def _chrom_mids(self, bed2=False):
-        if bed2:
-            mids = self.mids2
-        else:
-            mids = self.mids
-        for chrom in self.final_chroms:
+    def _chrom_mids(self, chroms, mids):
+        for chrom in chroms:
             if self.kind == "bed":
-                yield chrom, self.mids[mids["chr"] == chrom]
+                yield chrom, mids[mids["chr"] == chrom]
             else:
-                yield chrom, mids[mids["chr1"] == chrom]
+                yield chrom, mids[(mids["chr1"] == chrom) & (mids["chr2"] == chrom)]
 
     def chrom_mids(self):
         chrommids = self._chrom_mids(self.final_chroms, self.mids)
