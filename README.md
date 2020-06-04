@@ -82,7 +82,7 @@ McLaughlin, K., Flyamer, I.M., Thomson, J.P., Mjoseng, H.K., Shukla, R., William
 [https://www.sciencedirect.com/science/article/pii/S2211124719313312?via%3Dihub](https://www.sciencedirect.com/science/article/pii/S2211124719313312?via%3Dihub)
 
 
-Boyle, S., Flyamer, I.M., Williamson, I., Sengupta, D., Bickmore, W.A., and Illingworth, R.S. (2019). A Central Role for Canonical PRC1 in Shaping the 3D Nuclear Landscape. BioRxiv 2019.12.15.876771.
+Boyle, S., Flyamer, I.M., Williamson, I., Sengupta, D., Bickmore, W.A., and Illingworth, R.S. (2019). A Central Role for Canonical PRC1 in Shaping the 3D Nuclear Landscape. Genes & Development 2020
 
 [http://genesdev.cshlp.org/content/early/2020/05/21/gad.336487.120.abstract](http://genesdev.cshlp.org/content/early/2020/05/21/gad.336487.120.abstract)
 
