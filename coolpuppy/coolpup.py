@@ -531,8 +531,7 @@ class CoordCreator:
 
         if (self.local and anchor) or (self.local and (self.mids2 is not None)):
             raise ValueError(
-                """Can't have a local pileup with an anchor or with
-                                two bed files"""
+                """Can't have a local pileup with an anchor or with two bed files"""
             )
         if mids is None:
             mids = self.mids
@@ -639,13 +638,11 @@ class CoordCreator:
             self.bed2, self.bed2kind = self.auto_read_bed(self.bed2)
             if self.kind != "bed":
                 raise ValueError(
-                    """Please provide two BED files; baselist doesn't
-                             seem to be one"""
+                    """Please provide two BED files; baselist doesn't seem to be one"""
                 )
             elif self.bed2kind != "bed":
                 raise ValueError(
-                    """Please provide two BED files; bed2 doesn't
-                             seem to be one"""
+                    """Please provide two BED files; bed2 doesn't seem to be one"""
                 )
         if self.kind == "bed":
             basechroms = set(self.bases["chr"])
@@ -676,10 +673,10 @@ class CoordCreator:
         if len(self.final_chroms) == 0:
             raise ValueError(
                 """No chromosomes are in common between the coordinate
-                             file/anchor and the cooler file. Are they in the same
-                             format, e.g. starting with "chr"?
-                             Alternatively, all regions might have been filtered
-                             by distance/size filters."""
+                   file/anchor and the cooler file. Are they in the same
+                   format, e.g. starting with "chr"?
+                   Alternatively, all regions might have been filtered
+                   by distance/size filters."""
             )
 
         self.mids = self._get_mids(self.bases)

@@ -347,7 +347,8 @@ def main():
             control = False
         if not os.path.isfile(args.expected):
             raise FileExistsError("Expected file doesn't exist")
-        expected = pd.read_csv(args.expected, sep="\t", header=0)
+        expected = pd.read_csv(args.expected, sep="\t", header=0, dtype={'region':str,
+                                                                         'chrom':str})
     else:
         expected = False
     if args.mindist is None:
