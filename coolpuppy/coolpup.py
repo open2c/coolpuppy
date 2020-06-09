@@ -369,11 +369,20 @@ class CoordCreator:
         if filetype == "bed" or kind == "bed":
             filter_func = self.filter_bed
             names = ["chr", "start", "end"]
-            row1 = filter_func(pd.DataFrame([row1], columns=names))
+            dtype = {"chr": str, "start": int, "end": int}
+            row1 = filter_func(pd.DataFrame([row1], columns=names, dtype=dtype))
         elif filetype == "bedpe" or kind == "bedpe":  # bedpe
             filter_func = self.filter_bedpe
             names = ["chr1", "start1", "end1", "chr2", "start2", "end2"]
-            row1 = filter_func(pd.DataFrame([row1], columns=names))
+            dtype = {
+                "chr1": str,
+                "start1": int,
+                "end1": int,
+                "chr2": str,
+                "start2": int,
+                "end2": int,
+            }
+            row1 = filter_func(pd.DataFrame([row1], columns=names, dtype=dtype))
         else:
             raise ValueError(
                 f"""Unsupported input kind: {kind}.
@@ -388,7 +397,12 @@ class CoordCreator:
                 appended = True
 
         for chunk in pd.read_csv(
-            file, sep="\t", names=names, index_col=False, chunksize=10 ** 4
+            file,
+            sep="\t",
+            names=names,
+            index_col=False,
+            chunksize=10 ** 4,
+            dtype=dtype,
         ):
             bases.append(filter_func(chunk))
         bases = pd.concat(bases)
@@ -396,14 +410,14 @@ class CoordCreator:
             bases = bases.iloc[1:]
         if filetype == "bed" or kind == "bed":
             kind = "bed"
-            bases["chr"] = bases["chr"].astype(str)
-            bases[["start", "end"]] = bases[["start", "end"]].astype(np.uint64)
+            # bases["chr"] = bases["chr"].astype(str)
+            # bases[["start", "end"]] = bases[["start", "end"]].astype(np.uint64)
         if filetype == "bedpe" or kind == "bedpe":
             kind = "bedpe"
-            bases[["chr1", "chr2"]] = bases[["chr1", "chr2"]].astype(str)
-            bases[["start1", "end1", "start2", "end2"]] = bases[
-                ["start1", "end1", "start2", "end2"]
-            ].astype(np.uint64)
+            # bases[["chr1", "chr2"]] = bases[["chr1", "chr2"]].astype(str)
+            # bases[["start1", "end1", "start2", "end2"]] = bases[
+            # ["start1", "end1", "start2", "end2"]
+            # ].astype(np.uint64)
         return bases, kind
 
     def subset(self, df):
@@ -968,11 +982,13 @@ class PileUpper:
             #                    )  # Padding to adjust to the right shape
             newmap = newmap.astype(float)
             if not self.local:
-                ignore_indices = np.tril_indices_from(newmap, diag-(stPad*2+1)-1+self.ignore_diags)
+                ignore_indices = np.tril_indices_from(
+                    newmap, diag - (stPad * 2 + 1) - 1 + self.ignore_diags
+                )
                 newmap[ignore_indices] = np.nan
             else:
                 mymap = np.triu(mymap, 0)
-                mymap += np.triu(mymap, 1).T                
+                mymap += np.triu(mymap, 1).T
             if self.rescale:
                 if newmap.size == 0 or np.all(np.isnan(newmap)):
                     newmap = np.zeros((self.rescale_size, self.rescale_size))
@@ -997,9 +1013,7 @@ class PileUpper:
                     new_cov_start = numutils.zoom_array(
                         new_cov_start, (self.rescale_size,)
                     )
-                    new_cov_end = numutils.zoom_array(
-                        new_cov_end, (self.rescale_size,)
-                    )
+                    new_cov_end = numutils.zoom_array(new_cov_end, (self.rescale_size,))
                 else:
                     l = len(new_cov_start)
                     r = len(new_cov_end)
