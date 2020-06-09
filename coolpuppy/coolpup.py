@@ -369,20 +369,20 @@ class CoordCreator:
         if filetype == "bed" or kind == "bed":
             filter_func = self.filter_bed
             names = ["chr", "start", "end"]
-            dtype = {"chr": str, "start": "int", "end": "int"}
-            row1 = filter_func(pd.DataFrame([row1], columns=names, dtype=dtype))
+            dtype = {"chr": "str", "start": "int", "end": "int"}
+            row1 = filter_func(pd.DataFrame([row1], columns=names).astype(dtype=dtype))
         elif filetype == "bedpe" or kind == "bedpe":  # bedpe
             filter_func = self.filter_bedpe
             names = ["chr1", "start1", "end1", "chr2", "start2", "end2"]
             dtype = {
-                "chr1": str,
+                "chr1": "str",
                 "start1": "int",
                 "end1": "int",
-                "chr2": str,
+                "chr2": "str",
                 "start2": "int",
                 "end2": "int",
             }
-            row1 = filter_func(pd.DataFrame([row1], columns=names, dtype=dtype))
+            row1 = filter_func(pd.DataFrame([row1], columns=names).astype(dtype=dtype))
         else:
             raise ValueError(
                 f"""Unsupported input kind: {kind}.

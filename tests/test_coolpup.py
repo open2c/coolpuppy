@@ -70,6 +70,7 @@ def test___main__():
         "tests/testing_tad.txt",
         "tests/testing_bed2.txt",
         "tests/testing_loop_numeric.txt",
+        "tests/testing_loop_numeric_noX.txt",
     ):
         try:
             os.remove(f)
@@ -126,6 +127,17 @@ def test___main__():
                       --seed 0""".split()
     )
     testamap = load_array_with_header("tests/testing_loop_numeric.txt")['data']
+    assert np.isclose(get_enrichment(amap, 3), get_enrichment(testamap, 3), 0.1)
+    
+    subprocess.run(
+        """coolpup.py tests/Scc1-control.10000.numeric_chroms.cool
+                      tests/CH12_loops_Rao_numeric_chroms_noX.bed
+                      --mindist 0
+                      --unbalanced --coverage_norm --outdir tests
+                      --outname testing_loop_numeric_noX.txt --n_proc 2
+                      --seed 0""".split()
+    )
+    testamap = load_array_with_header("tests/testing_loop_numeric_noX.txt")['data']
     assert np.isclose(get_enrichment(amap, 3), get_enrichment(testamap, 3), 0.1)
 
 
