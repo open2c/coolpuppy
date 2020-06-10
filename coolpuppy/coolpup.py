@@ -987,7 +987,7 @@ class PileUpper:
                 )
                 newmap[ignore_indices] = np.nan
             else:
-                mymap = np.triu(mymap, 0)
+                mymap = np.triu(mymap, self.ignore_diags)
                 mymap += np.triu(mymap, 1).T
             if self.rescale:
                 if newmap.size == 0 or np.all(np.isnan(newmap)):
