@@ -533,6 +533,7 @@ def main():
                 logging.info(f"Saved individual pileups to {json_path}")
     else:
         pup = PU.pileupsWithControl(nproc)
+        args['resolution'] = c.binsize
         try:
             save_array_with_header(pup, vars(args), os.path.join(args.outdir, outname))
         except FileNotFoundError:
