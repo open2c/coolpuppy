@@ -98,7 +98,7 @@ def norm_cis(amap, i=3):
         Pileup.
     i : int, optional
         How many bins to use from each upper left and lower right corner: final corner
-        shape is i^2.
+        shape is i^2. 0 will not normalize.
         The default is 3.
 
     Returns
@@ -107,7 +107,10 @@ def norm_cis(amap, i=3):
         Normalized pileup.
 
     """
-    return amap / np.nanmean((amap[0:i, 0:i] + amap[-i:, -i:])) * 2
+    if i > 0:
+        return amap / np.nanmean((amap[0:i, 0:i] + amap[-i:, -i:])) * 2
+    else:
+        return amap
 
 
 def get_enrichment(amap, n):
@@ -153,6 +156,29 @@ def get_local_enrichment(amap, pad=1):
     c = int(c)
     return np.nanmean(amap[c:-c, c:-c])
 
+def get_insulation_strength(amap, ignore_central=0):
+    """Divide values in upper left and lower right corners over upper right and lower
+    left, ignoring the central bins.
+
+    Parameters
+    ----------
+    amap : 2D array
+        Pileup.
+    ignore_central : int, optional
+        How many central bins to ignore. Has to be odd or 0. The default is 0.
+
+    Returns
+    -------
+    float
+        Insulation strength.
+
+    """
+    if not ignore_central==0 or ignore_central%2==1:
+        raise ValueError(f'ignore_central has to be odd (or 0), got {ignore_central}')
+    i = (amap.shape[0] - ignore_central)//2
+    intra = np.nansum(amap[  :i,   :i]) + np.nansum(amap[-i:, -i:])
+    inter = np.nansum(amap[:i, -i: ]) + np.nansum(amap[-i:,   :i])
+    return intra/inter
 
 def prepare_single(item):
     """Generate enrichment and corner CV, reformat into a list
@@ -492,8 +518,8 @@ class CoordCreator:
         else:
             raise ValueError(
                 """
-                             kind can only be "bed" or "bedpe"
-                             """
+                kind can only be "bed" or "bedpe"
+                """
             )
         return mids
 
