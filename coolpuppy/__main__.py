@@ -533,14 +533,15 @@ def main():
                 logging.info(f"Saved individual pileups to {json_path}")
     else:
         pup = PU.pileupsWithControl(nproc)
-        args['resolution'] = c.binsize
+        headerdict = vars(args)
+        headerdict['resolution'] = c.binsize
         try:
-            save_array_with_header(pup, vars(args), os.path.join(args.outdir, outname))
+            save_array_with_header(pup, headerdict, os.path.join(args.outdir, outname))
         except FileNotFoundError:
             try:
                 os.mkdir(args.outdir)
             except FileExistsError:
                 pass
-            save_array_with_header(pup, vars(args), os.path.join(args.outdir, outname))
+            save_array_with_header(pup, headerdict, os.path.join(args.outdir, outname))
         finally:
             logging.info(f"Saved output to {os.path.join(args.outdir, outname)}")
