@@ -535,7 +535,6 @@ def main():
         pup = PU.pileupsWithControl(nproc)
         headerdict = vars(args)
         headerdict['resolution'] = int(c.binsize)
-        print(headerdict)
         try:
             save_array_with_header(pup, headerdict, os.path.join(args.outdir, outname))
         except FileNotFoundError:
