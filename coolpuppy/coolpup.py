@@ -565,7 +565,7 @@ class CoordCreator:
         else:
             return partial(self._filter_func_pairs_region, region)
 
-    def get_combinations(self, filter_func, mids=None, mids2=None, anchor=None):
+    def _get_combinations(self, filter_func, mids=None, mids2=None, anchor=None):
         if anchor is None:
             anchor = self.anchor
 
@@ -610,6 +610,13 @@ class CoordCreator:
             ):
                 yield list(i) + list(j)
 
+    def get_combinations(self, filter_func, mids=None, mids2=None, anchor=None):
+        stream = self._get_combinations(filter_func, mids, mids2, anchor)
+        if not self.local:
+            stream = self.filter_pos_stream_distance(stream)
+        return stream
+    
+
     def get_positions_stream(self, filter_func, mids=None):
         if mids is None:
             mids = self.mids
@@ -622,7 +629,7 @@ class CoordCreator:
         for posdata in zip(m, p):
             yield posdata
 
-    def get_position_pairs_stream(self, filter_func, mids=None):
+    def _get_position_pairs_stream(self, filter_func, mids=None):
         if mids is None:
             mids = self.mids
         mids = filter_func(mids)
@@ -635,6 +642,12 @@ class CoordCreator:
         p2 = (mids["Pad2"] // self.resolution).astype(int).values
         for posdata in zip(m1, m2, p1, p2):
             yield posdata
+            
+    def get_position_pairs_stream(self, filter_func, mids=None):
+        stream = self._get_position_pairs_stream(filter_func, mids)
+        if not self.local:
+            stream = self.filter_pos_stream_distance(stream)
+        return stream
 
     def control_regions(self, filter_func, pos_pairs=None):
         if self.seed is not None:
@@ -671,6 +684,12 @@ class CoordCreator:
             if ctrl:
                 out_stream = self.CC.control_regions(self.filter_func_all, out_stream)
             yield (m - p, m + p), out_stream
+            
+            
+    def filter_pos_stream_distance(self, stream):
+        for (m1, m2, p1, p2) in stream:
+            if self.mindist < abs(m2 - m1) * self.resolution < self.maxdist:
+                yield (m1, m2, p1, p2)
 
     def process(self):
         self.bases, self.kind = self.auto_read_bed(self.baselist)
@@ -733,6 +752,7 @@ class CoordCreator:
             self.pos_stream = self.get_combinations
         else:
             self.pos_stream = self.get_position_pairs_stream
+        
 
     def _chrom_mids(self, chroms, mids):
         for chrom in chroms:
@@ -782,7 +802,7 @@ class PileUpper:
             If using expected, pandas DataFrame with chromosome-wide expected.
             The default is False.
         control : bool, optional
-            Whehter to use randomly shifted controls.
+            Whether to use randomly shifted controls.
             The default is False.
         coverage_norm : bool, optional
             Whether to normalize final the final pileup by accumulated coverage as an
