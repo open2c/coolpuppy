@@ -1117,8 +1117,9 @@ class PileUpper:
             mids = self.CC.control_regions(filter_func)
         else:
             mids = self.CC.pos_stream(filter_func)
-        mids_row1 = mids.__next__()
-        if mids_row1[0] is None:  # Checking if empty selection
+        try:
+            mids_row1 = mids.__next__()
+        except StopIteration:
             logging.info(f"Nothing to sum up in chromosome {chrom}")
             return mymap, mymap, cov_start, cov_end, 0
         else:

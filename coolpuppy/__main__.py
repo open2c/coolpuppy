@@ -52,7 +52,7 @@ def parse_args_coolpuppy():
              """,
         required=False,
     )
-    parser.set_defaults(bed_ordered=True)
+    # parser.set_defaults(bed2_ordered=True)
     parser.add_argument(
         "--pad",
         default=100,
