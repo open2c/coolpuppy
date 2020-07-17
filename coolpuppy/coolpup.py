@@ -1160,6 +1160,7 @@ class PileUpper:
         loops, nums, cov_starts, cov_ends, ns = list(zip(*mymap(f, self.chroms)))
         loop = np.sum(loops, axis=0)
         n = np.sum(ns)
+        n_return = n
         num = np.sum(nums, axis=0)
         if self.coverage_norm:
             cov_start = np.sum(cov_starts, axis=0)
@@ -1191,7 +1192,7 @@ class PileUpper:
         if nproc > 1:
             p.close()
         loop[~np.isfinite(loop)] = 0
-        return loop
+        return loop, n_return
 
     def pileupsByWindow(
         self, chrom, expected=False, ctrl=False,
