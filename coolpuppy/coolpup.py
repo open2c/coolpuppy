@@ -658,12 +658,13 @@ class CoordCreator:
             source = self.pos_stream(filter_func)
         else:
             source = map(lambda x: x[1:], pos_pairs.itertuples())
-        row1 = source.__next__()
-        if row1[0] is None:  # Checking if empty selection
-            logging.debug("Empty selection")
-            yield row1
-        else:
-            source = itertools.chain([row1], source)
+        # try:
+        #     row1 = next(source)
+        # except StopIteration:
+        #     logging.debug("Empty selection")
+        #     raise StopIteration
+        # else:
+        #     source = itertools.chain([row1], source)
         for start, end, p1, p2 in source:
             for i in range(self.nshifts):
                 shift = np.random.randint(minbin, maxbin)
@@ -970,7 +971,19 @@ class PileUpper:
     def _do_pileups(
         self, mids, chrom, expected=False,
     ):
-
+        mymap = self.make_outmap()
+        cov_start = np.zeros(mymap.shape[0])
+        cov_end = np.zeros(mymap.shape[1])
+        num = np.zeros_like(mymap)
+        n = 0
+        try:
+            mids_row1 = next(mids)
+        except StopIteration:
+            logging.info(f"Nothing to sum up in chromosome {chrom}")
+            return mymap, mymap, cov_start, cov_end, n
+        else:
+            mids = itertools.chain([mids_row1], mids)
+        
         if expected:
             data = None
             logging.debug("Doing expected")
@@ -979,13 +992,10 @@ class PileUpper:
                 chrom
             )  # self.CoolSnipper.select(self.regions[chrom], self.regions[chrom])
         max_right = self.matsizes[chrom]
-        mymap = self.make_outmap()
+
         if self.coverage_norm:
             coverage = self.get_coverage(data)
-        cov_start = np.zeros(mymap.shape[0])
-        cov_end = np.zeros(mymap.shape[1])
-        num = np.zeros_like(mymap)
-        n = 0
+
         for stBin, endBin, stPad, endPad in mids:
             rot_flip = False
             rot = False
@@ -1117,13 +1127,6 @@ class PileUpper:
             mids = self.CC.control_regions(filter_func)
         else:
             mids = self.CC.pos_stream(filter_func)
-        try:
-            mids_row1 = mids.__next__()
-        except StopIteration:
-            logging.info(f"Nothing to sum up in chromosome {chrom}")
-            return mymap, mymap, cov_start, cov_end, 0
-        else:
-            mids = itertools.chain([mids_row1], mids)
         mymap, num, cov_start, cov_end, n = self._do_pileups(
             mids=mids, chrom=chrom, expected=expected,
         )
