@@ -691,9 +691,17 @@ class CoordCreator:
         for (m1, m2, p1, p2) in stream:
             if self.mindist < abs(m2 - m1) * self.resolution < self.maxdist:
                 yield (m1, m2, p1, p2)
-
+                
+    def empty_stream(self, *args, **kwargs):
+        yield from ()
+        
     def process(self):
         self.bases, self.kind = self.auto_read_bed(self.baselist)
+        if self.bases.shape[0] == 0:
+            warnings.warn('No regions in baselist, returning empty output')
+            self.pos_stream = self.empty_stream
+            self.final_chroms = []
+            return
         if self.bed2 is not None:
             self.bed2, self.bed2kind = self.auto_read_bed(self.bed2)
             if self.kind != "bed":
@@ -735,8 +743,8 @@ class CoordCreator:
                 """No chromosomes are in common between the coordinate
                    file/anchor and the cooler file. Are they in the same
                    format, e.g. starting with "chr"?
-                   Alternatively, all regions might have been filtered
-                   by distance/size filters."""
+                   Alternatively, all regions in overlapping chromosomes
+                   might have been filtered by distance/size filters."""
             )
 
         self.mids = self._get_mids(self.bases)
@@ -1149,6 +1157,8 @@ class PileUpper:
             Normalized pileup.
 
         """
+        if len(self.chroms) == 0:
+            return self.make_outmap(), 0
 
         if nproc > 1:
             p = Pool(nproc)
