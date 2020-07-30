@@ -156,7 +156,7 @@ def get_local_enrichment(amap, pad=1):
     c = int(c)
     return np.nanmean(amap[c:-c, c:-c])
 
-def get_insulation_strength(amap, ignore_central=0):
+def get_insulation_strength(amap, ignore_central=0, ignore_diags=2):
     """Divide values in upper left and lower right corners over upper right and lower
     left, ignoring the central bins.
 
@@ -173,11 +173,15 @@ def get_insulation_strength(amap, ignore_central=0):
         Insulation strength.
 
     """
-    if not ignore_central==0 or ignore_central%2==1:
+    for d in range(ignore_diags):
+        amap = numutils.fill_diag(amap, np.nan, d)
+        if d != 0:
+            amap = numutils.fill_diag(amap, np.nan, -d)
+    if ignore_central!=0 and ignore_central%2!=1:
         raise ValueError(f'ignore_central has to be odd (or 0), got {ignore_central}')
     i = (amap.shape[0] - ignore_central)//2
-    intra = np.nansum(amap[  :i,   :i]) + np.nansum(amap[-i:, -i:])
-    inter = np.nansum(amap[:i, -i: ]) + np.nansum(amap[-i:,   :i])
+    intra = np.nanmean(np.concatenate([amap[:i,   :i].ravel(), amap[-i:, -i:].ravel()]))
+    inter = np.nanmean(np.concatenate([amap[:i,   -i:].ravel(), amap[-i:, :i].ravel()]))
     return intra/inter
 
 def prepare_single(item):
