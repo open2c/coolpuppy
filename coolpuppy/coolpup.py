@@ -156,6 +156,7 @@ def get_local_enrichment(amap, pad=1):
     c = int(c)
     return np.nanmean(amap[c:-c, c:-c])
 
+
 def get_insulation_strength(amap, ignore_central=0, ignore_diags=2):
     """Divide values in upper left and lower right corners over upper right and lower
     left, ignoring the central bins.
@@ -177,12 +178,13 @@ def get_insulation_strength(amap, ignore_central=0, ignore_diags=2):
         amap = numutils.fill_diag(amap, np.nan, d)
         if d != 0:
             amap = numutils.fill_diag(amap, np.nan, -d)
-    if ignore_central!=0 and ignore_central%2!=1:
-        raise ValueError(f'ignore_central has to be odd (or 0), got {ignore_central}')
-    i = (amap.shape[0] - ignore_central)//2
-    intra = np.nanmean(np.concatenate([amap[:i,   :i].ravel(), amap[-i:, -i:].ravel()]))
-    inter = np.nanmean(np.concatenate([amap[:i,   -i:].ravel(), amap[-i:, :i].ravel()]))
-    return intra/inter
+    if ignore_central != 0 and ignore_central % 2 != 1:
+        raise ValueError(f"ignore_central has to be odd (or 0), got {ignore_central}")
+    i = (amap.shape[0] - ignore_central) // 2
+    intra = np.nanmean(np.concatenate([amap[:i, :i].ravel(), amap[-i:, -i:].ravel()]))
+    inter = np.nanmean(np.concatenate([amap[:i, -i:].ravel(), amap[-i:, :i].ravel()]))
+    return intra / inter
+
 
 def prepare_single(item):
     """Generate enrichment and corner CV, reformat into a list
@@ -619,7 +621,6 @@ class CoordCreator:
         if not self.local:
             stream = self.filter_pos_stream_distance(stream)
         return stream
-    
 
     def get_positions_stream(self, filter_func, mids=None):
         if mids is None:
@@ -646,7 +647,7 @@ class CoordCreator:
         p2 = (mids["Pad2"] // self.resolution).astype(int).values
         for posdata in zip(m1, m2, p1, p2):
             yield posdata
-            
+
     def get_position_pairs_stream(self, filter_func, mids=None):
         stream = self._get_position_pairs_stream(filter_func, mids)
         if not self.local:
@@ -689,20 +690,19 @@ class CoordCreator:
             if ctrl:
                 out_stream = self.CC.control_regions(self.filter_func_all, out_stream)
             yield (m - p, m + p), out_stream
-            
-            
+
     def filter_pos_stream_distance(self, stream):
         for (m1, m2, p1, p2) in stream:
             if self.mindist <= abs(m2 - m1) * self.resolution <= self.maxdist:
                 yield (m1, m2, p1, p2)
-                
+
     def empty_stream(self, *args, **kwargs):
         yield from ()
-        
+
     def process(self):
         self.bases, self.kind = self.auto_read_bed(self.baselist)
         if self.bases.shape[0] == 0:
-            warnings.warn('No regions in baselist, returning empty output')
+            warnings.warn("No regions in baselist, returning empty output")
             self.pos_stream = self.empty_stream
             self.final_chroms = []
             return
@@ -765,7 +765,6 @@ class CoordCreator:
             self.pos_stream = self.get_combinations
         else:
             self.pos_stream = self.get_position_pairs_stream
-        
 
     def _chrom_mids(self, chroms, mids):
         for chrom in chroms:
@@ -995,7 +994,7 @@ class PileUpper:
             return mymap, mymap, cov_start, cov_end, n
         else:
             mids = itertools.chain([mids_row1], mids)
-        
+
         if expected:
             data = None
             logging.debug("Doing expected")
