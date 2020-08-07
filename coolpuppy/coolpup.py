@@ -693,7 +693,7 @@ class CoordCreator:
             
     def filter_pos_stream_distance(self, stream):
         for (m1, m2, p1, p2) in stream:
-            if self.mindist < abs(m2 - m1) * self.resolution < self.maxdist:
+            if self.mindist <= abs(m2 - m1) * self.resolution <= self.maxdist:
                 yield (m1, m2, p1, p2)
                 
     def empty_stream(self, *args, **kwargs):
