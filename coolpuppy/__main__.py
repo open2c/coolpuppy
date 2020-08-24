@@ -425,7 +425,6 @@ def main():
         subset=args.subset,
         seed=args.seed,
     )
-    CC.process()
 
     PU = PileUpper(
         clr=c,

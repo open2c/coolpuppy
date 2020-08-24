@@ -350,6 +350,7 @@ class CoordCreator:
         self.local = local
         self.subset = subset
         self.seed = seed
+        self.process()
 
     def filter_bed(self, df):
         length = df["end"] - df["start"]
@@ -582,7 +583,7 @@ class CoordCreator:
         if mids is None:
             mids = self.mids
         mids = filter_func(self.mids)
-        if not len(mids) > 1:
+        if not len(mids) >= 1:
             logging.debug("Empty selection")
             yield None, None, None, None
         m = mids["Bin"].values.astype(int)
@@ -1010,7 +1011,7 @@ class PileUpper:
         for stBin, endBin, stPad, endPad in mids:
             rot_flip = False
             rot = False
-            if stBin > endBin:
+            if stBin >= endBin:
                 stBin, stPad, endBin, endPad = endBin, endPad, stBin, stPad
                 if self.anchor is None:
                     rot_flip = True
