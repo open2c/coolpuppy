@@ -12,7 +12,7 @@
 ## .cool format
 A versatile tool to perform pile-up analysis on Hi-C data in .cool format (https://github.com/mirnylab/cooler). And who doesn't like cool pupppies?
 
-.cool is a modern and flexible (and the best, in my opinion) format to store Hi-C data.
+.cool is a modern and flexible format to store Hi-C data.
 It uses HDF5 to store a sparse representation of the Hi-C data, which allows low memory requirements when dealing with high resolution datasets. Another popular format to store Hi-C data, .hic, can be converted into .cool files using `hic2cool` (https://github.com/4dn-dcic/hic2cool).
 
 See for details:
@@ -23,7 +23,7 @@ Abdennur, N., and Mirny, L. (2019). Cooler: scalable storage for Hi-C data and o
 
 This is the idea of how pileups work to check whether certain regions tend to interacts with each other:
 
-<img src="https://raw.githubusercontent.com/Phlya/coolpuppy/master/loop_quant.png" alt="Pileup schematic" width="1000px"/>
+<img src="https://raw.githubusercontent.com/open2c/coolpuppy/master/loop_quant.png" alt="Pileup schematic" width="1000px"/>
      
 What's not shown here is normalization to the expected values. This can be done in two ways: either using a provided file with expected values of interactions at different distances (output of `cooltools compute-expected`), or directly from Hi-C data by dividing the pileups over randomly shifted control regions. If neither expected normalization approach is used (just set `--nshifts 0`), this becomes essentially identical to the APA approach (Rao et al., 2014), which can be used for averaging strongly interacting regions, e.g. annotated loops. For weaker interactors, decay of contact probability with distance can hide any focal enrichment that could be observed otherwise.
 
@@ -44,7 +44,7 @@ For coolpuppy (and other dependencies) simply do:
 
 or
 
-`pip install https://github.com/Phlya/coolpuppy/archive/master.zip`
+`pip install https://github.com/open2c/coolpuppy/archive/master.zip`
 
 to get the latest version from GitHub. This will make `coolpup.py` callable in your terminal, and importable in python as `coolpuppy`.
 
@@ -63,10 +63,7 @@ For flexible plotting, I suggest to use `matplotlib` or another library. However
 
 
 ## Citing coolpup.py
-
-**Coolpup.py - a versatile tool to perform pile-up analysis of Hi-C data**
-
-Ilya M. Flyamer, Robert S. Illingworth, Wendy A. Bickmore
+Ilya M Flyamer, Robert S Illingworth, Wendy A Bickmore (2020). Coolpup.py: versatile pile-up analysis of Hi-C data. Bioinformatics, 36, 10, 2980–2985.
 
 [https://academic.oup.com/bioinformatics/article/36/10/2980/5719023](https://academic.oup.com/bioinformatics/article/36/10/2980/5719023)
 
