@@ -36,7 +36,7 @@ setup(
       long_description_content_type='text/markdown',
       project_urls={'Source':'https://github.com/Phlya/coolpuppy',
                     'Issues':'https://github.com/Phlya/coolpuppy/issues'},
-      author='Ilya Flyamer',
+      author='Open2C',
       author_email='flyamer@gmail.com',
       classifiers=[
         "Programming Language :: Python",
