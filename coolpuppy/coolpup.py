@@ -689,7 +689,7 @@ class CoordCreator:
                 self.filter_func_all, mids=chrmids, anchor=(chrom, m, m)
             )
             if ctrl:
-                out_stream = self.CC.control_regions(self.filter_func_all, out_stream)
+                out_stream = self.control_regions(self.filter_func_all, out_stream)
             yield (m - p, m + p), out_stream
 
     def filter_pos_stream_distance(self, stream):
