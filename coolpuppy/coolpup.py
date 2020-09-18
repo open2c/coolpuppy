@@ -663,7 +663,7 @@ class CoordCreator:
         if pos_pairs is None:
             source = self.pos_stream(filter_func)
         else:
-            source = map(lambda x: x[1:], pos_pairs.itertuples())
+            source = map(lambda x: x[1:], pos_pairs)
         # try:
         #     row1 = next(source)
         # except StopIteration:
