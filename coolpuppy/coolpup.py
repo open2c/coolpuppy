@@ -227,7 +227,7 @@ def norm_coverage(loop, cov_start, cov_end):
 
     """
     coverage = np.outer(cov_start, cov_end)
-    coverage /= np.nanmean(coverage)
+    coverage = coverage / np.nanmean(coverage)
     loop /= coverage
     loop[np.isnan(loop)] = 0
     return loop
@@ -980,13 +980,12 @@ class PileUpper:
         )
         return coverage
 
-    def _do_pileups(
+    def _stream_snips(
         self, mids, chrom, expected=False,
     ):
         mymap = self.make_outmap()
         cov_start = np.zeros(mymap.shape[0])
         cov_end = np.zeros(mymap.shape[1])
-        num = np.zeros_like(mymap)
         n = 0
         try:
             mids_row1 = next(mids)
@@ -1010,13 +1009,9 @@ class PileUpper:
 
         for stBin, endBin, stPad, endPad in mids:
             rot_flip = False
-            rot = False
             if stBin >= endBin:
                 stBin, stPad, endBin, endPad = endBin, endPad, stBin, stPad
-                if self.anchor is None:
-                    rot_flip = True
-                else:
-                    rot = True
+                rot_flip = True
             if self.rescale:
                 stPad = stPad + int(round(self.rescale_pad * 2 * stPad))
                 endPad = endPad + int(round(self.rescale_pad * 2 * endPad))
@@ -1066,10 +1061,8 @@ class PileUpper:
                     )
             if rot_flip:
                 newmap = np.rot90(np.flipud(newmap), 1)
-            elif rot:
-                newmap = np.rot90(newmap, -1)
 
-            mymap = np.nansum([mymap, newmap], axis=0)
+            # mymap = np.nansum([mymap, newmap], axis=0)
             if self.coverage_norm and not expected and (self.balance is False):
                 new_cov_start = coverage[lo_left:hi_left]
                 new_cov_end = coverage[lo_right:hi_right]
@@ -1091,12 +1084,27 @@ class PileUpper:
                     new_cov_end = np.pad(
                         new_cov_end, (0, mymap.shape[1] - r), "constant"
                     )
-                cov_start += np.nan_to_num(new_cov_start)
-                cov_end += +np.nan_to_num(new_cov_end)
+                if rot_flip:
+                    new_cov_start, new_cov_end = new_cov_end[::-1], new_cov_start[::-1]
+                # cov_start += np.nan_to_num(new_cov_start)
+                # cov_end += +np.nan_to_num(new_cov_end)
+            # num += np.isfinite(newmap).astype(int)
+            # n += 1
+            yield chrom, stBin, endBin, newmap, new_cov_start, new_cov_end
+        # return mymap, num, cov_start, cov_end, n
+    
+    def _do_pileups(self, snip_stream):
+        chrom, stBin, endBin, mymap, cov_start, cov_end = next(snip_stream)
+        num = np.isfinite(mymap).astype(int)
+        n = 1
+        for (chrom, stBin, endBin, newmap, new_cov_start, new_cov_end) in snip_stream:
+            mymap = np.nansum([mymap, newmap], axis=0)
             num += np.isfinite(newmap).astype(int)
+            cov_start = np.nansum([cov_start, new_cov_start], axis=0)
+            cov_end = np.nansum([cov_end, new_cov_end], axis=0)
             n += 1
         return mymap, num, cov_start, cov_end, n
-
+    
     def pileup_chrom(
         self, chrom, expected=False, ctrl=False,
     ):
@@ -1139,9 +1147,9 @@ class PileUpper:
             mids = self.CC.control_regions(filter_func)
         else:
             mids = self.CC.pos_stream(filter_func)
-        mymap, num, cov_start, cov_end, n = self._do_pileups(
+        mymap, num, cov_start, cov_end, n = self._do_pileups(self._stream_snips(
             mids=mids, chrom=chrom, expected=expected,
-        )
+        ))
         logging.info(f"{chrom}: {n}")
         return mymap, num, cov_start, cov_end, n
 
@@ -1235,9 +1243,9 @@ class PileUpper:
         """
         pileups = dict()
         for (start, end), stream in self.CC.get_combinations_by_window(chrom, ctrl):
-            pileup, nums, cov_starts, cov_ends, ns = self._do_pileups(
+            pileup, nums, cov_starts, cov_ends, ns = self._do_pileups(self._stream_snips(
                 mids=stream, chrom=chrom, expected=expected,
-            )
+            ))
             n = np.sum(ns)
             num = np.sum(nums, axis=0)
             if n > 0:
