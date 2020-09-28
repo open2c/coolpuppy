@@ -1004,14 +1004,11 @@ class PileUpper:
             )  # self.CoolSnipper.select(self.regions[chrom], self.regions[chrom])
         max_right = self.matsizes[chrom]
 
-        if self.coverage_norm:
-            coverage = self.get_coverage(data)
+        coverage = self.get_coverage(data)
 
         for stBin, endBin, stPad, endPad in mids:
-            rot_flip = False
             if stBin >= endBin:
                 stBin, stPad, endBin, endPad = endBin, endPad, stBin, stPad
-                rot_flip = True
             if self.rescale:
                 stPad = stPad + int(round(self.rescale_pad * 2 * stPad))
                 endPad = endPad + int(round(self.rescale_pad * 2 * endPad))
@@ -1023,7 +1020,6 @@ class PileUpper:
             hi_right = endBin + endPad + 1
             if lo_left < 0 or hi_right > max_right:
                 continue
-            diag = hi_left - lo_right
             if not expected:
                 try:
                     newmap = data[lo_left:hi_left, lo_right:hi_right].toarray()
@@ -1033,17 +1029,22 @@ class PileUpper:
                 newmap = self.get_expected_matrix(
                     chrom, (lo_left, hi_left), (lo_right, hi_right)
                 )
-            #                if (
-            #                    newmap.shape != mymap.shape and not self.rescale
-            #                ):  # AFAIK only happens at ends of chroms
-            #                    height, width = newmap.shape
-            #                    h, w = mymap.shape
-            #                    x = w - width
-            #                    y = h - height
-            #                    newmap = np.pad(
-            #                        newmap, [(y, 0), (0, x)], "constant"
-            #                    )  # Padding to adjust to the right shape
             newmap = newmap.astype(float)
+            new_cov_start = coverage[lo_left:hi_left]
+            new_cov_end = coverage[lo_right:hi_right]
+            yield chrom, stBin, endBin, stPad, endPad, newmap, new_cov_start, new_cov_end
+    
+    def _process_snips(self, snip_stream):
+        for (chrom, stBin, endBin, stPad, endPad, newmap, new_cov_start, new_cov_end) in snip_stream:
+            lo_left = stBin - stPad
+            hi_left = stBin + stPad + 1
+            lo_right = endBin - endPad
+            hi_right = endBin + endPad + 1
+            diag = hi_left - lo_right
+            rot_flip = False
+            if stBin >= endBin:
+                stBin, stPad, endBin, endPad = endBin, endPad, stBin, stPad
+                rot_flip = True
             if not self.local:
                 ignore_indices = np.tril_indices_from(
                     newmap, diag - (stPad * 2 + 1) - 1 + self.ignore_diags
@@ -1061,43 +1062,34 @@ class PileUpper:
                     )
             if rot_flip:
                 newmap = np.rot90(np.flipud(newmap), 1)
-
-            # mymap = np.nansum([mymap, newmap], axis=0)
-            if self.coverage_norm and not expected and (self.balance is False):
-                new_cov_start = coverage[lo_left:hi_left]
-                new_cov_end = coverage[lo_right:hi_right]
-                if self.rescale:
-                    if len(new_cov_start) == 0:
-                        new_cov_start = np.zeros(self.rescale_size)
-                    if len(new_cov_end) == 0:
-                        new_cov_end = np.zeros(self.rescale_size)
-                    new_cov_start = numutils.zoom_array(
-                        new_cov_start, (self.rescale_size,)
-                    )
-                    new_cov_end = numutils.zoom_array(new_cov_end, (self.rescale_size,))
-                else:
-                    l = len(new_cov_start)
-                    r = len(new_cov_end)
-                    new_cov_start = np.pad(
-                        new_cov_start, (mymap.shape[0] - l, 0), "constant"
-                    )
-                    new_cov_end = np.pad(
-                        new_cov_end, (0, mymap.shape[1] - r), "constant"
-                    )
-                if rot_flip:
-                    new_cov_start, new_cov_end = new_cov_end[::-1], new_cov_start[::-1]
-                # cov_start += np.nan_to_num(new_cov_start)
-                # cov_end += +np.nan_to_num(new_cov_end)
-            # num += np.isfinite(newmap).astype(int)
-            # n += 1
-            yield chrom, stBin, endBin, newmap, new_cov_start, new_cov_end
-        # return mymap, num, cov_start, cov_end, n
+    
+            if self.rescale:
+                if len(new_cov_start) == 0:
+                    new_cov_start = np.zeros(self.rescale_size)
+                if len(new_cov_end) == 0:
+                    new_cov_end = np.zeros(self.rescale_size)
+                new_cov_start = numutils.zoom_array(
+                    new_cov_start, (self.rescale_size,)
+                )
+                new_cov_end = numutils.zoom_array(new_cov_end, (self.rescale_size,))
+            else:
+                l = len(new_cov_start)
+                r = len(new_cov_end)
+                new_cov_start = np.pad(
+                    new_cov_start, (newmap.shape[0] - l, 0), "constant"
+                )
+                new_cov_end = np.pad(
+                    new_cov_end, (0, newmap.shape[1] - r), "constant"
+                )
+            if rot_flip:
+                new_cov_start, new_cov_end = new_cov_end[::-1], new_cov_start[::-1]
+            yield (chrom, stBin, endBin, stPad, endPad, newmap, new_cov_start, new_cov_end)
     
     def _do_pileups(self, snip_stream):
-        chrom, stBin, endBin, mymap, cov_start, cov_end = next(snip_stream)
+        chrom, stBin, endBin, stPad, endPad, mymap, cov_start, cov_end = next(snip_stream)
         num = np.isfinite(mymap).astype(int)
         n = 1
-        for (chrom, stBin, endBin, newmap, new_cov_start, new_cov_end) in snip_stream:
+        for (chrom, stBin, endBin, stPad, endPad, newmap, new_cov_start, new_cov_end) in snip_stream:
             mymap = np.nansum([mymap, newmap], axis=0)
             num += np.isfinite(newmap).astype(int)
             cov_start = np.nansum([cov_start, new_cov_start], axis=0)
@@ -1147,9 +1139,9 @@ class PileUpper:
             mids = self.CC.control_regions(filter_func)
         else:
             mids = self.CC.pos_stream(filter_func)
-        mymap, num, cov_start, cov_end, n = self._do_pileups(self._stream_snips(
+        mymap, num, cov_start, cov_end, n = self._do_pileups(self._process_snips(self._stream_snips(
             mids=mids, chrom=chrom, expected=expected,
-        ))
+        )))
         logging.info(f"{chrom}: {n}")
         return mymap, num, cov_start, cov_end, n
 
