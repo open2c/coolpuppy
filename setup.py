@@ -19,7 +19,7 @@ on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if on_rtd:
     INSTALL_REQUIRES = []
 else:
-    INSTALL_REQUIRES = ['Cython', 'numpy', 'cooler', 'pandas', 'natsort',
+    INSTALL_REQUIRES = ['Cython', 'cooler', 'natsort',
                         'scipy', 'cooltools', 'pyyaml']
 
 setup(
