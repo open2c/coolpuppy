@@ -36,6 +36,17 @@ def parse_args_coolpuppy():
     )
     ##### Extra arguments
     parser.add_argument(
+        "--basetype",
+        type=str,
+        choices=["bed", "bedpe", "auto"],
+        help="""Format of the baselist. Options:
+                bed: chrom, start, end
+                bedpe: chrom1, start1, end1, chrom2, start2, end2
+                auto (default): determined from the number of columns in the file""",
+        default="auto",
+        required=False,
+    )
+    parser.add_argument(
         "--bed2",
         type=str,
         help="""A 3-column bed file.
@@ -334,6 +345,8 @@ def main():
         baselist = sys.stdin
         args.baselist = 'stdin'
     if args.bed2 is not None:
+        if args.basetype=='bedpe':
+            raise ValueError("Can't use a second bed file with a bedpe baselist")
         bedname += "_vs_" + os.path.splitext(os.path.basename(args.bed2))[0]
 
     if args.nshifts > 0:
@@ -409,6 +422,7 @@ def main():
     CC = CoordCreator(
         baselist=baselist,
         resolution=c.binsize,
+        basetype=args.basetype,
         bed2=args.bed2,
         bed2_ordered=args.bed2_ordered,
         anchor=anchor,
