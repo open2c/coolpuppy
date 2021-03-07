@@ -863,7 +863,7 @@ class PileUpper:
             list(set(self.CC.final_chroms) & set(self.clr.chromnames))
         )
         self.regions = {
-            chrom: cooler.util.parse_region_string(chrom) for chrom in self.chroms
+            chrom: (chrom, 0, self.clr.chromsizes[chrom]) for chrom in self.chroms #cooler.util.parse_region_string(chrom) for chrom in self.chroms
         }
         if self.expected is not False:
             if self.control:
