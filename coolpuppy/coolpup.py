@@ -238,6 +238,7 @@ class CoordCreator:
         self,
         baselist,
         resolution,
+        basetype='auto',
         bed2=None,
         bed2_ordered=True,
         anchor=False,
@@ -262,6 +263,11 @@ class CoordCreator:
             Path to a bed- or bedpe-style file with coordinates.
         resolution : int
             Data resolution.
+        basetype : str, optional
+            Format of the baselist. Options:
+                bed: chrom, start, end
+                bedpe: chrom1, start1, end1, chrom2, start2, end2
+                auto (default): determined from the number of columns in the file
         bed2 : str, optional
             Path to a second bed-style file with coordinates. If specified,
             interactions between baselist and bed2 are used.
@@ -325,6 +331,7 @@ class CoordCreator:
         self.baselist = baselist
         self.stdin = self.baselist == sys.stdin
         self.resolution = resolution
+        self.basetype = basetype
         self.bed2 = bed2
         self.bed2_ordered = bed2_ordered
         self.anchor = anchor
@@ -373,6 +380,7 @@ class CoordCreator:
     def auto_read_bed(
         self, file, kind="auto",
     ):
+        row1 = None
         if kind == "auto":  # Guessing whether it's bed or bedpe style file
             if self.stdin:
                 row1 = file.__next__().split("\t")
@@ -380,18 +388,26 @@ class CoordCreator:
                 with open(file, "r") as fobject:
                     row1 = fobject.readline().split("\t")
             if len(row1) == 6:
-                filetype = "bedpe"
-                row1 = [
-                    row1[0],
-                    int(row1[1]),
-                    int(row1[2]),
-                    row1[3],
-                    int(row1[4]),
-                    int(row1[5]),
-                ]
+                try:
+                    row1 = [
+                        row1[0],
+                        int(row1[1]),
+                        int(row1[2]),
+                        row1[3],
+                        int(row1[4]),
+                        int(row1[5]),
+                    ]
+                    kind = "bedpe"
+                except:
+                    raise ValueError("Can't determine the type of baselist file,"
+                                     "please specify bed or bedpe")
             elif len(row1) == 3:
-                filetype = "bed"
-                row1 = [row1[0], int(row1[1]), int(row1[2])]
+                try:
+                    row1 = [row1[0], int(row1[1]), int(row1[2])]
+                    kind = "bed"
+                except:
+                    raise ValueError("Can't determine the type of baselist file,"
+                                     "please specify bed or bedpe")
             else:
                 raise ValueError(
                     f"""Input bed(pe) file has unexpected number of
@@ -399,12 +415,13 @@ class CoordCreator:
                         """
                 )
 
-        if filetype == "bed" or kind == "bed":
+        if kind == "bed":
             filter_func = self.filter_bed
             names = ["chr", "start", "end"]
             dtype = {"chr": "str", "start": "int", "end": "int"}
-            row1 = filter_func(pd.DataFrame([row1], columns=names).astype(dtype=dtype))
-        elif filetype == "bedpe" or kind == "bedpe":  # bedpe
+            if row1 is not None:
+                row1 = filter_func(pd.DataFrame([row1], columns=names).astype(dtype=dtype))
+        elif kind == "bedpe":  # bedpe
             filter_func = self.filter_bedpe
             names = ["chr1", "start1", "end1", "chr2", "start2", "end2"]
             dtype = {
@@ -415,19 +432,19 @@ class CoordCreator:
                 "start2": "int",
                 "end2": "int",
             }
-            row1 = filter_func(pd.DataFrame([row1], columns=names).astype(dtype=dtype))
+            if row1 is not None:
+                row1 = filter_func(pd.DataFrame([row1], columns=names).astype(dtype=dtype))
         else:
             raise ValueError(
                 f"""Unsupported input kind: {kind}.
-                             Expect bed or bedpe"""
+                             Expect auto, bed or bedpe"""
             )
         bases = []
-
-        appended = False
-        if kind == "auto":
-            if row1.shape[0] == 1:
-                bases.append(row1)
-                appended = True
+        
+        if self.stdin:
+            if row1 is not None:
+                if row1.shape[0] == 1:
+                    bases.append(row1)
 
         for chunk in pd.read_csv(
             file,
@@ -439,14 +456,12 @@ class CoordCreator:
         ):
             bases.append(filter_func(chunk))
         bases = pd.concat(bases)
-        if appended:  # Would mean we read it twice when checking and in the first chunk
+        if not self.stdin:  # Would mean we read it twice when checking and in the first chunk
             bases = bases.iloc[1:]
-        if filetype == "bed" or kind == "bed":
-            kind = "bed"
+
             # bases["chr"] = bases["chr"].astype(str)
             # bases[["start", "end"]] = bases[["start", "end"]].astype(np.uint64)
-        if filetype == "bedpe" or kind == "bedpe":
-            kind = "bedpe"
+
             # bases[["chr1", "chr2"]] = bases[["chr1", "chr2"]].astype(str)
             # bases[["start1", "end1", "start2", "end2"]] = bases[
             # ["start1", "end1", "start2", "end2"]
@@ -701,22 +716,14 @@ class CoordCreator:
         yield from ()
 
     def process(self):
-        self.bases, self.kind = self.auto_read_bed(self.baselist)
+        self.bases, self.kind = self.auto_read_bed(self.baselist, kind=self.basetype)
         if self.bases.shape[0] == 0:
             warnings.warn("No regions in baselist, returning empty output")
             self.pos_stream = self.empty_stream
             self.final_chroms = []
             return
         if self.bed2 is not None:
-            self.bed2, self.bed2kind = self.auto_read_bed(self.bed2)
-            if self.kind != "bed":
-                raise ValueError(
-                    """Please provide two BED files; baselist doesn't seem to be one"""
-                )
-            elif self.bed2kind != "bed":
-                raise ValueError(
-                    """Please provide two BED files; bed2 doesn't seem to be one"""
-                )
+            self.bed2, self.bed2kind = self.auto_read_bed(self.bed2, kind='bed')
         if self.kind == "bed":
             basechroms = set(self.bases["chr"])
             if self.anchor:
