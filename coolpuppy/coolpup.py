@@ -208,7 +208,7 @@ def prepare_single(item):
     return list(key) + [n, enr1, enr3, cv3, cv5]
 
 
-def norm_coverage(loop, cov_start, cov_end):
+def norm_coverage(snip):
     """Normalize a pileup by coverage arrays
 
     Parameters
@@ -226,11 +226,11 @@ def norm_coverage(loop, cov_start, cov_end):
         Normalized pileup.
 
     """
-    coverage = np.outer(cov_start, cov_end)
+    coverage = np.outer(snip.cov_start, snip.cov_end)
     coverage = coverage / np.nanmean(coverage)
-    loop /= coverage
-    loop[np.isnan(loop)] = 0
-    return loop
+    snip.data /= coverage
+    snip.data[np.isnan(snip.data)] = 0
+    return snip
 
 
 class CoordCreator:
@@ -1037,72 +1037,76 @@ class PileUpper:
                     chrom, (lo_left, hi_left), (lo_right, hi_right)
                 )
             newmap = newmap.astype(float)
-            new_cov_start = coverage[lo_left:hi_left]
-            new_cov_end = coverage[lo_right:hi_right]
-            yield chrom, stBin, endBin, stPad, endPad, newmap, new_cov_start, new_cov_end
+            cov_start = coverage[lo_left:hi_left]
+            cov_end = coverage[lo_right:hi_right]
+            yield pd.Series({'chrom':chrom, 'stBin':stBin, 'endBin':endBin,
+                   'stPad':stPad, 'endPad':endPad,
+                   'data':newmap, 'cov_start':cov_start, 'cov_end':cov_end})
     
     def _process_snips(self, snip_stream):
-        for (chrom, stBin, endBin, stPad, endPad, newmap, new_cov_start, new_cov_end) in snip_stream:
-            lo_left = stBin - stPad
-            hi_left = stBin + stPad + 1
-            lo_right = endBin - endPad
-            hi_right = endBin + endPad + 1
+        for snip in snip_stream:
+            lo_left = snip.stBin - snip.stPad
+            hi_left = snip.stBin + snip.stPad + 1
+            lo_right = snip.endBin - snip.endPad
+            hi_right = snip.endBin + snip.endPad + 1
             diag = hi_left - lo_right
             rot_flip = False
-            if stBin >= endBin:
-                stBin, stPad, endBin, endPad = endBin, endPad, stBin, stPad
+            if snip.stBin >= snip.endBin:
+                snip.stBin, snip.stPad, snip.endBin, snip.endPad = snip.endBin, snip.endPad, snip.stBin, snip.stPad
                 rot_flip = True
             if not self.local:
                 ignore_indices = np.tril_indices_from(
-                    newmap, diag - (stPad * 2 + 1) - 1 + self.ignore_diags
+                    snip.data, diag - (snip.stPad * 2 + 1) - 1 + self.ignore_diags
                 )
-                newmap[ignore_indices] = np.nan
+                snip.data[ignore_indices] = np.nan
             else:
-                newmap = np.triu(newmap, self.ignore_diags)
-                newmap += np.triu(newmap, 1).T
+                snip.data = np.triu(snip.data, self.ignore_diags)
+                snip.data += np.triu(snip.data, 1).T
             if self.rescale:
-                if newmap.size == 0 or np.all(np.isnan(newmap)):
-                    newmap = np.zeros((self.rescale_size, self.rescale_size))
+                if snip.data.size == 0 or np.all(np.isnan(snip.data)):
+                    snip.data = np.zeros((self.rescale_size, self.rescale_size))
                 else:
-                    newmap = numutils.zoom_array(
-                        newmap, (self.rescale_size, self.rescale_size)
+                    snip.data = numutils.zoom_array(
+                        snip.data, (self.rescale_size, self.rescale_size)
                     )
             if rot_flip:
-                newmap = np.rot90(np.flipud(newmap), 1)
+                snip.data = np.rot90(np.flipud(snip.data), 1)
     
             if self.rescale:
-                if len(new_cov_start) == 0:
-                    new_cov_start = np.zeros(self.rescale_size)
-                if len(new_cov_end) == 0:
-                    new_cov_end = np.zeros(self.rescale_size)
-                new_cov_start = numutils.zoom_array(
-                    new_cov_start, (self.rescale_size,)
+                # if len(new_cov_start) == 0:
+                #     new_cov_start = np.zeros(self.rescale_size)
+                # if len(new_cov_end) == 0:
+                #     new_cov_end = np.zeros(self.rescale_size)
+                snip.cov_start = numutils.zoom_array(
+                    snip.cov_start, (self.rescale_size,)
                 )
-                new_cov_end = numutils.zoom_array(new_cov_end, (self.rescale_size,))
-            else:
-                l = len(new_cov_start)
-                r = len(new_cov_end)
-                new_cov_start = np.pad(
-                    new_cov_start, (newmap.shape[0] - l, 0), "constant"
+                snip.cov_end = numutils.zoom_array(
+                    snip.cov_end, (self.rescale_size,)
                 )
-                new_cov_end = np.pad(
-                    new_cov_end, (0, newmap.shape[1] - r), "constant"
-                )
+            # else:
+            #     l = len(snip.cov_start)
+            #     r = len(snip.cov_end)
+            #     new_cov_start = np.pad(
+            #         new_cov_start, (newmap.shape[0] - l, 0), "constant"
+            #     )
+            #     new_cov_end = np.pad(
+            #         new_cov_end, (0, newmap.shape[1] - r), "constant"
+            #     )
             if rot_flip:
-                new_cov_start, new_cov_end = new_cov_end[::-1], new_cov_start[::-1]
-            yield (chrom, stBin, endBin, stPad, endPad, newmap, new_cov_start, new_cov_end)
+                snip.cov_start, snip.cov_end = snip.cov_end[::-1], snip.cov_start[::-1]
+            yield snip
     
     def _do_pileups(self, snip_stream):
-        chrom, stBin, endBin, stPad, endPad, mymap, cov_start, cov_end = next(snip_stream)
-        num = np.isfinite(mymap).astype(int)
-        n = 1
-        for (chrom, stBin, endBin, stPad, endPad, newmap, new_cov_start, new_cov_end) in snip_stream:
-            mymap = np.nansum([mymap, newmap], axis=0)
-            num += np.isfinite(newmap).astype(int)
-            cov_start = np.nansum([cov_start, new_cov_start], axis=0)
-            cov_end = np.nansum([cov_end, new_cov_end], axis=0)
-            n += 1
-        return mymap, num, cov_start, cov_end, n
+        final = next(snip_stream)
+        final['num'] = np.isfinite(final.data).astype(int)
+        final['n'] = 1
+        for snip in snip_stream:
+            final.data = np.nansum([final.data, snip.data], axis=0)
+            final.num += np.isfinite(snip.data).astype(int)
+            final.cov_start = np.nansum([final.cov_start, snip.cov_start], axis=0)
+            final.cov_end = np.nansum([final.cov_end, snip.cov_end], axis=0)
+            final.n += 1
+        return final
     
     def pileup_chrom(
         self, chrom, expected=False, ctrl=False,
@@ -1132,9 +1136,9 @@ class PileUpper:
 
         """
 
-        mymap = self.make_outmap()
-        cov_start = np.zeros(mymap.shape[0])
-        cov_end = np.zeros(mymap.shape[1])
+        # mymap = self.make_outmap()
+        # cov_start = np.zeros(mymap.shape[0])
+        # cov_end = np.zeros(mymap.shape[1])
 
         if self.anchor:
             assert chrom == self.anchor[0]
@@ -1146,11 +1150,11 @@ class PileUpper:
             mids = self.CC.control_regions(filter_func)
         else:
             mids = self.CC.pos_stream(filter_func)
-        mymap, num, cov_start, cov_end, n = self._do_pileups(self._process_snips(self._stream_snips(
+        final = self._do_pileups(self._process_snips(self._stream_snips(
             mids=mids, chrom=chrom, expected=expected,
         )))
-        logging.info(f"{chrom}: {n}")
-        return mymap, num, cov_start, cov_end, n
+        logging.info(f"{chrom}: {final.n}")
+        return final
 
     def pileupsWithControl(self, nproc=1):
         """Perform pileups across all chromosomes and applies required
@@ -1178,42 +1182,35 @@ class PileUpper:
             mymap = map
         # Loops
         f = partial(self.pileup_chrom, ctrl=False, expected=False,)
-        loops, nums, cov_starts, cov_ends, ns = list(zip(*mymap(f, self.chroms)))
-        loop = np.sum(loops, axis=0)
-        n = np.sum(ns)
-        n_return = n
-        num = np.sum(nums, axis=0)
+        snips = pd.DataFrame(list(mymap(f, self.chroms)))
+        aggregated_snip = snips.sum(axis=0)
+        # loop = np.sum(loops, axis=0)
+        # n = np.sum(ns)
+        # n_return = n
+        # num = np.sum(nums, axis=0)
         if self.coverage_norm:
-            cov_start = np.sum(cov_starts, axis=0)
-            cov_end = np.sum(cov_ends, axis=0)
-            loop = norm_coverage(loop, cov_start, cov_end)
-        loop /= num
-        logging.info(f"Total number of piled up windows: {n}")
+            # cov_start = np.sum(cov_starts, axis=0)
+            # cov_end = np.sum(cov_ends, axis=0)
+            aggregated_snip = norm_coverage(aggregated_snip)
+        pileup = aggregated_snip.data / aggregated_snip.num
+        logging.info(f"Total number of piled up windows: {aggregated_snip.n}")
         # Controls
         if self.expected is not False:
             f = partial(self.pileup_chrom, ctrl=False, expected=True,)
-            exps, nums, cov_starts, cov_ends, ns = list(zip(*mymap(f, self.chroms)))
-            exp = np.sum(exps, axis=0)
-            num = np.sum(nums, axis=0)
-            exp /= num
-            loop /= exp
         elif self.control:
             f = partial(self.pileup_chrom, ctrl=True, expected=False,)
-            ctrls, nums, cov_starts, cov_ends, ns = list(zip(*mymap(f, self.chroms)))
-            ctrl = np.sum(ctrls, axis=0)
-            num = np.sum(nums, axis=0)
-            n = np.sum(ns)
-            if self.coverage_norm:
-                cov_start = np.sum(cov_starts, axis=0)
-                cov_end = np.sum(cov_ends, axis=0)
-                ctrl = norm_coverage(ctrl, cov_start, cov_end)
-            ctrl /= num
-            logging.info(f"Total number of piled up control windows: {n}")
-            loop /= ctrl
+        expected_snips = pd.DataFrame(list(mymap(f, self.chroms)))
+        aggregated_expected_snip = expected_snips.sum(axis=0)
+        logging.info(f"Total number of piled up background windows: {aggregated_expected_snip.n}")
+
+        if self.coverage_norm:
+            aggregated_expected_snip = norm_coverage(aggregated_expected_snip)
+        aggregated_expected_snip.data /= aggregated_expected_snip.num
+        pileup /= aggregated_expected_snip.data
         if nproc > 1:
             p.close()
-        loop[~np.isfinite(loop)] = 0
-        return loop, n_return
+        pileup[~np.isfinite(pileup)] = 0
+        return pileup, aggregated_snip.n
 
     def pileupsByWindow(
         self, chrom, expected=False, ctrl=False,
