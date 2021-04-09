@@ -1366,7 +1366,7 @@ class PileUpper:
             if self.local:
                 data = np.nansum(np.dstack((data, data.T)), 2)
                 if expected:
-                    exp_data = np.nansum(np.dstack((data, data.T)), 2)
+                    exp_data = np.nansum(np.dstack((exp_data, exp_data.T)), 2)
             if self.coverage_norm:
                 cov_start = coverage[snip["stBin1"] : snip["endBin1"]]
                 cov_end = coverage[snip["stBin2"] : snip["endBin2"]]
@@ -1670,7 +1670,8 @@ class PileUpper:
         self, nproc=1, distance_edges=np.append([0], 50000 * 2 ** np.arange(30))
     ):
         """Perform by-strand by-distance pileups across all chromosomes and applies
-        required normalization. Simple wrapper around pileupsWithControl
+        required normalization. Simple wrapper around pileupsWithControl.
+        Assumes the baselist in CoordCreator file has a "strand" column.
 
         Parameters
         ----------
@@ -1702,4 +1703,37 @@ class PileUpper:
         normalized_pileups = normalized_pileups[
             ["orientation", "distance_band", "data", "n"]
         ]
+        return normalized_pileups
+
+    def pileupsByStrandWithControl(self, nproc=1):
+        """Perform by-strand pileups across all chromosomes and applies required
+        normalization. Simple wrapper around pileupsWithControl.
+        Assumes the baselist in CoordCreator file has a "strand" column.
+
+        Parameters
+        ----------
+        nproc : int, optional
+            How many cores to use. Sends a whole chromosome per process.
+            The default is 1.
+        distance_edges : list/array of int
+            How to group snips by distance (based on their centres).
+            Default uses separations [0, 50_000, 100_000, 200_000, ...]
+
+        Returns
+        -------
+        pileup_df : 2D array
+            Normalized pileups in a pandas DataFrame, with columns `data` and `num`.
+            `data` contains the normalized pileups, and `num` - how many snippets were
+            combined (the regions of interest, not control regions).
+            Each distance band is a row, annotated in columns `separation`
+        """
+        normalized_pileups = self.pileupsWithControl(
+            nproc=nproc,
+            groupby=["strand1", "strand2"],
+        )
+        normalized_pileups = normalized_pileups.drop(index="all").reset_index()
+        normalized_pileups["orientation"] = (
+            normalized_pileups["strand1"] + normalized_pileups["strand2"]
+        )
+        normalized_pileups = normalized_pileups[["orientation", "data", "n"]]
         return normalized_pileups
