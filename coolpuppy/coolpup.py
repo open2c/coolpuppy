@@ -1131,6 +1131,7 @@ class PileUpper:
         *,
         balance="weight",
         expected=False,
+        ooe=True,
         control=False,
         coverage_norm=False,
         rescale_size=99,
@@ -1151,6 +1152,11 @@ class PileUpper:
         expected : DataFrame, optional
             If using expected, pandas DataFrame with chromosome-wide expected.
             The default is False.
+        ooe : bool, optional
+            Whether to normalize each snip by expected value. If False, all snips are
+            accumulated, all expected values are accumulated, and then the former
+            divided by the latter - like with randomly shifted controls. Only has effect
+            when expected is provided.
         control : bool, optional
             Whether to use randomly shifted controls.
             The default is False.
@@ -1178,6 +1184,7 @@ class PileUpper:
         self.__dict__.update(self.CC.__dict__)
         self.balance = balance
         self.expected = expected
+        self.ooe = ooe
         self.control = control
         self.pad_bins = self.CC.pad // self.resolution
         self.coverage_norm = coverage_norm
@@ -1316,7 +1323,6 @@ class PileUpper:
         self,
         intervals,
         chrom,
-        expected=False,
     ):
         mymap = self.make_outmap()
         cov_start = np.zeros(mymap.shape[0])
@@ -1348,14 +1354,16 @@ class PileUpper:
                 .toarray()
                 .astype(float)
             )
-            if expected:
-                exp_snip = snip.copy()
-                exp_snip["kind"] = "control"
+            if self.expected:
                 exp_data = self.get_expected_matrix(
                     chrom,
                     (snip["stBin1"], snip["endBin1"]),
                     (snip["stBin2"], snip["endBin2"]),
                 )
+                if not self.ooe:      
+                    exp_snip = snip.copy()
+                    exp_snip["kind"] = "control"
+                    exp_snip['data'] = exp_data
             D = (
                 diag_indicator[
                     snip["stBin1"] : snip["endBin1"], snip["stBin2"] : snip["endBin2"]
@@ -1365,21 +1373,23 @@ class PileUpper:
             data[D] = np.nan
             if self.local:
                 data = np.nansum(np.dstack((data, data.T)), 2)
-                if expected:
-                    exp_data = np.nansum(np.dstack((exp_data, exp_data.T)), 2)
             if self.coverage_norm:
                 cov_start = coverage[snip["stBin1"] : snip["endBin1"]]
                 cov_end = coverage[snip["stBin2"] : snip["endBin2"]]
                 snip["cov_start"] = cov_start
                 snip["cov_end"] = cov_end
+            if self.expected and self.ooe:
+                data = data / exp_data
             snip["data"] = data
-
+            
             if self.rescale:
                 snip = self._rescale_snip(snip)
-                if expected:
+                if self.expected and not self.ooe:
                     exp_snip = self._rescale_snip(exp_snip)
+                    
             yield snip
-            if expected:
+            
+            if self.expected and not self.ooe:
                 exp_snip["data"] = exp_data
                 yield exp_snip
 
@@ -1447,7 +1457,7 @@ class PileUpper:
                 _add_snip(outdict[kind], tuple(key), snip)
         if "all" not in outdict["ROI"]:
             outdict["ROI"]["all"] = reduce(sum_pups, outdict["ROI"].values())
-        if self.control or self.expected:
+        if self.control or (self.expected and not self.ooe):
             if "all" not in outdict["control"]:
                 outdict["control"]["all"] = reduce(
                     sum_pups, outdict["control"].values()
@@ -1457,8 +1467,6 @@ class PileUpper:
     def pileup_chrom(
         self,
         chrom,
-        expected=False,
-        control=False,
         groupby=[],
         modify_2Dintervals_func=None,
         postprocess_func=None,
@@ -1469,8 +1477,6 @@ class PileUpper:
         ----------
         chrom : str
             Chromosome name.
-        expected : bool, optional
-            Whether to create pileup of expected values. The default is False.
         groupby : str or list of str, optional
             Which attributes of each snip to assign a group to it
         modify_2Dintervals_func : function, optional
@@ -1500,7 +1506,7 @@ class PileUpper:
 
         intervals = self.CC.pos_stream(
             filter_func,
-            control=control,
+            control=self.control,
             groupby=groupby,
             modify_2Dintervals_func=modify_2Dintervals_func,
         )
@@ -1508,7 +1514,6 @@ class PileUpper:
             self._stream_snips(
                 intervals=intervals,
                 chrom=chrom,
-                expected=expected,
             ),
             postprocess_func=postprocess_func,
         )
@@ -1553,8 +1558,6 @@ class PileUpper:
         # Loops
         f = partial(
             self.pileup_chrom,
-            expected=self.expected,
-            control=self.control,
             groupby=groupby,
             modify_2Dintervals_func=modify_2Dintervals_func,
             postprocess_func=postprocess_func,
@@ -1565,7 +1568,7 @@ class PileUpper:
             .apply(lambda x: reduce(sum_pups, x.dropna()))
             .T
         )
-        if self.control or self.expected:
+        if self.control or (self.expected and not self.ooe):
             ctrl = (
                 pd.DataFrame([pileup["control"] for pileup in pileups])
                 .apply(lambda x: reduce(sum_pups, x.dropna()))
@@ -1578,7 +1581,7 @@ class PileUpper:
             elif self.expected:
                 warnings.warn("Expected can not be normalized to coverage")
         normalized_roi = pd.DataFrame(roi["data"] / roi["num"], columns=["data"])
-        if self.control or self.expected:
+        if self.control or (self.expected and not self.ooe):
             normalized_control = pd.DataFrame(
                 ctrl["data"] / ctrl["num"], columns=["data"]
             )
