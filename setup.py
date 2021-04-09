@@ -20,7 +20,7 @@ if on_rtd:
     INSTALL_REQUIRES = []
 else:
     INSTALL_REQUIRES = ['Cython', 'cooler', 'natsort', 'numpy>=1.16.5',
-                        'scipy', 'cooltools', 'pyyaml']
+                        'scipy', 'cooltools>=0.4.0', 'pyyaml', 'more_itertools']
 
 setup(
       name='coolpuppy',
@@ -34,8 +34,8 @@ setup(
       description='A versatile tool to perform pile-up analysis on Hi-C data in .cool format.',
       long_description=long_description,
       long_description_content_type='text/markdown',
-      project_urls={'Source':'https://github.com/Phlya/coolpuppy',
-                    'Issues':'https://github.com/Phlya/coolpuppy/issues'},
+      project_urls={'Source':'https://github.com/open2c/coolpuppy',
+                    'Issues':'https://github.com/open2c/coolpuppy/issues'},
       author='Open2C',
       author_email='flyamer@gmail.com',
       classifiers=[

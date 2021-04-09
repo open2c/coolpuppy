@@ -506,7 +506,7 @@ def main():
         data = pd.DataFrame(
             data,
             columns=[
-                "chr",
+                "chrom",
                 "start",
                 "end",
                 "N",
@@ -518,7 +518,7 @@ def main():
         )
         data = data.reindex(
             index=order_by_index(
-                data.index, index_natsorted(zip(data["chr"], data["start"]))
+                data.index, index_natsorted(zip(data["chrom"], data["start"]))
             )
         )
         try:
