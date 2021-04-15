@@ -1,21 +1,17 @@
 # -*- coding: utf-8 -*-
 import numpy as np
-import cooler
-import sys
 import warnings
 import pandas as pd
 import itertools
 from multiprocessing import Pool
 from functools import partial, reduce
 import logging
-from natsort import index_natsorted, order_by_index, natsorted
+from natsort import natsorted
 from scipy import sparse
-from scipy.linalg import toeplitz
 from cooltools import numutils, snipping
 import yaml
 import io
-import bioframe
-from more_itertools import value_chain, flatten, collapse
+from more_itertools import collapse
 import flammkuchen as fl
 
 
