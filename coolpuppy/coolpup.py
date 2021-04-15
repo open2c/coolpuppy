@@ -18,6 +18,7 @@ import bioframe
 from more_itertools import value_chain, flatten, collapse
 import flammkuchen as fl
 
+
 def save_pileup_df(filename, df, metadata=None):
     """
     Saves a dataframe with metadata into a binary HDF5 file using `flammkuchen`
@@ -38,8 +39,9 @@ def save_pileup_df(filename, df, metadata=None):
     """
     if metadata is None:
         metadata = {}
-    tosave = {'metadata':metadata, 'data':df}
+    tosave = {"metadata": metadata, "data": df}
     fl.save(filename, tosave)
+
 
 def load_pileup_df(filename):
     """
@@ -58,13 +60,14 @@ def load_pileup_df(filename):
     """
     loaded = fl.load(filename)
     try:
-        assert 'metadata' in loaded
-        assert 'data' in loaded
+        assert "metadata" in loaded
+        assert "data" in loaded
     except:
         raise ValueError("The specified file doesn't contain metadata or data")
-    metadata = loaded['metadata']
-    data = loaded['data']
+    metadata = loaded["metadata"]
+    data = loaded["data"]
     return metadata, data
+
 
 def save_array_with_header(array, header, filename):
     """Save a numpy array with a YAML header generated from a dictionary
@@ -850,7 +853,9 @@ class CoordCreator:
             intervals["endBin"] = np.ceil(
                 intervals["exp_end"] / self.resolution
             ).astype(int)
-            intervals[['exp_start', 'exp_end']] = intervals[['stBin', 'endBin']] * self.resolution
+            intervals[["exp_start", "exp_end"]] = (
+                intervals[["stBin", "endBin"]] * self.resolution
+            )
             # intervals = intervals.drop_duplicates(
             #     ["chrom", "stBin", 'endBin']
             # )
@@ -868,8 +873,12 @@ class CoordCreator:
             intervals["endBin2"] = np.ceil(
                 intervals["exp_end2"] / self.resolution
             ).astype(int)
-            intervals[['exp_start1', 'exp_end1']] = intervals[['stBin1', 'endBin1']] * self.resolution
-            intervals[['exp_start2', 'exp_end2']] = intervals[['stBin2', 'endBin2']] * self.resolution
+            intervals[["exp_start1", "exp_end1"]] = (
+                intervals[["stBin1", "endBin1"]] * self.resolution
+            )
+            intervals[["exp_start2", "exp_end2"]] = (
+                intervals[["stBin2", "endBin2"]] * self.resolution
+            )
             # intervals = intervals.drop_duplicates(
             #     ["chrom", "stBin1", 'endBin1', 'stBin2', 'endBin2']
             # )
@@ -1186,19 +1195,23 @@ class PileUpper:
                     "are not simply chromosome names."
                 )
         self.regions = regions.set_index("name")
-        self.matsizes = {}
-        try:
+        self.region_extents = {}
+        for region_name, region in self.regions.iterrows():
+            lo, hi = self.clr.extent(region)
+            chroffset = self.clr.offset(region[0])
+            self.region_extents[region_name] = lo - chroffset, hi - chroffset
+
+        if self.expected is not False:
             for region_name, group in self.expected.groupby("region"):
                 n_diags = group.shape[0]
                 region = self.regions.loc[region_name]
-                lo, hi = self.clr.extent(region)
-                assert n_diags == (hi - lo)
-                self.matsizes[region_name] = n_diags
-        except AssertionError:
-            raise ValueError(
-                "Region shape mismatch between expected and cooler. "
-                "Are they using the same resolution?"
-            )
+                lo, hi = self.region_extents[region_name]
+                if n_diags != (hi - lo):
+                    raise ValueError(
+                        "Region shape mismatch between expected and cooler. "
+                        "Are they using the same resolution?"
+                    )
+
         self.ooe = ooe
         self.control = control
         self.pad_bins = self.CC.pad // self.resolution
@@ -1213,7 +1226,7 @@ class PileUpper:
         self.chroms = natsorted(
             list(set(self.CC.final_chroms) & set(self.clr.chromnames))
         )
-        self.regions = self.regions[self.regions['chrom'].isin(self.chroms)]
+        self.regions = self.regions[self.regions["chrom"].isin(self.chroms)]
         # self.regions = {
         #     chrom: (chrom, 0, self.clr.chromsizes[chrom])
         #     for chrom in self.chroms  # cooler.util.parse_region_string(chrom) for chrom in self.chroms
@@ -1225,10 +1238,15 @@ class PileUpper:
                 )
                 self.control = False
             assert isinstance(self.expected, pd.DataFrame)
-            self.expected = self.expected[self.expected['region'].isin(self.regions.index)]
-            self.ExpSnipper = snipping.ExpectedSnipper(self.clr, self.expected, regions=self.regions.reset_index())
+            self.expected = self.expected[
+                self.expected["region"].isin(self.regions.index)
+            ]
+            self.ExpSnipper = snipping.ExpectedSnipper(
+                self.clr, self.expected, regions=self.regions.reset_index()
+            )
             self.expected_selections = {
-                region_name: self.ExpSnipper.select(region_name, region_name) for region_name in self.regions.index
+                region_name: self.ExpSnipper.select(region_name, region_name)
+                for region_name in self.regions.index
             }
             self.expected = True
 
@@ -1351,15 +1369,16 @@ class PileUpper:
         bigdata = self.get_data(
             region
         )  # self.CoolSnipper.select(self.regions[chrom], self.regions[chrom])
-        max_right = self.matsizes[region]
+        min_left, max_right = self.region_extents[region]
         if self.coverage_norm:
             coverage = self.get_coverage(bigdata)
 
-        ar = np.arange(max_right, dtype=np.int32)
+        ar = np.arange(max_right - min_left, dtype=np.int32)
         diag_indicator = numutils.LazyToeplitz(-ar, ar)
 
         for snip in intervals:
-            if snip["stBin1"] < 0 or snip["endBin2"] > max_right:
+            snip[["stBin1", "endBin1", "stBin2", "endBin2"]] -= min_left
+            if snip["stBin1"] < 0 or snip["endBin2"] > (max_right - min_left):
                 continue
             data = (
                 bigdata[
@@ -1515,7 +1534,9 @@ class PileUpper:
 
         if self.anchor:
             assert region_coords[0] == self.anchor[0]
-            logging.info(f"Anchor: {region_coords[0]}:{self.anchor[1]}-{self.anchor[2]}")
+            logging.info(
+                f"Anchor: {region_coords[0]}:{self.anchor[1]}-{self.anchor[2]}"
+            )
 
         filter_func = self.CC.filter_func_region(region=region_coords)
 
