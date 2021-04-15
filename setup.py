@@ -20,7 +20,8 @@ if on_rtd:
     INSTALL_REQUIRES = []
 else:
     INSTALL_REQUIRES = ['Cython', 'cooler', 'natsort', 'numpy>=1.16.5',
-                        'scipy', 'cooltools>=0.4.0', 'pyyaml', 'more_itertools']
+                        'scipy', 'cooltools>=0.4.0', 'pyyaml', 'more_itertools',
+                        'flammkuchen']
 
 setup(
       name='coolpuppy',
