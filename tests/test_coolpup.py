@@ -23,7 +23,7 @@ def test_bystrand_pileups_with_expected(request):
     regions = bf.read_table(
         op.join(request.fspath.dirname, "data/CN.mm9.toy_regions.bed"), schema="bed4"
     )
-    features = bf.read_table('data/toy_features.bed', schema='bed')
+    features = bf.read_table(op.join(request.fspath.dirname, 'data/toy_features.bed'), schema='bed')
     cc = CoordCreator(features, 1_000_000, basetype='bed', local=False, pad=2_000_000, mindist=0)
     # Test with ooe=True
     pu = PileUpper(clr, cc, expected=exp, regions=regions, ooe=True)
@@ -43,7 +43,7 @@ def test_bystrand_pileups_with_controls(request):
     regions = bf.read_table(
         op.join(request.fspath.dirname, "data/CN.mm9.toy_regions.bed"), schema="bed4"
     )
-    features = bf.read_table('data/toy_features.bed', schema='bed')
+    features = bf.read_table(op.join(request.fspath.dirname, 'data/toy_features.bed'), schema='bed')
     cc = CoordCreator(features, 1_000_000, basetype='bed', local=False, pad=2_000_000, mindist=0)
     pu = PileUpper(clr, cc, expected=False, regions=regions, control=True)
     pup = pu.pileupsByStrandWithControl()
@@ -58,7 +58,7 @@ def test_bystrand_bydistance_pileups_with_controls(request):
     regions = bf.read_table(
         op.join(request.fspath.dirname, "data/CN.mm9.toy_regions.bed"), schema="bed4"
     )
-    features = bf.read_table('data/toy_features.bed', schema='bed')
+    features = bf.read_table(op.join(request.fspath.dirname, 'data/toy_features.bed'), schema='bed')
     cc = CoordCreator(features, 1_000_000, basetype='bed', local=False, pad=2_000_000, mindist=0)
     pu = PileUpper(clr, cc, expected=False, regions=regions, control=True)
     pup = pu.pileupsByStrandByDistanceWithControl()
