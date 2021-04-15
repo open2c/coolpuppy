@@ -46,3 +46,18 @@ def test_bystrand_pileups_with_controls(request):
     pu = PileUpper(clr, cc, expected=False, regions=regions, control=True)
     pup = pu.pileupsByStrandWithControl()
     assert np.all(pup.sort_values('orientation')['n'] == [1, 3, 1, 1])
+    
+def test_bystrand_bydistance_pileups_with_controls(request):
+    """
+    Test the snipping on matrix:
+    """
+    # Read cool file and create regions out of it:
+    clr = cooler.Cooler(op.join(request.fspath.dirname, "data/CN.mm9.1000kb.cool"))
+    regions = bioframe.read_table(
+        op.join(request.fspath.dirname, "data/CN.mm9.toy_regions.bed"), schema="bed4"
+    )
+    features = bf.read_table('data/toy_features.bed', schema='bed')
+    cc = CoordCreator(features, 1_000_000, basetype='bed', local=False, pad=2_000_000, mindist=0)
+    pu = PileUpper(clr, cc, expected=False, regions=regions, control=True)
+    pup = pu.pileupsByStrandByDistanceWithControl()
+    assert np.all(pup.sort_values(['orientation', 'distance_band'])['n'] == [1, 2, 1, 1, 1])
