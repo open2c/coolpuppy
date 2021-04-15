@@ -6,7 +6,9 @@ Created on Fri Jul  5 13:24:55 2019
 @author: Ilya Flyamer
 """
 
-from coolpuppy import *
+from coolpuppy import PileUpper, CoordCreator
+import pandas as pd
+import numpy as np
 import cooler
 import bioframe as bf
 import os.path as op
@@ -18,7 +20,7 @@ def test_bystrand_pileups_with_expected(request):
     # Read cool file and create regions out of it:
     clr = cooler.Cooler(op.join(request.fspath.dirname, "data/CN.mm9.1000kb.cool"))
     exp = pd.read_table(op.join(request.fspath.dirname, "data/CN.mm9.toy_expected.tsv"))
-    regions = bioframe.read_table(
+    regions = bf.read_table(
         op.join(request.fspath.dirname, "data/CN.mm9.toy_regions.bed"), schema="bed4"
     )
     features = bf.read_table('data/toy_features.bed', schema='bed')
@@ -38,7 +40,7 @@ def test_bystrand_pileups_with_controls(request):
     """
     # Read cool file and create regions out of it:
     clr = cooler.Cooler(op.join(request.fspath.dirname, "data/CN.mm9.1000kb.cool"))
-    regions = bioframe.read_table(
+    regions = bf.read_table(
         op.join(request.fspath.dirname, "data/CN.mm9.toy_regions.bed"), schema="bed4"
     )
     features = bf.read_table('data/toy_features.bed', schema='bed')
@@ -53,7 +55,7 @@ def test_bystrand_bydistance_pileups_with_controls(request):
     """
     # Read cool file and create regions out of it:
     clr = cooler.Cooler(op.join(request.fspath.dirname, "data/CN.mm9.1000kb.cool"))
-    regions = bioframe.read_table(
+    regions = bf.read_table(
         op.join(request.fspath.dirname, "data/CN.mm9.toy_regions.bed"), schema="bed4"
     )
     features = bf.read_table('data/toy_features.bed', schema='bed')
