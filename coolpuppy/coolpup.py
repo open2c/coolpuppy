@@ -963,7 +963,7 @@ class CoordCreator:
         else:  # all combinations
             intervals_left = intervals.rename(columns=lambda x: x + "1")
             intervals_right = intervals.rename(columns=lambda x: x + "2")
-            for i in range(intervals.shape[0]):
+            for i in range(1, intervals.shape[0]):
                 combinations = pd.concat(
                     [
                         intervals_left.iloc[:-i].reset_index(drop=True),
