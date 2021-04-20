@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from coolpuppy import CoordCreator, PileUpper
-from coolpupp import *
+from coolpuppy import *
 from coolpuppy import __version__
 import cooler
 import pandas as pd
