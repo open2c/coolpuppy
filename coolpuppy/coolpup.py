@@ -1180,7 +1180,12 @@ class PileUpper:
         self.balance = balance
         self.expected = expected
         if regions is None:
-            if set(self.expected["region"]).issubset(clr.chromnames):
+            if self.expected is False:
+                regions = pd.DataFrame(
+                    [(chrom, 0, l, chrom) for chrom, l in clr.chromsizes.items()],
+                    columns=["chrom", "start", "end", "name"],
+                )
+            elif set(self.expected["region"]).issubset(clr.chromnames):
                 regions = pd.DataFrame(
                     [(chrom, 0, l, chrom) for chrom, l in clr.chromsizes.items()],
                     columns=["chrom", "start", "end", "name"],

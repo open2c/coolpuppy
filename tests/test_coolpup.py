@@ -33,6 +33,10 @@ def test_bystrand_pileups_with_expected(request):
     pu = PileUpper(clr, cc, expected=exp, regions=regions, ooe=False)
     pup = pu.pileupsByStrandWithControl()
     assert np.all(pup.sort_values('orientation')['n'] == [1, 3, 1, 1])
+    # No regions provided without expected
+    pu = PileUpper(clr, cc, expected=False, ooe=False)
+    pup = pu.pileupsByStrandWithControl()
+    assert np.all(pup.sort_values('orientation')['n'] == [1, 3, 1, 1])
 
 def test_bystrand_pileups_with_controls(request):
     """
