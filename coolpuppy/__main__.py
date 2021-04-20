@@ -50,15 +50,6 @@ def parse_args_coolpuppy():
         required=False,
     )
     parser.add_argument(
-        "--bed2",
-        type=str,
-        help="""A 3-column bed file.
-                Should be tab-delimited.
-                Will consider all cis combinations of intervals
-                between baselist and bed2""",
-        required=False,
-    )
-    parser.add_argument(
         "--pad",
         default=100,
         type=int,
@@ -342,9 +333,6 @@ def main():
         bedname = "stdin"
         baselist = bf.read_table(sys.stdin, schema=args.basetype)
         args.baselist = 'stdin'
-    if args.bed2 is not None:
-        if args.basetype=='bedpe':
-            raise ValueError("Can't use a second bed file with a bedpe baselist")
         bedname += "_vs_" + os.path.splitext(os.path.basename(args.bed2))[0]
 
     if args.nshifts > 0:
