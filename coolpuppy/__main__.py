@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
-from coolpuppy import *
+from coolpuppy import CoordCreator, PileUpper
+from coolpupp import *
 from coolpuppy import __version__
 import cooler
 import pandas as pd
+import bioframe as bf
 import os
 from natsort import index_natsorted, order_by_index, natsorted
 import argparse
@@ -38,11 +40,12 @@ def parse_args_coolpuppy():
     parser.add_argument(
         "--basetype",
         type=str,
-        choices=["bed", "bedpe", "auto"],
+        choices=["bed", "bedpe", "bed"auto"],
         help="""Format of the baselist. Options:
                 bed: chrom, start, end
                 bedpe: chrom1, start1, end1, chrom2, start2, end2
-                auto (default): determined from the number of columns in the file""",
+                auto (default): determined from the file name extension
+                Has to be explicitly provided is baselist is piped through stdin""",
         default="auto",
         required=False,
     )
@@ -55,15 +58,6 @@ def parse_args_coolpuppy():
                 between baselist and bed2""",
         required=False,
     )
-    parser.add_argument(
-        "--bed2_unordered",
-        action="store_false",
-        dest="bed2_ordered",
-        help="""Whether to use baselist as left ends, and bed2 as right ends of regions
-             """,
-        required=False,
-    )
-    # parser.set_defaults(bed2_ordered=True)
     parser.add_argument(
         "--pad",
         default=100,
@@ -106,13 +100,23 @@ def parse_args_coolpuppy():
         help="""File with expected (output of ``cooltools compute-expected``).
                 If None, don't use expected and use randomly shifted controls""",
     )
+    parser.add_argument(
+        "--ooe",
+        default=True,
+        type=bool,
+        required=False,
+        help="""If expected is provided, normalize each snipper individually. If False,
+                will accumulate all expected snippets just like forrandomly shifted
+                controls""",
+    )
     # Filtering
     parser.add_argument(
         "--mindist",
         type=int,
         required=False,
         help="""Minimal distance of interactions to use, bp.
-                If not specified, uses 2*pad+2 (in bins) as mindist""",
+                If "auto", uses 2*pad+2 (in bins) as mindist to avoid first two
+                diagonals""",
     )
     parser.add_argument(
         "--maxdist",
@@ -126,18 +130,6 @@ def parse_args_coolpuppy():
         default=2,
         required=False,
         help="""How many diagonals to ignore""",
-    )
-    parser.add_argument(
-        "--minsize",
-        type=int,
-        required=False,
-        help="""Minimal length of features to use for local analysis""",
-    )
-    parser.add_argument(
-        "--maxsize",
-        type=int,
-        required=False,
-        help="""Maximal length of features to use for local analysis""",
     )
     parser.add_argument(
         "--excl_chrs",
@@ -180,16 +172,24 @@ def parse_args_coolpuppy():
         required=False,
         help="""Perform by-window pile-ups.
                 Create a pile-up for each coordinate in the baselist.
-                Will save a master-table with coordinates, their enrichments and
-                corner coefficient of variation, which is reflective of noisiness""",
+                Not compatible with --by_strand and --by_distance""",
     )
     parser.add_argument(
-        "--save_all",
+        "--by_strand",
         action="store_true",
         default=False,
         required=False,
-        help="""If ``--by-window``, save all individual pile-ups in a separate json file
-             """,
+        help="""Perform by-strand pile-ups.
+                Create a separate pile-up for each strand combination in the baselist.""",
+    )
+    parser.add_argument(
+        "--by_distance",
+        action="store_true",
+        default=False,
+        required=False,
+        help="""Perform by-distance pile-ups.
+                Create a separate pile-up for each distance band using 
+                [0, 50000, 100000, 200000, ...) as edges.""",
     )
     parser.add_argument(
         "--local",
@@ -259,20 +259,14 @@ def parse_args_coolpuppy():
     )
     # Output
     parser.add_argument(
-        "--outdir",
-        default=".",
-        type=str,
-        required=False,
-        help="""Directory to save the data in""",
-    )
-    parser.add_argument(
         "--outname",
         default="auto",
         type=str,
         required=False,
         help="""Name of the output file.
-                If not set, it is generated automatically to include important
-                information""",
+                If not set, file is saved in the current directory and the name is
+                generated automatically to include important information and avoid
+                overwriting files generated with different settings.""",
     )
     # Technicalities
     parser.add_argument(
@@ -328,9 +322,6 @@ def main():
 
     c = cooler.Cooler(args.coolfile)
 
-    if not os.path.isfile(args.baselist) and args.baselist != "-":
-        raise FileExistsError("Loop(base) coordinate file doesn't exist")
-
     if args.unbalanced:
         balance = False
     else:
@@ -338,11 +329,18 @@ def main():
 
     coolname = os.path.splitext(os.path.basename(c.filename))[0]
     if args.baselist != "-":
-        bedname = os.path.splitext(os.path.basename(args.baselist))[0]
+        bedname, ext = os.path.splitext(os.path.basename(args.baselist))
         baselist = args.baselist
+        if args.basetype is 'auto':
+            schema = ext
+        else:
+            schema = args.basetype
+        baselist = bf.read_table(baselist, schema=schema)
     else:
+        if args.basetype is 'auto':
+            raise ValueError("Can't determine format when baselist is piped in, please specify")
         bedname = "stdin"
-        baselist = sys.stdin
+        baselist = bf.read_table(sys.stdin, schema=args.basetype)
         args.baselist = 'stdin'
     if args.bed2 is not None:
         if args.basetype=='bedpe':
@@ -362,10 +360,12 @@ def main():
             raise FileExistsError("Expected file doesn't exist")
         expected = pd.read_csv(args.expected, sep="\t", header=0, dtype={'region':str,
                                                                          'chrom':str})
+        if not set(expected['region']) in set(c.chromnames):
+            raise ValueError('Only chromosome-wide expected is currently supported')
     else:
         expected = False
     if args.mindist is None:
-        mindist = "auto"
+        mindist = 0
     else:
         mindist = args.mindist
 
@@ -374,26 +374,10 @@ def main():
     else:
         maxdist = args.maxdist
 
-    if args.minsize is None:
-        minsize = 0
-    else:
-        minsize = args.minsize
-
-    if args.maxsize is None:
-        maxsize = np.inf
-    else:
-        maxsize = args.maxsize
-
     if args.incl_chrs == "all":
         incl_chrs = np.array(c.chromnames).astype(str)
     else:
         incl_chrs = args.incl_chrs.split(",")
-
-    if args.by_window and args.rescale:
-        raise NotImplementedError(
-            """Rescaling with by-window pileups is not
-                                  supported"""
-        )
 
     if args.rescale and args.rescale_size % 2 == 0:
         raise ValueError("Please provide an odd rescale_size")
@@ -419,20 +403,29 @@ def main():
     if args.anchor is not None:
         anchor = cooler.util.parse_region_string(args.anchor)
 
+    if args.by_window:
+        if CC.kind != "bed":
+            raise ValueError("Can't make by-window pileups without making combinations")
+        if args.local:
+            raise ValueError("Can't make local by-window pileups")
+        if anchor:
+            raise ValueError("Can't make by-window combinations with an anchor")
+        #        if args.coverage_norm:
+        #            raise NotImplementedError("""Can't make by-window combinations with
+        #                                      coverage normalization - please use
+        #                                      balanced data instead""")
+
     CC = CoordCreator(
         baselist=baselist,
         resolution=c.binsize,
         basetype=args.basetype,
-        bed2=args.bed2,
-        bed2_ordered=args.bed2_ordered,
         anchor=anchor,
         pad=args.pad * 1000,
+        fraction_pad=args.rescale_pad,
         chroms=fchroms,
         minshift=args.minshift,
         maxshift=args.maxshift,
         nshifts=args.nshifts,
-        minsize=minsize,
-        maxsize=maxsize,
         mindist=mindist,
         maxdist=maxdist,
         local=args.local,
@@ -445,10 +438,9 @@ def main():
         CC=CC,
         balance=balance,
         expected=expected,
+        ooe=args.ooe,
         control=control,
         coverage_norm=args.coverage_norm,
-        rescale=args.rescale,
-        rescale_pad=args.rescale_pad,
         rescale_size=args.rescale_size,
         ignore_diags=args.ignore_diags,
     )
@@ -481,81 +473,31 @@ def main():
         if args.subset > 0:
             outname += f"_subset-{args.subset}"
         if args.by_window:
-            outname = f"Enrichment_{outname}.txt"
-        else:
-            outname += ".np.txt"
+            outname += "_by-window"
+        if args.by_strand:
+            outname += "_by-strand"
+        outname += ".clpy"
     else:
         outname = args.outname
 
-    if args.by_window:
-        if CC.kind != "bed":
-            raise ValueError("Can't make by-window pileups without making combinations")
-        if args.local:
-            raise ValueError("Can't make local by-window pileups")
-        if anchor:
-            raise ValueError("Can't make by-window combinations with an anchor")
-        #        if args.coverage_norm:
-        #            raise NotImplementedError("""Can't make by-window combinations with
-        #                                      coverage normalization - please use
-        #                                      balanced data instead""")
-        finloops = PU.pileupsByWindowWithControl(nproc=nproc)
-
-        p = Pool(nproc)
-        data = p.map(prepare_single, finloops.items())
-        p.close()
-        data = pd.DataFrame(
-            data,
-            columns=[
-                "chr",
-                "start",
-                "end",
-                "N",
-                "Enrichment1",
-                "Enrichment3",
-                "CV3",
-                "CV5",
-            ],
-        )
-        data = data.reindex(
-            index=order_by_index(
-                data.index, index_natsorted(zip(data["chr"], data["start"]))
-            )
-        )
-        try:
-            data.to_csv(os.path.join(args.outdir, outname), sep="\t", index=False)
-        except FileNotFoundError:
-            os.mkdir(args.outdir)
-            data.to_csv(os.path.join(args.outdir, outname), sep="\t", index=False)
-        finally:
-            logging.info(
-                f"Saved enrichment table to {os.path.join(args.outdir, outname)}"
-            )
-
-        if args.save_all:
-            outdict = {
-                "%s:%s-%s" % key: (val[0], val[1].tolist())
-                for key, val in finloops.items()
-            }
-            import json
-
-            json_path = (
-                os.path.join(args.outdir, os.path.splitext(outname)[0]) + ".json"
-            )
-            with open(json_path, "w") as fp:
-                json.dump(outdict, fp)  # , sort_keys=True, indent=4)
-                logging.info(f"Saved individual pileups to {json_path}")
+        pups = PU.pileupsByWindowWithControl(nproc=nproc)
+    if args.by_strand and args.by_distance:
+        pups = PU.pileupsByStrandByDistanceWithControl(nproc=nproc)
+    elif args.by_strand:
+        pups = PU.pileupsByStrandWithControl(nproc=nproc)
+    elif args.by_distance:
+        pups = PU.pileupsByDistanceWithControl(nproc=nproc)
     else:
-        pup, n = PU.pileupsWithControl(nproc)
-        headerdict = vars(args)
-        headerdict['resolution'] = int(c.binsize)
-        headerdict['n'] = int(n)
+        pup = PU.pileupsWithControl(nproc)
+    headerdict = vars(args)
+    headerdict['resolution'] = int(c.binsize)
+    try:
+        save_pileup_df(outname, pups, headerdict)
+    except FileNotFoundError:
         try:
-            save_array_with_header(pup, headerdict, os.path.join(args.outdir, outname))
-        except FileNotFoundError:
-            try:
-                os.mkdir(args.outdir)
-            except FileExistsError:
-                pass
-            save_array_with_header(pup, headerdict, os.path.join(args.outdir, outname))
-        finally:
-            logging.info(f"Saved output to {os.path.join(args.outdir, outname)}")
+            os.mkdir(args.outdir)
+        except FileExistsError:
+            pass
+        save_array_with_header(pup, headerdict, os.path.join(args.outdir, outname))
+    finally:
+        logging.info(f"Saved output to {outname}")
