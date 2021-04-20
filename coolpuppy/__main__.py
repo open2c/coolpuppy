@@ -40,7 +40,7 @@ def parse_args_coolpuppy():
     parser.add_argument(
         "--basetype",
         type=str,
-        choices=["bed", "bedpe", "bed"auto"],
+        choices=["bed", "bedpe", "auto"],
         help="""Format of the baselist. Options:
                 bed: chrom, start, end
                 bedpe: chrom1, start1, end1, chrom2, start2, end2
