@@ -1,7 +1,7 @@
 Welcome to coolpup.py's documentation!
 ======================================
 
-Project homepage with code and issues is on `GitHub <https://github.com/Phlya/coolpuppy>`_.
+Project homepage with code and issues is on `GitHub <https://github.com/open2c/coolpuppy>`_.
 
 Please feel free to report any problems or contribute.
 
