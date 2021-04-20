@@ -433,9 +433,6 @@ def main():
         ignore_diags=args.ignore_diags,
     )
 
-    if args.outdir == ".":
-        args.outdir = os.getcwd()
-
     if args.outname == "auto":
         outname = f"{coolname}-{c.binsize / 1000}K_over_{bedname}"
         if args.nshifts > 0 and args.expected is None:
@@ -479,13 +476,5 @@ def main():
         pup = PU.pileupsWithControl(nproc)
     headerdict = vars(args)
     headerdict['resolution'] = int(c.binsize)
-    try:
-        save_pileup_df(outname, pups, headerdict)
-    except FileNotFoundError:
-        try:
-            os.mkdir(args.outdir)
-        except FileExistsError:
-            pass
-        save_array_with_header(pup, headerdict, os.path.join(args.outdir, outname))
-    finally:
-        logging.info(f"Saved output to {outname}")
+    save_pileup_df(outname, pups, headerdict)
+    logging.info(f"Saved output to {outname}")
