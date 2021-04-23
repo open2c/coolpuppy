@@ -1646,7 +1646,7 @@ class PileUpper:
             )
             normalized_roi = normalized_roi.drop(columns="index")
             normalized_roi = normalized_roi.set_index(groupby)
-            n = normalized_roi.loc["all", "n"].values[0]
+            n = normalized_roi.loc["all", "n"]
         else:
             n = normalized_roi.loc["all", "n"]
         logging.info(f"Total number of piled up windows: {n}")
