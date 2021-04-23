@@ -1,16 +1,14 @@
 # -*- coding: utf-8 -*-
-from coolpuppy import CoordCreator, PileUpper
+from coolpuppy import CoordCreator, PileUpper,save_pileup_df
 from coolpuppy import *
 from coolpuppy import __version__
 import cooler
 import pandas as pd
 import bioframe as bf
 import os
-from natsort import index_natsorted, order_by_index, natsorted
 import argparse
 import logging
 import numpy as np
-from multiprocessing import Pool
 import sys
 import pdb, traceback
 
@@ -322,17 +320,17 @@ def main():
     if args.baselist != "-":
         bedname, ext = os.path.splitext(os.path.basename(args.baselist))
         baselist = args.baselist
-        if args.basetype is 'auto':
-            schema = ext
+        if args.basetype=='auto':
+            schema = ext[1:]
         else:
             schema = args.basetype
         baselist = bf.read_table(baselist, schema=schema)
     else:
-        if args.basetype is 'auto':
+        if args.basetype=='auto':
             raise ValueError("Can't determine format when baselist is piped in, please specify")
+        schema = args.basetype
         bedname = "stdin"
-        baselist = bf.read_table(sys.stdin, schema=args.basetype)
-        args.baselist = 'stdin'
+        baselist = bf.read_table(sys.stdin, schema=schema)
         bedname += "_vs_" + os.path.splitext(os.path.basename(args.bed2))[0]
 
     if args.nshifts > 0:
@@ -392,16 +390,12 @@ def main():
         anchor = cooler.util.parse_region_string(args.anchor)
 
     if args.by_window:
-        if CC.kind != "bed":
+        if schema != "bed":
             raise ValueError("Can't make by-window pileups without making combinations")
         if args.local:
             raise ValueError("Can't make local by-window pileups")
         if anchor:
             raise ValueError("Can't make by-window combinations with an anchor")
-        #        if args.coverage_norm:
-        #            raise NotImplementedError("""Can't make by-window combinations with
-        #                                      coverage normalization - please use
-        #                                      balanced data instead""")
 
     CC = CoordCreator(
         baselist=baselist,
@@ -429,6 +423,7 @@ def main():
         ooe=args.ooe,
         control=control,
         coverage_norm=args.coverage_norm,
+        rescale=args.rescale,
         rescale_size=args.rescale_size,
         ignore_diags=args.ignore_diags,
     )
@@ -445,8 +440,6 @@ def main():
             outname += f"_from_{anchor_name}"
         if args.local:
             outname += "_local"
-            if minsize > 0 or maxsize < np.inf:
-                outname += f"_len_{minsize}-{maxsize}"
         elif args.mindist is not None or args.maxdist is not None:
             outname += f"_dist_{mindist}-{maxdist}"
         if args.rescale:
@@ -464,16 +457,17 @@ def main():
         outname += ".clpy"
     else:
         outname = args.outname
-
+        
+    if args.by_window:
         pups = PU.pileupsByWindowWithControl(nproc=nproc)
-    if args.by_strand and args.by_distance:
+    elif args.by_strand and args.by_distance:
         pups = PU.pileupsByStrandByDistanceWithControl(nproc=nproc)
     elif args.by_strand:
         pups = PU.pileupsByStrandWithControl(nproc=nproc)
     elif args.by_distance:
         pups = PU.pileupsByDistanceWithControl(nproc=nproc)
     else:
-        pup = PU.pileupsWithControl(nproc)
+        pups = PU.pileupsWithControl(nproc)
     headerdict = vars(args)
     headerdict['resolution'] = int(c.binsize)
     save_pileup_df(outname, pups, headerdict)

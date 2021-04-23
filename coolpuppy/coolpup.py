@@ -1127,6 +1127,7 @@ class PileUpper:
         ooe=True,
         control=False,
         coverage_norm=False,
+        rescale=False,
         rescale_size=99,
         ignore_diags=2,
     ):
@@ -1159,6 +1160,9 @@ class PileUpper:
             Whether to normalize final the final pileup by accumulated coverage as an
             alternative to balancing. Useful for single-cell Hi-C data.
             The default is False.
+        rescale : bool, optional
+            Whether to rescale the pileups.
+            The default is False
         rescale_size : int, optional
             Final shape of rescaled pileups. E.g. if 99, pileups will be squares of
             99×99 pixels.
@@ -1217,7 +1221,7 @@ class PileUpper:
         self.control = control
         self.pad_bins = self.CC.pad // self.resolution
         self.coverage_norm = coverage_norm
-        self.rescale = self.CC.fraction_pad is not None
+        self.rescale = rescale
         self.rescale_size = rescale_size
         self.ignore_diags = ignore_diags
         # self.CoolSnipper = snipping.CoolerSnipper(
@@ -1596,7 +1600,6 @@ class PileUpper:
             mymap = p.map
         else:
             mymap = map
-        # Loops
         f = partial(
             self.pileup_region,
             groupby=groupby,
@@ -1775,7 +1778,7 @@ class PileUpper:
             nproc=nproc,
             groupby=["strand1", "strand2"],
         )
-        normalized_pileups = normalized_pileups.drop(index="all").reset_index()
+        normalized_pileups = normalized_pileups.drop(index=("all", "all")).reset_index()
         normalized_pileups["orientation"] = (
             normalized_pileups["strand1"] + normalized_pileups["strand2"]
         )
