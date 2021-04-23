@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from coolpuppy import CoordCreator, PileUpper,save_pileup_df
+from coolpuppy import CoordCreator, PileUpper, save_pileup_df
 from coolpuppy import *
 from coolpuppy import __version__
 import cooler
@@ -320,14 +320,16 @@ def main():
     if args.baselist != "-":
         bedname, ext = os.path.splitext(os.path.basename(args.baselist))
         baselist = args.baselist
-        if args.basetype=='auto':
+        if args.basetype == "auto":
             schema = ext[1:]
         else:
             schema = args.basetype
         baselist = bf.read_table(baselist, schema=schema)
     else:
-        if args.basetype=='auto':
-            raise ValueError("Can't determine format when baselist is piped in, please specify")
+        if args.basetype == "auto":
+            raise ValueError(
+                "Can't determine format when baselist is piped in, please specify"
+            )
         schema = args.basetype
         bedname = "stdin"
         baselist = bf.read_table(sys.stdin, schema=schema)
@@ -344,10 +346,11 @@ def main():
             control = False
         if not os.path.isfile(args.expected):
             raise FileExistsError("Expected file doesn't exist")
-        expected = pd.read_csv(args.expected, sep="\t", header=0, dtype={'region':str,
-                                                                         'chrom':str})
-        if not set(expected['region']).issubset(set(c.chromnames)):
-            raise ValueError('Only chromosome-wide expected is currently supported')
+        expected = pd.read_csv(
+            args.expected, sep="\t", header=0, dtype={"region": str, "chrom": str}
+        )
+        if not set(expected["region"]).issubset(set(c.chromnames)):
+            raise ValueError("Only chromosome-wide expected is currently supported")
     else:
         expected = False
     if args.mindist is None:
@@ -457,7 +460,7 @@ def main():
         outname += ".clpy"
     else:
         outname = args.outname
-        
+
     if args.by_window:
         pups = PU.pileupsByWindowWithControl(nproc=nproc)
     elif args.by_strand and args.by_distance:
@@ -469,6 +472,6 @@ def main():
     else:
         pups = PU.pileupsWithControl(nproc)
     headerdict = vars(args)
-    headerdict['resolution'] = int(c.binsize)
+    headerdict["resolution"] = int(c.binsize)
     save_pileup_df(outname, pups, headerdict)
     logging.info(f"Saved output to {outname}")

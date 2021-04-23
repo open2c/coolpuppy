@@ -1456,8 +1456,11 @@ class PileUpper:
             snip["data"] = numutils.zoom_array(
                 snip["data"], (self.rescale_size, self.rescale_size)
             )
-        snip["cov_start"] = numutils.zoom_array(snip["cov_start"], (self.rescale_size,))
-        snip["cov_end"] = numutils.zoom_array(snip["cov_end"], (self.rescale_size,))
+        if self.coverage_norm:
+            snip["cov_start"] = numutils.zoom_array(
+                snip["cov_start"], (self.rescale_size,)
+            )
+            snip["cov_end"] = numutils.zoom_array(snip["cov_end"], (self.rescale_size,))
         return snip
 
     def accumulate_stream(self, snip_stream, postprocess_func=None):
