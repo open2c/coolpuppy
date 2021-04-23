@@ -346,7 +346,7 @@ def main():
             raise FileExistsError("Expected file doesn't exist")
         expected = pd.read_csv(args.expected, sep="\t", header=0, dtype={'region':str,
                                                                          'chrom':str})
-        if not set(expected['region']) in set(c.chromnames):
+        if not set(expected['region']).issubset(set(c.chromnames)):
             raise ValueError('Only chromosome-wide expected is currently supported')
     else:
         expected = False
