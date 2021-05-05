@@ -324,6 +324,8 @@ def main():
             schema = ext[1:]
         else:
             schema = args.basetype
+            if schema == "bed":
+                schema = "bed12"
         baselist = bf.read_table(baselist, schema=schema)
     else:
         if args.basetype == "auto":
@@ -331,6 +333,8 @@ def main():
                 "Can't determine format when baselist is piped in, please specify"
             )
         schema = args.basetype
+        if schema == "bed":
+            schema = "bed12"
         bedname = "stdin"
         baselist = bf.read_table(sys.stdin, schema=schema)
         bedname += "_vs_" + os.path.splitext(os.path.basename(args.bed2))[0]
@@ -393,7 +397,7 @@ def main():
         anchor = cooler.util.parse_region_string(args.anchor)
 
     if args.by_window:
-        if schema != "bed":
+        if schema != "bed12":
             raise ValueError("Can't make by-window pileups without making combinations")
         if args.local:
             raise ValueError("Can't make local by-window pileups")
