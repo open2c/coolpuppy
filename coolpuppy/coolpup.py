@@ -611,12 +611,16 @@ class CoordCreator:
                 raise ValueError("Can't use anchor with both sides of loops defined")
             elif self.local:
                 raise ValueError("Can't make local with both sides of loops defined")
-            basechroms = set(self.intervals["chrom1"]) & set(self.intervals["chrom2"])
+            basechroms = set(self.intervals["chrom1"]).intersection(
+                set(self.intervals["chrom2"])
+            )
         self.basechroms = natsorted(list(basechroms))
         if self.chroms == "all":
             self.final_chroms = natsorted(list(basechroms))
         else:
-            self.final_chroms = natsorted(list(set(self.chroms) & set(self.basechroms)))
+            self.final_chroms = natsorted(
+                list(set(self.chroms).intersection(set(self.basechroms)))
+            )
         if len(self.final_chroms) == 0:
             raise ValueError(
                 """No chromosomes are in common between the coordinate
@@ -1298,9 +1302,7 @@ class PileUpper:
         )
         return exp_matrix
 
-    def make_outmap(
-        self,
-    ):
+    def make_outmap(self,):
         """Generate zero-filled array of the right shape
 
         Returns
@@ -1357,9 +1359,7 @@ class PileUpper:
         return coverage
 
     def _stream_snips(
-        self,
-        intervals,
-        region,
+        self, intervals, region,
     ):
         mymap = self.make_outmap()
         cov_start = np.zeros(mymap.shape[0])
@@ -1506,11 +1506,7 @@ class PileUpper:
         return outdict
 
     def pileup_region(
-        self,
-        region,
-        groupby=[],
-        modify_2Dintervals_func=None,
-        postprocess_func=None,
+        self, region, groupby=[], modify_2Dintervals_func=None, postprocess_func=None,
     ):
         """
 
@@ -1555,10 +1551,7 @@ class PileUpper:
             modify_2Dintervals_func=modify_2Dintervals_func,
         )
         final = self.accumulate_stream(
-            self._stream_snips(
-                intervals=intervals,
-                region=region,
-            ),
+            self._stream_snips(intervals=intervals, region=region,),
             postprocess_func=postprocess_func,
         )
         logging.info(f"{region}: {final['ROI']['all']['n']}")
@@ -1656,8 +1649,7 @@ class PileUpper:
         return normalized_roi
 
     def pileupsByWindowWithControl(
-        self,
-        nproc=1,
+        self, nproc=1,
     ):
         """Perform by-window pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl
@@ -1778,8 +1770,7 @@ class PileUpper:
             Each distance band is a row, annotated in columns `separation`
         """
         normalized_pileups = self.pileupsWithControl(
-            nproc=nproc,
-            groupby=["strand1", "strand2"],
+            nproc=nproc, groupby=["strand1", "strand2"],
         )
         normalized_pileups = normalized_pileups.drop(index=("all", "all")).reset_index()
         normalized_pileups["orientation"] = (
