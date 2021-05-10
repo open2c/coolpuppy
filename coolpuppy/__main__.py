@@ -326,7 +326,7 @@ def main():
             schema = args.basetype
             if schema == "bed":
                 schema = "bed12"
-        baselist = bf.read_table(baselist, schema=schema)
+        baselist = bf.read_table(baselist, schema=schema, index_col=False)
     else:
         if args.basetype == "auto":
             raise ValueError(
@@ -336,7 +336,7 @@ def main():
         if schema == "bed":
             schema = "bed12"
         bedname = "stdin"
-        baselist = bf.read_table(sys.stdin, schema=schema)
+        baselist = bf.read_table(sys.stdin, schema=schema, index_col=False)
         bedname += "_vs_" + os.path.splitext(os.path.basename(args.bed2))[0]
 
     if args.nshifts > 0:
