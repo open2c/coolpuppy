@@ -1203,6 +1203,8 @@ class PileUpper:
                     "Please provide the regions table, if region names"
                     "are not simply chromosome names."
                 )
+        else:
+            regions = regions[regions['chrom'].isin(self.clr.chromnames)]
         self.regions = regions.set_index("name")
         self.region_extents = {}
         for region_name, region in self.regions.iterrows():
