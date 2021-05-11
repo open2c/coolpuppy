@@ -367,8 +367,6 @@ def main():
         expected = pd.read_csv(
             args.expected, sep="\t", header=0, dtype={"region": str, "chrom": str}
         )
-        if not set(expected["region"]).issubset(set(c.chromnames)):
-            raise ValueError("Only chromosome-wide expected is currently supported")
     else:
         expected = False
     if args.mindist is None:
