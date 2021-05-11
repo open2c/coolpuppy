@@ -372,7 +372,6 @@ def _add_snip(outdict, key, snip):
         )
         outdict[key]["n"] += 1
 
-
 def sum_pups(pup1, pup2):
     """
     Only preserves data, cov_start, cov_end, n and num
@@ -1260,6 +1259,12 @@ class PileUpper:
                 for region_name in self.regions.index
             }
             self.expected = True
+        self.empty_outmap = self.make_outmap()
+        self.empty_pup = pd.Series({'data':self.empty_outmap,
+                                    'n':0,
+                                    'num':self.empty_outmap,
+                                    'cov_start':np.zeros((self.empty_outmap.shape[0])),
+                                    'cov_end':np.zeros((self.empty_outmap.shape[1]))})
 
     # def get_matrix(self, matrix, chrom, left_interval, right_interval):
     #     lo_left, hi_left = left_interval
@@ -1318,6 +1323,7 @@ class PileUpper:
         else:
             outmap = np.zeros((2 * self.pad_bins + 1, 2 * self.pad_bins + 1))
         return outmap
+    
 
     def get_data(self, region):
         """Get sparse data for a region
@@ -1370,7 +1376,11 @@ class PileUpper:
             row1 = next(intervals)
         except StopIteration:
             logging.info(f"Nothing to sum up in region {region}")
-            return mymap, mymap, cov_start, cov_end, 0
+            return
+        if row1 is None:
+            logging.info(f"Nothing to sum up in region {region}")
+            return
+        
         intervals = itertools.chain([row1], intervals)
 
         bigdata = self.get_data(
@@ -1499,11 +1509,12 @@ class PileUpper:
             else:
                 _add_snip(outdict[kind], tuple(key), snip)
         if "all" not in outdict["ROI"]:
-            outdict["ROI"]["all"] = reduce(sum_pups, outdict["ROI"].values())
+            outdict["ROI"]["all"] = reduce(sum_pups, outdict["ROI"].values(),
+                                           self.empty_pup)
         if self.control or (self.expected and not self.ooe):
             if "all" not in outdict["control"]:
                 outdict["control"]["all"] = reduce(
-                    sum_pups, outdict["control"].values()
+                    sum_pups, outdict["control"].values(), self.empty_pup
                 )
         return outdict
 
