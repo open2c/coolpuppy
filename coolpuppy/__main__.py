@@ -386,6 +386,10 @@ def main():
 
     if args.rescale and args.rescale_size % 2 == 0:
         raise ValueError("Please provide an odd rescale_size")
+    if not args.rescale:
+        rescale_pad = None
+    else:
+        rescale_pad = args.rescale_pad
 
     if args.anchor is not None:
         if "_" in args.anchor:
@@ -422,7 +426,7 @@ def main():
         basetype=args.basetype,
         anchor=anchor,
         pad=args.pad * 1000,
-        fraction_pad=args.rescale_pad,
+        fraction_pad=rescale_pad,
         chroms=fchroms,
         minshift=args.minshift,
         maxshift=args.maxshift,
