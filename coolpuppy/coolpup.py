@@ -291,9 +291,9 @@ def assign_groups(intervals, groupby=[]):
 
 def expand(intervals, pad, fraction_pad=None):
     if fraction_pad is None:
-        intervals["exp_start", "exp_end"] = bf.expand(intervals, pad=pad)[['start', 'end']]
+        intervals[["exp_start", "exp_end"]] = bf.expand(intervals, pad=pad)[['start', 'end']]
     else:
-        intervals["exp_start", "exp_end"] = bf.expand(intervals, scale=2*fraction_pad+1)[['start', 'end']]
+        intervals[["exp_start", "exp_end"]] = bf.expand(intervals, scale=2*fraction_pad+1)[['start', 'end']]
     return intervals
 
 
