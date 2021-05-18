@@ -2,6 +2,7 @@
 import numpy as np
 import warnings
 import pandas as pd
+import bioframe as bf
 import itertools
 from multiprocessing import Pool
 from functools import partial, reduce
@@ -288,54 +289,21 @@ def assign_groups(intervals, groupby=[]):
     return intervals
 
 
-def expand(intervals, pad, resolution, fraction_pad=None):
+def expand(intervals, pad, fraction_pad=None):
     if fraction_pad is None:
-        intervals["exp_start"] = np.floor(intervals["center"] - pad)
-        intervals["exp_end"] = np.ceil(intervals["center"] + pad + 0.5)
+        intervals["exp_start", "exp_end"] = bf.expand(intervals, pad=pad)[['start', 'end']]
     else:
-        intervals["exp_start"] = np.floor(
-            intervals["center"]
-            - (intervals["center"] - intervals["start"]) * fraction_pad
-        )
-        intervals["exp_end"] = np.ceil(
-            intervals["center"]
-            + (intervals["end"] - intervals["center"]) * fraction_pad
-            + 0.5
-        )
-    intervals[["exp_start", "exp_end"]] = intervals[["exp_start", "exp_end"]].astype(
-        int
-    )
+        intervals["exp_start", "exp_end"] = bf.expand(intervals, scale=2*fraction_pad+1)[['start', 'end']]
     return intervals
 
 
 def expand2D(intervals, pad, fraction_pad=None):
     if fraction_pad is None:
-        intervals["exp_start1"] = np.floor(intervals["center1"] - pad)
-        intervals["exp_end1"] = np.ceil(intervals["center1"] + pad + 0.5)
-        intervals["exp_start2"] = np.floor(intervals["center2"] - pad)
-        intervals["exp_end2"] = np.ceil(intervals["center2"] + pad + 0.5)
+        intervals["exp_start1", "exp_end1"] = bf.expand(intervals, pad=pad, cols=['chrom1', 'start1', 'end1'])[['start1', 'end1']]
+        intervals["exp_start2", "exp_end2"] = bf.expand(intervals, pad=pad, cols=['chrom2', 'start2', 'end2'])[['start2', 'end2']]
     else:
-        intervals["exp_start1"] = np.floor(
-            intervals["start1"]
-            - (intervals["center1"] - intervals["start1"]) * fraction_pad
-        )
-        intervals["exp_end1"] = np.ceil(
-            intervals["end1"]
-            + (intervals["end1"] - intervals["center1"]) * fraction_pad
-            + 0.5
-        )
-        intervals["exp_start2"] = np.floor(
-            intervals["start2"]
-            - (intervals["center2"] - intervals["start2"]) * fraction_pad
-        )
-        intervals["exp_end2"] = np.ceil(
-            intervals["end2"]
-            + (intervals["end2"] - intervals["center2"]) * fraction_pad
-            + 0.5
-        )
-    intervals[["exp_start1", "exp_end1", "exp_start2", "exp_end2"]] = intervals[
-        ["exp_start1", "exp_end1", "exp_start2", "exp_end2"]
-    ].astype(int)
+        intervals["exp_start1", "exp_end1"] = bf.expand(intervals, scale=2*fraction_pad+1, cols=['chrom1', 'start1', 'end1'])[['start1', 'end1']]
+        intervals["exp_start2", "exp_end2"] = bf.expand(intervals, scale=2*fraction_pad+1, cols=['chrom2', 'start2', 'end2'])[['start2', 'end2']]
     return intervals
 
 
