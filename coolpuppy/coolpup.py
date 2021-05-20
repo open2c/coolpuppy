@@ -299,11 +299,11 @@ def expand(intervals, pad, fraction_pad=None):
 
 def expand2D(intervals, pad, fraction_pad=None):
     if fraction_pad is None:
-        intervals["exp_start1", "exp_end1"] = bf.expand(intervals, pad=pad, cols=['chrom1', 'start1', 'end1'])[['start1', 'end1']]
-        intervals["exp_start2", "exp_end2"] = bf.expand(intervals, pad=pad, cols=['chrom2', 'start2', 'end2'])[['start2', 'end2']]
+        intervals[["exp_start1", "exp_end1"]] = bf.expand(intervals, pad=pad, cols=['chrom1', 'start1', 'end1'])[['start1', 'end1']]
+        intervals[["exp_start2", "exp_end2"]] = bf.expand(intervals, pad=pad, cols=['chrom2', 'start2', 'end2'])[['start2', 'end2']]
     else:
-        intervals["exp_start1", "exp_end1"] = bf.expand(intervals, scale=2*fraction_pad+1, cols=['chrom1', 'start1', 'end1'])[['start1', 'end1']]
-        intervals["exp_start2", "exp_end2"] = bf.expand(intervals, scale=2*fraction_pad+1, cols=['chrom2', 'start2', 'end2'])[['start2', 'end2']]
+        intervals[["exp_start1", "exp_end1"]] = bf.expand(intervals, scale=2*fraction_pad+1, cols=['chrom1', 'start1', 'end1'])[['start1', 'end1']]
+        intervals[["exp_start2", "exp_end2"]] = bf.expand(intervals, scale=2*fraction_pad+1, cols=['chrom2', 'start2', 'end2'])[['start2', 'end2']]
     return intervals
 
 
