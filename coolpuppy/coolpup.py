@@ -289,18 +289,22 @@ def assign_groups(intervals, groupby=[]):
     return intervals
 
 
-def expand(intervals, pad, fraction_pad=None):
+def expand(intervals, pad, resolution, fraction_pad=None):
+    intervals = intervals.copy()
     if fraction_pad is None:
-        intervals[["exp_start", "exp_end"]] = bf.expand(intervals, pad=pad)[['start', 'end']]
+        intervals["exp_start"] = np.floor(intervals["center"]/resolution)*resolution - pad
+        intervals["exp_end"] =    np.ceil(intervals["center"]/resolution)*resolution + pad
     else:
         intervals[["exp_start", "exp_end"]] = bf.expand(intervals, scale=2*fraction_pad+1)[['start', 'end']]
     return intervals
 
 
-def expand2D(intervals, pad, fraction_pad=None):
+def expand2D(intervals, pad, resolution, fraction_pad=None):
     if fraction_pad is None:
-        intervals[["exp_start1", "exp_end1"]] = bf.expand(intervals, pad=pad, cols=['chrom1', 'start1', 'end1'])[['start1', 'end1']]
-        intervals[["exp_start2", "exp_end2"]] = bf.expand(intervals, pad=pad, cols=['chrom2', 'start2', 'end2'])[['start2', 'end2']]
+        intervals["exp_start1"] = np.floor(intervals["center1"]//resolution)*resolution - pad
+        intervals["exp_end1"] =    np.ceil(intervals["center1"]/resolution)*resolution + pad
+        intervals["exp_start2"] = np.floor(intervals["center2"]//resolution)*resolution - pad
+        intervals["exp_end2"] =    np.ceil(intervals["center2"]/resolution)*resolution + pad
     else:
         intervals[["exp_start1", "exp_end1"]] = bf.expand(intervals, scale=2*fraction_pad+1, cols=['chrom1', 'start1', 'end1'])[['start1', 'end1']]
         intervals[["exp_start2", "exp_end2"]] = bf.expand(intervals, scale=2*fraction_pad+1, cols=['chrom2', 'start2', 'end2'])[['start2', 'end2']]
@@ -535,7 +539,7 @@ class CoordCreator:
             self.intervals["center"] = (
                 self.intervals["start"] + self.intervals["end"]
             ) / 2
-            self.intervals = expand(self.intervals, self.pad, self.fraction_pad)
+            self.intervals = expand(self.intervals, self.pad, self.resolution, self.fraction_pad)
         else:
             assert all(
                 [
@@ -556,7 +560,7 @@ class CoordCreator:
                 (self.mindist <= self.intervals["distance"].abs())
                 & (self.intervals["distance"].abs() <= self.maxdist)
             ]
-            self.intervals = expand2D(self.intervals, self.pad, self.fraction_pad)
+            self.intervals = expand2D(self.intervals, self.pad, self.resolution, self.fraction_pad)
 
         if self.nshifts > 0 and self.kind == "bedpe":
             self.intervals = self._control_regions(self.intervals)
