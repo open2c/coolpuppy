@@ -293,7 +293,7 @@ def expand(intervals, pad, resolution, fraction_pad=None):
     intervals = intervals.copy()
     if fraction_pad is None:
         intervals["exp_start"] = np.floor(intervals["center"]/resolution)*resolution - pad
-        intervals["exp_end"] =    np.ceil(intervals["center"]/resolution)*resolution + pad
+        intervals["exp_end"] = np.floor(intervals["center"]/resolution+1)*resolution + pad
     else:
         intervals[["exp_start", "exp_end"]] = bf.expand(intervals, scale=2*fraction_pad+1)[['start', 'end']]
     return intervals
@@ -302,9 +302,9 @@ def expand(intervals, pad, resolution, fraction_pad=None):
 def expand2D(intervals, pad, resolution, fraction_pad=None):
     if fraction_pad is None:
         intervals["exp_start1"] = np.floor(intervals["center1"]//resolution)*resolution - pad
-        intervals["exp_end1"] =    np.ceil(intervals["center1"]/resolution)*resolution + pad
+        intervals["exp_end1"] = np.floor(intervals["center1"]/resolution+1)*resolution + pad
         intervals["exp_start2"] = np.floor(intervals["center2"]//resolution)*resolution - pad
-        intervals["exp_end2"] =    np.ceil(intervals["center2"]/resolution)*resolution + pad
+        intervals["exp_end2"] = np.floor(intervals["center2"]/resolution+1)*resolution + pad
     else:
         intervals[["exp_start1", "exp_end1"]] = bf.expand(intervals, scale=2*fraction_pad+1, cols=['chrom1', 'start1', 'end1'])[['start1', 'end1']]
         intervals[["exp_start2", "exp_end2"]] = bf.expand(intervals, scale=2*fraction_pad+1, cols=['chrom2', 'start2', 'end2'])[['start2', 'end2']]
