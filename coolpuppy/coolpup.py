@@ -32,6 +32,10 @@ def save_pileup_df(filename, df, metadata=None):
     Returns
     -------
     None.
+    
+    Notes
+    -----
+    Replaces `None` in metadata values with `False`, since HDF5 doesn't support `None`
 
     """
     if metadata is None:
@@ -48,6 +52,8 @@ def save_pileup_df(filename, df, metadata=None):
         group = f.create_group("attrs")
         if metadata is not None:
             for key, val in metadata.items():
+                if val is None:
+                    val = False
                 group.attrs[key] = val
     return
 
