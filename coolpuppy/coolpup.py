@@ -13,12 +13,12 @@ from cooltools import numutils, snipping
 import yaml
 import io
 from more_itertools import collapse
-import flammkuchen as fl
+import h5py
 
 
 def save_pileup_df(filename, df, metadata=None):
     """
-    Saves a dataframe with metadata into a binary HDF5 file using `flammkuchen`
+    Saves a dataframe with metadata into a binary HDF5 file`
 
     Parameters
     ----------
@@ -36,8 +36,20 @@ def save_pileup_df(filename, df, metadata=None):
     """
     if metadata is None:
         metadata = {}
-    tosave = {"metadata": metadata, "data": df}
-    fl.save(filename, tosave)
+    df[df.columns[df.columns != "data"]].to_hdf(filename, "annotation")
+    chunksize = df["data"][0].shape[0]
+    with h5py.File(filename, "a") as f:
+        _ = f.create_dataset(
+            "data",
+            data=np.concatenate(df["data"].values),
+            compression="lzf",
+            chunks=(chunksize, chunksize),
+        )
+        group = f.create_group("attrs")
+        if metadata is not None:
+            for key, val in metadata.items():
+                group.attrs[key] = val
+    return
 
 
 def load_pileup_df(filename):
@@ -55,14 +67,15 @@ def load_pileup_df(filename):
     data : pd.DataFrame
 
     """
-    loaded = fl.load(filename)
-    try:
-        assert "metadata" in loaded
-        assert "data" in loaded
-    except:
-        raise ValueError("The specified file doesn't contain metadata or data")
-    metadata = loaded["metadata"]
-    data = loaded["data"]
+    with h5py.File(filename, "r", libver="latest") as f:
+        metadata = dict(zip(f["attrs"].attrs.keys(), f["attrs"].attrs.values()))
+        dstore = f["data"]
+        data = []
+        for chunk in dstore.iter_chunks():
+            chunk = dstore[chunk]
+            data.append(chunk)
+        annotation = pd.read_hdf(filename, "annotation")
+        annotation["data"] = data
     return metadata, data
 
 
@@ -292,22 +305,40 @@ def assign_groups(intervals, groupby=[]):
 def expand(intervals, pad, resolution, fraction_pad=None):
     intervals = intervals.copy()
     if fraction_pad is None:
-        intervals["exp_start"] = np.floor(intervals["center"]/resolution)*resolution - pad
-        intervals["exp_end"] = np.floor(intervals["center"]/resolution+1)*resolution + pad
+        intervals["exp_start"] = (
+            np.floor(intervals["center"] / resolution) * resolution - pad
+        )
+        intervals["exp_end"] = (
+            np.floor(intervals["center"] / resolution + 1) * resolution + pad
+        )
     else:
-        intervals[["exp_start", "exp_end"]] = bf.expand(intervals, scale=2*fraction_pad+1)[['start', 'end']]
+        intervals[["exp_start", "exp_end"]] = bf.expand(
+            intervals, scale=2 * fraction_pad + 1
+        )[["start", "end"]]
     return intervals
 
 
 def expand2D(intervals, pad, resolution, fraction_pad=None):
     if fraction_pad is None:
-        intervals["exp_start1"] = np.floor(intervals["center1"]//resolution)*resolution - pad
-        intervals["exp_end1"] = np.floor(intervals["center1"]/resolution+1)*resolution + pad
-        intervals["exp_start2"] = np.floor(intervals["center2"]//resolution)*resolution - pad
-        intervals["exp_end2"] = np.floor(intervals["center2"]/resolution+1)*resolution + pad
+        intervals["exp_start1"] = (
+            np.floor(intervals["center1"] // resolution) * resolution - pad
+        )
+        intervals["exp_end1"] = (
+            np.floor(intervals["center1"] / resolution + 1) * resolution + pad
+        )
+        intervals["exp_start2"] = (
+            np.floor(intervals["center2"] // resolution) * resolution - pad
+        )
+        intervals["exp_end2"] = (
+            np.floor(intervals["center2"] / resolution + 1) * resolution + pad
+        )
     else:
-        intervals[["exp_start1", "exp_end1"]] = bf.expand(intervals, scale=2*fraction_pad+1, cols=['chrom1', 'start1', 'end1'])[['start1', 'end1']]
-        intervals[["exp_start2", "exp_end2"]] = bf.expand(intervals, scale=2*fraction_pad+1, cols=['chrom2', 'start2', 'end2'])[['start2', 'end2']]
+        intervals[["exp_start1", "exp_end1"]] = bf.expand(
+            intervals, scale=2 * fraction_pad + 1, cols=["chrom1", "start1", "end1"]
+        )[["start1", "end1"]]
+        intervals[["exp_start2", "exp_end2"]] = bf.expand(
+            intervals, scale=2 * fraction_pad + 1, cols=["chrom2", "start2", "end2"]
+        )[["start2", "end2"]]
     return intervals
 
 
@@ -343,6 +374,7 @@ def _add_snip(outdict, key, snip):
             [outdict[key]["cov_end"], snip["cov_end"]], axis=0
         )
         outdict[key]["n"] += 1
+
 
 def sum_pups(pup1, pup2):
     """
@@ -539,7 +571,9 @@ class CoordCreator:
             self.intervals["center"] = (
                 self.intervals["start"] + self.intervals["end"]
             ) / 2
-            self.intervals = expand(self.intervals, self.pad, self.resolution, self.fraction_pad)
+            self.intervals = expand(
+                self.intervals, self.pad, self.resolution, self.fraction_pad
+            )
         else:
             assert all(
                 [
@@ -560,7 +594,9 @@ class CoordCreator:
                 (self.mindist <= self.intervals["distance"].abs())
                 & (self.intervals["distance"].abs() <= self.maxdist)
             ]
-            self.intervals = expand2D(self.intervals, self.pad, self.resolution, self.fraction_pad)
+            self.intervals = expand2D(
+                self.intervals, self.pad, self.resolution, self.fraction_pad
+            )
 
         if self.nshifts > 0 and self.kind == "bedpe":
             self.intervals = self._control_regions(self.intervals)
@@ -666,14 +702,14 @@ class CoordCreator:
     #         raise ValueError("Some ends in the file are smaller than starts")
     #     return df
 
-    def filter_bedpe(self, df):
-        mid1 = np.mean(df[["start1", "end1"]], axis=1)
-        mid2 = np.mean(df[["start2", "end2"]], axis=1)
-        length = mid2 - mid1
-        df = df[(length >= self.mindist) & (length <= self.maxdist)]
-        if self.chroms != "all":
-            df = df[(df["chrom1"].isin(self.chroms)) & (df["chrom2"].isin(self.chroms))]
-        return df
+    # def filter_bedpe(self, df):
+    #     mid1 = np.mean(df[["start1", "end1"]], axis=1)
+    #     mid2 = np.mean(df[["start2", "end2"]], axis=1)
+    #     length = mid2 - mid1
+    #     df = df[(length >= self.mindist) & (length <= self.maxdist)]
+    #     if self.chroms != "all":
+    #         df = df[(df["chrom1"].isin(self.chroms)) & (df["chrom2"].isin(self.chroms))]
+    #     return df
 
     # def auto_read_bed(
     #     self, file, kind="auto",
@@ -810,10 +846,10 @@ class CoordCreator:
             df.columns = ["chrom", "start", "end"]
         return df
 
-    def _binnify_region(self, region):
-        start_bin = np.floor(region[1] / self.resolution).astype(int)
-        end_bin = np.ceil(region[2] / self.resolution).astype(int)
-        return region[0], start_bin, end_bin
+    # def _binnify_region(self, region):
+    #     start_bin = np.floor(region[1] / self.resolution).astype(int)
+    #     end_bin = np.ceil(region[2] / self.resolution).astype(int)
+    #     return region[0], start_bin, end_bin
 
     def _binnify(self, intervals):
         if self.kind == "bed":
@@ -1008,86 +1044,8 @@ class CoordCreator:
         for i, interval in intervals.iterrows():
             yield interval
 
-    # def _get_position_pairs_stream(self, filter_func, intervals=None):
-    #     if intervals is None:
-    #         intervals = self.intervals
-    #     intervals = filter_func(intervals)
-    #     if not len(intervals) >= 1:
-    #         logging.debug("Empty selection")
-    #         yield None
-    #     for i, row in itertools.combinations(intervals.index, intervals.index):
-    #         yield intervals.iloc[i], intervals.iloc[j]
-
-    # def get_position_pairs_stream(self, filter_func, intervals=None):
-    #     stream = self.get_intervals_stream(filter_func, intervals)
-    #     if not self.local:
-    #         stream = self.filter_pos_stream_distance(stream)
-    #     return stream
-
-    # def control_regions(self, filter_func, pos_pairs=None):
-    #     if self.seed is not None:
-    #         np.random.seed(self.seed)
-    #     if pos_pairs is None:
-    #         source = self.pos_stream(filter_func)
-    #     else:
-    #         source = pos_pairs
-    #     # try:
-    #     #     row1 = next(source)
-    #     # except StopIteration:
-    #     #     logging.debug("Empty selection")
-    #     #     raise StopIteration
-    #     # else:
-    #     #     source = itertools.chain([row1], source)
-    #     for orig_row in source:
-    #         shift = np.random.randint(self.minshift, self.maxshift, self.nshifts)
-    #         sign = np.random.choice([-1, 1], self.nshifts)
-    #         shift *= sign
-    #         controls = pd.DataFrame([orig_row]*self.nshifts)
-    #         controls[['start1', 'start2', 'end1', 'end2']] = controls[['start1', 'start2', 'end1', 'end2']] + shift[:, np.newaxis]
-    #         controls[['stBin1', 'endBin1', 'stBin2', 'endBin2']] = controls[['stBin1', 'endBin1', 'stBin2', 'endBin2']] + (shift // self.resolution)[:, np.newaxis]
-    #         for i, row in controls.iterrows():
-    #             yield row
-
-    # def get_combinations_by_window(self, chrom, ctrl=False, intervals=None):
-    #     assert self.kind == "bed"
-    #     if intervals is None:
-    #         chrmids = self.filter_func_chrom(chrom)(self.intervals)
-    #     else:
-    #         chrmids = self.filter_func_chrom(chrom)(intervals)
-    #     for i, (b, m, p) in chrmids[["Bin", "Mids", "Pad"]].astype(int).iterrows():
-    #         out_stream = self.get_combinations(
-    #             self.filter_func_all, intervals=chrmids, anchor=(chrom, m, m)
-    #         )
-    #         if ctrl:
-    #             out_stream = self.control_regions(self.filter_func_all, out_stream)
-    #         yield (m - p, m + p), out_stream
-
-    # def filter_pos_stream_distance(self, stream):
-    #     for row in stream:
-    #         if self.mindist <= abs(row['distance']) <= self.maxdist:
-    #             yield row
-
     def empty_stream(self, *args, **kwargs):
         yield from ()
-
-    # def _chrom_mids(self, chroms, intervals):
-    #     for chrom in chroms:
-    #         if self.kind == "bed":
-    #             yield chrom, intervals[intervals["chrom"] == chrom]
-    #         else:
-    #             yield chrom, intervals[
-    #                 (intervals["chrom1"] == chrom) & (intervals["chrom2"] == chrom)
-    #             ]
-
-    # def chrom_mids(self):
-    #     chrommids = self._chrom_mids(self.final_chroms, self.intervals)
-    #     if self.intervals2 is not None:
-    #         chrommids2 = self._chrom_mids(self.final_chroms, self.intervals2)
-    #     else:
-    #         chrommids2 = zip(itertools.cycle([None]), itertools.cycle([None]))
-    #     chrommids = zip(chrommids, chrommids2)
-    #     for i in chrommids:
-    #         yield i
 
 
 class PileUpper:
@@ -1175,7 +1133,7 @@ class PileUpper:
                     "are not simply chromosome names."
                 )
         else:
-            regions = regions[regions['chrom'].isin(self.clr.chromnames)]
+            regions = regions[regions["chrom"].isin(self.clr.chromnames)]
         self.regions = regions.set_index("name")
         self.region_extents = {}
         for region_name, region in self.regions.iterrows():
@@ -1232,11 +1190,15 @@ class PileUpper:
             }
             self.expected = True
         self.empty_outmap = self.make_outmap()
-        self.empty_pup = pd.Series({'data':self.empty_outmap,
-                                    'n':0,
-                                    'num':self.empty_outmap,
-                                    'cov_start':np.zeros((self.empty_outmap.shape[0])),
-                                    'cov_end':np.zeros((self.empty_outmap.shape[1]))})
+        self.empty_pup = pd.Series(
+            {
+                "data": self.empty_outmap,
+                "n": 0,
+                "num": self.empty_outmap,
+                "cov_start": np.zeros((self.empty_outmap.shape[0])),
+                "cov_end": np.zeros((self.empty_outmap.shape[1])),
+            }
+        )
 
     # def get_matrix(self, matrix, chrom, left_interval, right_interval):
     #     lo_left, hi_left = left_interval
@@ -1295,7 +1257,6 @@ class PileUpper:
         else:
             outmap = np.zeros((2 * self.pad_bins + 1, 2 * self.pad_bins + 1))
         return outmap
-    
 
     def get_data(self, region):
         """Get sparse data for a region
@@ -1352,7 +1313,7 @@ class PileUpper:
         if row1 is None:
             logging.info(f"Nothing to sum up in region {region}")
             return
-        
+
         intervals = itertools.chain([row1], intervals)
 
         bigdata = self.get_data(
@@ -1481,8 +1442,9 @@ class PileUpper:
             else:
                 _add_snip(outdict[kind], tuple(key), snip)
         if "all" not in outdict["ROI"]:
-            outdict["ROI"]["all"] = reduce(sum_pups, outdict["ROI"].values(),
-                                           self.empty_pup)
+            outdict["ROI"]["all"] = reduce(
+                sum_pups, outdict["ROI"].values(), self.empty_pup
+            )
         if self.control or (self.expected and not self.ooe):
             if "all" not in outdict["control"]:
                 outdict["control"]["all"] = reduce(
@@ -1660,7 +1622,7 @@ class PileUpper:
         normalized_pileups[["chrom", "start", "end"]] = pd.DataFrame(
             normalized_pileups["index"].to_list(), index=normalized_pileups.index
         )
-        normalized_pileups.drop(columns="index")
+        normalized_pileups = normalized_pileups.drop(columns="index")
         return normalized_pileups
 
     def pileupsByDistanceWithControl(
