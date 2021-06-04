@@ -82,7 +82,7 @@ def load_pileup_df(filename):
             data.append(chunk)
         annotation = pd.read_hdf(filename, "annotation")
         annotation["data"] = data
-    return metadata, data
+    return metadata, annotation
 
 
 def save_array_with_header(array, header, filename):
