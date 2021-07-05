@@ -40,7 +40,7 @@ def save_pileup_df(filename, df, metadata=None):
     """
     if metadata is None:
         metadata = {}
-    df[df.columns[df.columns != "data"]].to_hdf(filename, "annotation")
+    df[df.columns[df.columns != "data"]].to_hdf(filename, "annotation", moda='a')
     with h5py.File(filename, "a") as f:
         width = df['data'].iloc[0].shape[0]
         height = width * df['data'].shape[0]
@@ -201,7 +201,7 @@ def get_enrichment(amap, n):
         Mean of the pixels in the central square.
 
     """
-    c = int(np.floor(amap.shape[0] / 2))
+    c = amap.shape[0] // 2
     return np.nanmean(amap[c - n // 2 : c + n // 2 + 1, c - n // 2 : c + n // 2 + 1])
 
 
