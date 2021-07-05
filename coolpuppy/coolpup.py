@@ -1040,9 +1040,10 @@ class CoordCreator:
     ):
         if intervals is None:
             intervals = self.intervals
+        intervals = filter_func(intervals)
         intervals = self._control_regions(intervals, self.nshifts * control)
         if modify_2Dintervals_func is not None:
-            intervals = modify_2Dintervals_func(filter_func(intervals))
+            intervals = modify_2Dintervals_func(intervals)
         intervals = assign_groups(intervals, groupby)
         intervals = intervals.reindex(
             columns=list(intervals.columns) + ["data", "cov_start", "cov_end"]
