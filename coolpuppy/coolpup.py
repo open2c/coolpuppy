@@ -40,7 +40,7 @@ def save_pileup_df(filename, df, metadata=None):
     """
     if metadata is None:
         metadata = {}
-    df[df.columns[df.columns != "data"]].to_hdf(filename, "annotation", moda='a')
+    df[df.columns[df.columns != "data"]].to_hdf(filename, "annotation", mode='a')
     with h5py.File(filename, "a") as f:
         width = df['data'].iloc[0].shape[0]
         height = width * df['data'].shape[0]
