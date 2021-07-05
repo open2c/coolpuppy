@@ -16,7 +16,7 @@ from more_itertools import collapse
 import h5py
 
 
-def save_pileup_df(filename, df, metadata=None):
+def save_pileup_df(filename, df, metadata=None, mode='w'):
     """
     Saves a dataframe with metadata into a binary HDF5 file`
 
@@ -28,6 +28,9 @@ def save_pileup_df(filename, df, metadata=None):
         DataFrame to save into binary hdf5 file.
     metadata : dict, optional
         Dictionary with meatadata.
+    mode : str, optional
+        Mode for the first time access to the output file: 'w' to overwrite if file
+        exists, or 'a' to fail if outpout file already exists
 
     Returns
     -------
@@ -40,7 +43,7 @@ def save_pileup_df(filename, df, metadata=None):
     """
     if metadata is None:
         metadata = {}
-    df[df.columns[df.columns != "data"]].to_hdf(filename, "annotation", mode='a')
+    df[df.columns[df.columns != "data"]].to_hdf(filename, "annotation", mode=mode)
     with h5py.File(filename, "a") as f:
         width = df['data'].iloc[0].shape[0]
         height = width * df['data'].shape[0]
