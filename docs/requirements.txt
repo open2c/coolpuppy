@@ -3,5 +3,5 @@ ipykernel
 nbsphinx
 sphinx-argparse
 natsort
-m2r
+m2r2
 sphinx_rtd_theme
