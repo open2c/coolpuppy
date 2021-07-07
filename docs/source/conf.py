@@ -60,7 +60,8 @@ MOCK_MODULES = ['cooltools',
                 'pysam',
                 'natsort',
                 'yaml',
-                'bioframe'
+                'bioframe',
+                'more_itertools'
                 ]
 
 for mod_name in MOCK_MODULES:
