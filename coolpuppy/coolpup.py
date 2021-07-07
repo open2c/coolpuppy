@@ -283,16 +283,52 @@ def prepare_single(item):
     return list(key) + [n, enr1, enr3, cv3, cv5]
 
 
-def bin_distance_intervals(
-    intervals, band_edges=np.append([0], 50000 * 2 ** np.arange(30))
-):
+def bin_distance_intervals(intervals, band_edges='default'):
+    """
+    
+    Parameters
+    ----------
+    intervals : pd.DataFrame
+        Dataframe containing intervals with any annotations.
+        Has to have a 'distance' column
+    band_edges : list or array-like, or "default", optional
+        Edges of distance bands used to split the intervals into groups.
+        Default is np.append([0], 50000 * 2 ** np.arange(30))
+
+    Returns
+    -------
+    snip : pd.DataFrame
+        The same dataframe with added ['distance_band'] annotation.
+    
+    """
+    if band_edges=='default':
+        band_edges=np.append([0], 50000 * 2 ** np.arange(30))
     edge_ids = np.searchsorted(band_edges, intervals["distance"], side="right")
     bands = [tuple(band_edges[i - 1 : i + 1]) for i in edge_ids]
     intervals["distance_band"] = bands
     return intervals
 
 
-def bin_distance(snip, band_edges=50000 * 2 ** np.arange(30)):
+def bin_distance(snip, band_edges='default'):
+    """
+    
+
+    Parameters
+    ----------
+    snip : pd.Series
+        Series containing any annotations. Has to have ['distance']
+    band_edges : list or array-like, or "default", optional
+        Edges of distance bands used to assign the distance band.
+        Default is np.append([0], 50000 * 2 ** np.arange(30))
+
+    Returns
+    -------
+    snip : pd.Series
+        The same snip with added ['distance_band'] annotation.
+
+    """
+    if band_edges=='default':
+        band_edges=np.append([0], 50000 * 2 ** np.arange(30))
     i = np.searchsorted(band_edges, snip["distance"])
     snip["distance_band"] = tuple(band_edges[i - 1 : i + 1])
     return snip
@@ -307,6 +343,22 @@ def group_by_region(snip):
 
 
 def assign_groups(intervals, groupby=[]):
+    """
+    
+
+    Parameters
+    ----------
+    intervals : TYPE
+        DESCRIPTION.
+    groupby : TYPE, optional
+        DESCRIPTION. The default is [].
+
+    Returns
+    -------
+    intervals : TYPE
+        DESCRIPTION.
+
+    """
     if not groupby:
         intervals["group"] = "all"
     else:
@@ -1443,7 +1495,6 @@ class PileUpper:
             Dictionary of accumulated snips (each as a Series) for each group.
             Always includes "all"
         """
-
         if postprocess_func is not None:
             snip_stream = map(postprocess_func, snip_stream)
         outdict = {"ROI": {}, "control": {}}
@@ -1639,7 +1690,7 @@ class PileUpper:
         return normalized_pileups
 
     def pileupsByDistanceWithControl(
-        self, nproc=1, distance_edges=np.append([0], 50000 * 2 ** np.arange(30))
+        self, nproc=1, distance_edges="default"
     ):
         """Perform by-distance pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl
@@ -1669,7 +1720,7 @@ class PileUpper:
         return normalized_pileups
 
     def pileupsByStrandByDistanceWithControl(
-        self, nproc=1, distance_edges=np.append([0], 50000 * 2 ** np.arange(30))
+        self, nproc=1, distance_edges="default"
     ):
         """Perform by-strand by-distance pileups across all chromosomes and applies
         required normalization. Simple wrapper around pileupsWithControl.

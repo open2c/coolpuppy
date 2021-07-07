@@ -4,3 +4,4 @@ nbsphinx
 sphinx-argparse
 natsort
 m2r
+sphinx_rtd_theme

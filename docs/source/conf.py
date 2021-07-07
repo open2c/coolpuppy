@@ -24,7 +24,7 @@ copyright = '2020, Ilya M. Flyamer'
 author = 'Ilya M. Flyamer'
 
 # The full version, including alpha/beta/rc tags
-release = '0.9.3'
+release = '0.9.7'
 
 
 # -- General configuration ---------------------------------------------------
@@ -39,7 +39,7 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.mathjax',
               'sphinx.ext.napoleon',
               'sphinxarg.ext',
-              'm2r'
+              'm2r2'
               ]
 
 
@@ -49,12 +49,18 @@ MOCK_MODULES = ['cooltools',
                 'scipy.linalg',
                 'Cython',
                 'matplotlib',
+                'matplotlib.colors',
+                'matpliotlib.ticker',
+                'matplotlib.pyplot',
+                'matplotlib.font_manager',
+                'mpl_toolkits.axes_grid1',
                 'pandas',
                 'h5py',
                 'cooler',
                 'pysam',
                 'natsort',
-                'yaml'
+                'yaml',
+                'bioframe'
                 ]
 
 for mod_name in MOCK_MODULES:
@@ -105,7 +111,9 @@ def skip(app, what, name, obj, would_skip, options):
 
 def setup(app):
     app.connect("autodoc-skip-member", skip)
-    app.add_stylesheet('my_theme.css')
+    app.add_css_file('my_theme.css')
 
 source_suffix = ['.rst', '.md', '.ipynb']
 html_favicon = 'favicon.ico'
+
+autodoc_docstring_signature = True

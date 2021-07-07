@@ -18,6 +18,6 @@ plotpup.py command
 ------------------
 
 .. argparse::
-   :module: coolpuppy.__main__
+   :module: coolpuppy.__plotpuppy_main__
    :func: parse_args_plotpuppy
    :prog: plotpup.py
