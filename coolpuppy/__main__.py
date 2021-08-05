@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from coolpuppy import CoordCreator, PileUpper, save_pileup_df
-from coolpuppy import *
-from coolpuppy import __version__
+from coolpuppy.coolpup import CoordCreator, PileUpper, save_pileup_df
+# from coolpuppy import *
+from coolpuppy._version import __version__
 import cooler
 import pandas as pd
 import bioframe as bf

@@ -1,0 +1,199 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Mar 23 14:05:06 2020
+
+@author: Ilya Flyamer
+"""
+from coolpuppy.coolpup import (
+    norm_cis,
+    load_pileup_df,
+    load_pileup_df_list,
+    get_enrichment,
+)
+from plotpuppy.plotpup import make_heatmap_grid
+from coolpuppy._version import __version__
+
+import matplotlib
+
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+
+import argparse
+
+import sys
+import pdb, traceback
+
+def parse_args_plotpuppy():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument(
+        "--cmap",
+        type=str,
+        required=False,
+        default="coolwarm",
+        help="""Colourmap to use
+                (see https://matplotlib.org/users/colormaps.html)""",
+    )
+    parser.add_argument(
+        "--symmetric",
+        type=bool,
+        required=False,
+        default=True,
+        help="""Whether to make colormap symmetric around 1, if log scale""",
+    )
+    parser.add_argument(
+        "--vmin", type=float, required=False, help="""Value for the lowest colour"""
+    )
+    parser.add_argument(
+        "--vmax", type=float, required=False, help="""Value for the highest colour"""
+    )
+    parser.add_argument(
+        "--scale",
+        type=str,
+        default="log",
+        required=False,
+        choices={"linear", "log"},
+        help="""Whether to use linear or log scaling for mapping colours""",
+    )
+    # parser.add_argument(
+    #     "--cbar_mode",
+    #     type=str,
+    #     default="single",
+    #     required=False,
+    #     choices={"single", "edge", "each"},
+    #     help="""Whether to show a single colorbar, one per row or one for each subplot
+    #          """,
+    # )
+    # parser.add_argument(
+    #     "--n_cols",
+    #     type=int,
+    #     default=0,
+    #     required=False,
+    #     help="""How many columns to use for plotting the data.
+    #             If 0, automatically make the figure as square as possible""",
+    # )
+    parser.add_argument(
+        "--cols",
+        type=str,
+        required=False,
+        help="""Which value to map as columns""",
+    )
+    parser.add_argument(
+        "--rows",
+        type=str,
+        required=False,
+        help="""Which value to map as rows""",
+    )
+    parser.add_argument(
+        "--col_order",
+        type=str,
+        required=False,
+        default="",
+        help="""Order of columns to use, comma separated""",
+    )
+    parser.add_argument(
+        "--row_order",
+        type=str,
+        required=False,
+        default="",
+        help="""Order of rows to use, comma separated""",
+    )
+    parser.add_argument(
+        "--norm_corners",
+        type=int,
+        required=False,
+        default=0,
+        help="""Whether to normalize pileups by their top left and bottom right corners.
+                0 for no normalization, positive number to define the size of the corner
+                squares whose values are averaged""",
+    )
+    parser.add_argument(
+        "--enrichment",
+        type=int,
+        required=False,
+        default=1,
+        help="""Whether to show the level of enrichment in the central pixels.
+                0 to not show, odd positive number to define the size of the central
+                square whose values are averaged""",
+    )
+    parser.add_argument(
+        "--quaich",
+        required=False,
+        default=False,
+        action="store_true",
+        help="""Activate if pileups are named accodring to Quaich naming convention
+                to get information from the file name""")
+    parser.add_argument(
+        "--dpi",
+        type=int,
+        required=False,
+        default=300,
+        help="""DPI of the output plot. Try increasing if heatmaps look blurry""",
+    )
+    #    parser.add_argument("--n_rows", type=int, default=0,
+    #                    required=False,
+    #                    help="""How many rows to use for plotting the data""")
+    parser.add_argument(
+        "--output",
+        "-o",
+        type=str,
+        required=False,
+        default="pup.pdf",
+        help="""Where to save the plot""",
+    )
+    parser.add_argument(
+        "--post_mortem",
+        action="store_true",
+        default=False,
+        required=False,
+        help="""Enter debugger if there is an error""",
+    )
+    parser.add_argument(
+        "pileup_files", type=str, nargs="*", help="""All files to plot"""
+    )
+    parser.add_argument("-v", "--version", action="version", version=__version__)
+    return parser
+
+
+def main():
+    parser = parse_args_plotpuppy()
+    args = parser.parse_args()
+    if args.post_mortem:
+        def _excepthook(exc_type, value, tb):
+            traceback.print_exception(exc_type, value, tb)
+            print()
+            pdb.pm()
+    
+        sys.excepthook = _excepthook
+    mpl.rcParams["svg.fonttype"] = "none"
+    mpl.rcParams["pdf.fonttype"] = 42
+    
+    pups = load_pileup_df_list(args.pileup_files, quaich=args.quaich)
+
+    if args.norm_corners > 0:
+        pups['data'] = pups['data'].apply(norm_cis, i=int(args.norm_corners))
+    
+    if args.enrichment:
+        pups['score'] = pups['data'].apply(get_enrichment, n=int(args.enrichment))
+        score = 'score'
+    else:
+        score = False
+
+    fg = make_heatmap_grid(pups,
+                           cols=args.cols,
+                           rows=args.rows,
+                           score=score,
+                           col_order=args.col_order.strip().split(','),
+                           row_order=args.row_order.strip().split(','),
+                           vmin=args.vmin,
+                           vmax=args.vmax,
+                           sym=args.symmetric,
+                           cmap=args.cmap,
+                           scale=args.scale)
+    
+    plt.savefig(args.output, bbox_inches="tight", dpi=args.dpi)
+

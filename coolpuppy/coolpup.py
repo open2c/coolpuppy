@@ -14,6 +14,8 @@ import yaml
 import io
 from more_itertools import collapse
 import h5py
+import os
+import re
 
 
 def save_pileup_df(filename, df, metadata=None, mode='w'):
@@ -64,7 +66,7 @@ def save_pileup_df(filename, df, metadata=None, mode='w'):
     return
 
 
-def load_pileup_df(filename):
+def load_pileup_df(filename, quaich=False):
     """
     Loads a dataframe saved using `save_pileup_df`
 
@@ -88,7 +90,19 @@ def load_pileup_df(filename):
             data.append(chunk)
         annotation = pd.read_hdf(filename, "annotation")
         annotation["data"] = data
-    return metadata, annotation
+    for key, val in metadata.items():
+        annotation[key] = val
+    if quaich:
+        basename = os.path.basename(filename)
+        sample, bedname = re.search('^(.*)-(?:[0-9]+)_over_(.*)_(?:[0-9]+-shifts|expected).*\.clpy', basename).groups()
+        annotation['sample'] = sample
+        annotation['bedname'] = bedname
+    return annotation
+
+def load_pileup_df_list(lst, quaich=False):
+    pups = pd.concat([load_pileup_df(path, quaich=quaich) for path in lst])
+    pups['norm'] = np.where(pd.isna(pups['expected']), ['shifts']*pups.shape[0], ['expected']*pups.shape[0]).astype(str)
+    return pups.reset_index(drop=True)
 
 
 def save_array_with_header(array, header, filename):

@@ -21,15 +21,16 @@ if on_rtd:
 else:
     INSTALL_REQUIRES = ['Cython', 'cooler', 'natsort', 'numpy>=1.16.5',
                         'scipy', 'cooltools>=0.4.0', 'pyyaml', 'more_itertools',
+                        'seaborn', 'natsort'
                         ]
 
 setup(
       name='coolpuppy',
       version=verstr,
-      packages=['coolpuppy'],
+      packages=['coolpuppy', 'plotpuppy'],
       entry_points={
           'console_scripts': ['coolpup.py = coolpuppy.__main__:main',
-                              'plotpup.py = coolpuppy.__plotpuppy_main__:main']},
+                              'plotpup.py = plotpuppy.__main__:main']},
       install_requires=INSTALL_REQUIRES,
       python_requires='>=3.6',
       description='A versatile tool to perform pile-up analysis on Hi-C data in .cool format.',
