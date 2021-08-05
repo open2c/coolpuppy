@@ -99,9 +99,10 @@ def load_pileup_df(filename, quaich=False):
         annotation['bedname'] = bedname
     return annotation
 
+
 def load_pileup_df_list(lst, quaich=False):
     pups = pd.concat([load_pileup_df(path, quaich=quaich) for path in lst])
-    pups['norm'] = np.where(pd.isna(pups['expected']), ['shifts']*pups.shape[0], ['expected']*pups.shape[0]).astype(str)
+    pups['norm'] = np.where(pups['expected'], ['shifts']*pups.shape[0], ['expected']*pups.shape[0]).astype(str)
     return pups.reset_index(drop=True)
 
 
