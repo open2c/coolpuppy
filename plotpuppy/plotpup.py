@@ -2,7 +2,7 @@
 
 # import pandas as pd
 import numpy as np
-import coolpuppy
+from coolpuppy import coolpup
 import matplotlib.pyplot as plt
 # from mpl_toolkits.axes_grid1 import ImageGrid
 from matplotlib.colors import LogNorm, Normalize
@@ -114,7 +114,7 @@ def make_heatmap_grid(
 
     if norm_corners:
         pupsdf["data"] = pupsdf.apply(
-            lambda x: coolpuppy.norm_cis(x["data"], norm_corners), axis=1
+            lambda x: coolpup.norm_cis(x["data"], norm_corners), axis=1
         )
 
     if cols is not None and col_order is None:
