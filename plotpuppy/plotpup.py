@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
-# import pandas as pd
 import numpy as np
 from coolpuppy import coolpup
 import matplotlib.pyplot as plt
+
 # from mpl_toolkits.axes_grid1 import ImageGrid
 from matplotlib.colors import LogNorm, Normalize
 from matplotlib import cm
@@ -70,31 +70,40 @@ def get_min_max(pups, vmin=None, vmax=None, sym=True):
     return vmin, vmax
 
 
-def add_heatmap(data, color=None, cmap='coolwarm', norm=LogNorm(0.5, 2)):
+def add_heatmap(data, color=None, cmap="coolwarm", norm=LogNorm(0.5, 2)):
     """
     Adds the array contained in data.values[0] to the current axes as a heatmap
     """
     if len(data) > 1:
-        raise ValueError('Multiple pileups for one of the conditions, ensure unique correspondence for each col/row combination')
+        raise ValueError(
+            "Multiple pileups for one of the conditions, ensure unique correspondence for each col/row combination"
+        )
     elif len(data) == 0:
         return
     ax = plt.gca()
-    ax.imshow(data.values[0], cmap=cmap, norm=norm)
-    
+    ax.imshow(data.values[0], cmap=cmap, norm=norm)  #
+
+
+#     sns.heatmap(data.values[0], cmap=cmap, norm=norm, ax=ax, square=True, cbar=False,
+#                xticklabels=False, yticklabels=False)
+
+
 def add_score(score, color=None):
     """
     Adds the value contained in score.values[0] to the current axes as a label in top left corner
     """
     if score is not None:
         ax = plt.gca()
-        ax.text(s=f"{score.values[0]:.3g}",
-                y=0.95,
-                x=0.05,
-                ha="left",
-                va="top",
-                size="x-small",
-                transform=ax.transAxes,
-                )
+        ax.text(
+            s=f"{score.values[0]:.3g}",
+            y=0.95,
+            x=0.05,
+            ha="left",
+            va="top",
+            size="x-small",
+            transform=ax.transAxes,
+        )
+
 
 def make_heatmap_grid(
     pupsdf,
@@ -109,6 +118,8 @@ def make_heatmap_grid(
     norm_corners=0,
     cmap="coolwarm",
     scale="log",
+    height=1,
+    **kwargs,
 ):
     pupsdf = pupsdf.copy()
 
@@ -143,23 +154,34 @@ def make_heatmap_grid(
         raise ValueError(
             f"Unknown scale value, only log or linear implemented, but got {scale}"
         )
-    
-    vmin, vmax = get_min_max(pupsdf['data'].values, vmin, vmax, sym=sym)
-    
+
+    vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym)
+
+    right = len(col_order) / (len(col_order) + 0.5)
+
     # sns.set(font_scale=5)
-    fg = sns.FacetGrid(pupsdf, col=cols, row=rows,
-                       row_order=row_order,
-                       col_order=col_order,
-                       height=7, margin_titles=True,
-                       gridspec_kws={'right':0.9,
-                                     'hspace':0.0,
-                                     'wspace':0.05,
-                                     'top':0.95,
-                                     'bottom':0.05})
+    fg = sns.FacetGrid(
+        pupsdf,
+        col=cols,
+        row=rows,
+        row_order=row_order,
+        col_order=col_order,
+        aspect=1,
+        margin_titles=True,
+        gridspec_kws={
+            "right": right,
+            "hspace": 0.05,
+            "wspace": 0.05,
+            #'top':0.95,
+            #'bottom':0.05
+        },
+        height=height,
+        **kwargs,
+    )
     # fg.fig.set_constrained_layout(True)
     norm = norm(vmin, vmax)
-    fg.map(add_heatmap, 'data', norm=norm)
-    fg.map(add_score, 'score')
+    fg.map(add_heatmap, "data", norm=norm, cmap=cmap)
+    fg.map(add_score, "score")
     fg.map(lambda color: plt.gca().set_xticks([]))
     fg.map(lambda color: plt.gca().set_yticks([]))
     fg.set_titles(col_template="", row_template="")
@@ -167,86 +189,19 @@ def make_heatmap_grid(
         if row_val == row_order[-1]:
             ax.set_xlabel(col_val)
         if col_val == col_order[0]:
-            ax.set_ylabel(row_val, rotation=0, ha='right')
-    cax = fg.fig.add_axes([0.91, 0.08, 0.02, 0.84])
-    plt.colorbar(cm.ScalarMappable(norm, 'coolwarm'), cax=cax, ticks=[vmin, vmax])    
-    return fg                        
-
-    # f = plt.figure(dpi=dpi, figsize=(max(3.5, ncols + 0.5), max(3, nrows)))
-    # grid = ImageGrid(
-    #     f,
-    #     111,
-    #     share_all=True,
-    #     nrows_ncols=(nrows, ncols),
-    #     axes_pad=0.05,
-    #     label_mode="L",
-    #     cbar_location="right",
-    #     # cbar_mode=cbar_mode,
-    #     cbar_size="5%",
-    #     cbar_pad="3%",
-    # )
-    # axarr = np.array(grid).reshape((nrows, ncols))
-
-    # if cbar_mode == "single":
-    #     vmin, vmax = coolpuppy.get_min_max(pupsdf.values, vmin, vmax, sym=sym)
-    # elif cbar_mode == "edge":
-    #     colorscales = {
-    #         rowname: coolpuppy.get_min_max(row.values, vmin, vmax, sym=sym)
-    #         for rowname, row in pupsdf.groupby(rows)
-    #     }
-    # elif cbar_mode == "each":
-    #     grid.cbar_axes = np.asarray(grid.cbar_axes).reshape((nrows, ncols))
-
-    # cbs = []
-
-    # for rowid, rowname in enumerate(rowvals):
-    #     # axarr[rowid, 0].set_ylabel(rowname)
-    #     if cbar_mode == "edge":
-    #         vmin, vmax = colorscales[rowname]
-    #     for colid, colname in enumerate(colvals):
-    #         ax = axarr[rowid, colid]
-    #         try:
-    #             mat = pupsdf.loc[rowname, colname]
-    #             if cbar_mode == "each":
-    #                 vmin, vmax = coolpuppy.get_min_max([mat], vmin, vmax, sym=sym)
-    #             im = ax.imshow(
-    #                 mat,
-    #                 interpolation="none",
-    #                 norm=norm(vmax=vmax, vmin=vmin),
-    #                 cmap=cmap,
-    #                 extent=(0, 1, 0, 1),
-    #             )
-    #             if score:
-    #                 enr = pupsdf.loc[rowname, colname][score]
-    #                 ax.text(
-    #                     s=f"{enr:.3g}",
-    #                     y=0.95,
-    #                     x=0.05,
-    #                     ha="left",
-    #                     va="top",
-    #                     size="x-small",
-    #                     transform=ax.transAxes,
-    #                 )
-    #             if cbar_mode == "edge":
-    #                 cbs.append(plt.colorbar(im, cax=grid.cbar_axes[rowid]))
-    #             elif cbar_mode == "each":
-    #                 cbs.append(plt.colorbar(im, cax=grid.cbar_axes[rowid, colid]))
-    #             ax.set_xticks([])
-    #             ax.set_yticks([])
-    #         except KeyError:
-    #             ax.axis("off")
-    #             if cbar_mode == "each":
-    #                 grid.cbar_axes[rowid, colid].axis("off")
-    # if cbar_mode == "single":
-    #     cbs.append(plt.colorbar(im, cax=grid.cbar_axes[0]))
-    # if rows:
-    #     for rowid, rowname in enumerate(rowvals):
-    #         axarr[rowid, 0].set_ylabel(
-    #             rowname.replace("_", "\n"), rotation=0, ha="right", va="center"
-    #         )
-    # if cols:
-    #     for colid, colname in enumerate(colvals):
-    #         axarr[-1, colid].set_xlabel(colname.replace("_", "\n"))
-    # return f, axarr, cbs
-    
-    
+            ax.set_ylabel(row_val, rotation=0, ha="right")
+    plt.draw()
+    ax_bottom = fg.axes[-1, -1]
+    bottom = ax_bottom.get_position().y0
+    ax_top = fg.axes[0, -1]
+    top = ax_top.get_position().y1
+    height = top - bottom
+    right = ax_top.get_position().x1
+    cax = fg.fig.add_axes([right + 0.005, bottom, (1 - right - 0.005) / 3, height])
+    if sym:
+        ticks = [vmin, 1, vmax]
+    else:
+        ticks = [vmin, vmax]
+    cb = plt.colorbar(cm.ScalarMappable(norm, cmap), ticks=ticks, cax=cax)
+    cax.minorticks_off()
+    return fg
