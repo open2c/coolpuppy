@@ -9,7 +9,7 @@ from coolpuppy.coolpup import (
     norm_cis,
     load_pileup_df,
     load_pileup_df_list,
-    get_enrichment,
+    get_score,
 )
 from plotpuppy.plotpup import make_heatmap_grid
 from coolpuppy._version import __version__
@@ -124,13 +124,29 @@ def parse_args_plotpuppy():
                 squares whose values are averaged""",
     )
     parser.add_argument(
-        "--enrichment",
+        "--score",
+        type=bool,
+        required=False,
+        default=True,
+        help="""Whether to calculate score and add it to the top right corner of each
+                pileup. Will use the 'coolpup.get_score' function with 'center' and
+                'ignore_central' arguments.""",
+    )
+    parser.add_argument(
+        "--center",
         type=int,
         required=False,
-        default=1,
-        help="""Whether to show the level of enrichment in the central pixels.
-                0 to not show, odd positive number to define the size of the central
-                square whose values are averaged""",
+        default=3,
+        help="""How many central pixels to consider when calculating enrichment for
+                off-diagonal pileups.""",
+    )
+    parser.add_argument(
+        "--ignore_central",
+        type=int,
+        required=False,
+        default=3,
+        help="""ow many central bins to ignore when calculating insulation for
+                local (on-diagonal) non-rescaled pileups.""",
     )
     parser.add_argument(
         "--quaich",
@@ -194,8 +210,8 @@ def main():
     if args.norm_corners > 0:
         pups["data"] = pups["data"].apply(norm_cis, i=int(args.norm_corners))
 
-    if args.enrichment:
-        pups["score"] = pups["data"].apply(get_enrichment, n=int(args.enrichment))
+    if args.score:
+        pups["score"] = pups.apply(get_score, center=args.center, ignore_central=args.ignore_central, axis=1)
         score = "score"
     else:
         score = False

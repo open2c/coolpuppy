@@ -304,6 +304,42 @@ def get_insulation_strength(amap, ignore_central=0, ignore_diags=2):
     return intra / inter
 
 
+def get_score(pup, center=3, ignore_central=3):
+    """Calculate reasonable sclre for any kind of pileup
+    For non-local (off-diagonal) pileups, calculates average signal in the central
+    pixels (based on 'center').
+    For local non-rescaled pileups calculates insulation strength, and ignores the
+    central bins (based on 'ignore_central')
+    For local rescaled pileups calculates enrichment in the central rescaled area
+    relative to the two neighouring areas on the sides.
+
+    Parameters
+    ----------
+    pup : pd.Series or dict
+        Series or dict with pileup in 'data' and annotations in other keys.
+        Will correctly calculate enrichment score with annotations in 'local' (book),
+        'rescale' (bool) and 'rescale_pad' (float)
+    enrichment : int, optional
+        Passed to 'get_enrichment' to calculate the average strength of central pixels.
+        The default is 3.
+    ignore_central : int, optional
+        How many central bins to ignore for calculation of insulation in local pileups.
+        The default is 3.
+
+    Returns
+    -------
+    float
+        Score.
+
+    """
+    if not pup['local']:
+        return get_enrichment(pup['data'], center)
+    else:
+        if pup['rescale']:
+            return get_local_enrichment(pup['data'], pup['rescale_pad'])
+        else:
+            return get_insulation_strength(pup['data'], ignore_central)
+
 def prepare_single(item):
     """Generate enrichment and corner CV, reformat into a list
 
