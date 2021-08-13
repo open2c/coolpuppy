@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 
 # from mpl_toolkits.axes_grid1 import ImageGrid
 from matplotlib.colors import LogNorm, Normalize
+from matplotlib import ticker
 from matplotlib import cm
 import seaborn as sns
 
@@ -132,6 +133,8 @@ def make_heatmap_grid(
         col_order = list(set(pupsdf[cols].dropna()))
         #     pupsdf = pupsdf[pupsdf[cols].isin(col_order + ["data"])]
         ncols = len(col_order)
+    elif col_order is not None:
+        ncols = len(col_order)
     else:
         ncols = 1
         # colvals = ['']
@@ -139,6 +142,8 @@ def make_heatmap_grid(
         row_order = list(set(pupsdf[rows].dropna()))
         # else:
         #     pupsdf = pupsdf[pupsdf[rows].isin(row_order)]
+        nrows = len(row_order)
+    elif row_order is not None:
         nrows = len(row_order)
     else:
         nrows = 1
@@ -157,7 +162,7 @@ def make_heatmap_grid(
 
     vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym)
 
-    right = len(col_order) / (len(col_order) + 0.5)
+    right = ncols / (ncols + 0.25)
 
     # sns.set(font_scale=5)
     fg = sns.FacetGrid(
@@ -178,18 +183,29 @@ def make_heatmap_grid(
         height=height,
         **kwargs,
     )
-    # fg.fig.set_constrained_layout(True)
     norm = norm(vmin, vmax)
     fg.map(add_heatmap, "data", norm=norm, cmap=cmap)
-    fg.map(add_score, "score")
+    if score:
+        fg.map(add_score, "score")
     fg.map(lambda color: plt.gca().set_xticks([]))
     fg.map(lambda color: plt.gca().set_yticks([]))
     fg.set_titles(col_template="", row_template="")
-    for (row_val, col_val), ax in fg.axes_dict.items():
-        if row_val == row_order[-1]:
-            ax.set_xlabel(col_val)
-        if col_val == col_order[0]:
-            ax.set_ylabel(row_val, rotation=0, ha="right")
+
+    if nrows > 1 and ncols > 1:
+        for (row_val, col_val), ax in fg.axes_dict.items():
+            if row_val == row_order[-1]:
+                ax.set_xlabel(col_val)
+            if col_val == col_order[0]:
+                ax.set_ylabel(row_val, rotation=0, ha="right")
+    else:
+        if nrows == 1 and ncols > 1:
+            for col_val, ax in fg.axes_dict.items():
+                ax.set_xlabel(col_val)
+        elif nrows > 1 and ncols == 1:
+            for row_val, ax in fg.axes_dict.items():
+                ax.set_ylabel(row_val)
+        else:
+            pass
     plt.draw()
     ax_bottom = fg.axes[-1, -1]
     bottom = ax_bottom.get_position().y0
@@ -197,11 +213,16 @@ def make_heatmap_grid(
     top = ax_top.get_position().y1
     height = top - bottom
     right = ax_top.get_position().x1
-    cax = fg.fig.add_axes([right + 0.005, bottom, (1 - right - 0.005) / 3, height])
+    cax = fg.fig.add_axes([right + 0.005, bottom, (1 - right - 0.005) / 5, height])
     if sym:
         ticks = [vmin, 1, vmax]
     else:
         ticks = [vmin, vmax]
-    cb = plt.colorbar(cm.ScalarMappable(norm, cmap), ticks=ticks, cax=cax)
+    cb = plt.colorbar(
+        cm.ScalarMappable(norm, cmap),
+        ticks=ticks,
+        cax=cax,
+        format=ticker.FuncFormatter(lambda x, pos: f"{x:.2g}"),
+    )
     cax.minorticks_off()
     return fg

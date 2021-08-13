@@ -74,11 +74,14 @@ def load_pileup_df(filename, quaich=False):
     ----------
     filename : str
         File to load from.
+    quaich : bool, optional
+        Whether to assume standard quaich file naming to extract sample name and bedname.
+        The default is False.
 
     Returns
     -------
-    metadata : dict
-    data : pd.DataFrame
+    annotation : pd.DataFrame
+        Pileups are in the "data" column, all metadata in other columns
 
     """
     with h5py.File(filename, "r", libver="latest") as f:
@@ -100,9 +103,34 @@ def load_pileup_df(filename, quaich=False):
     return annotation
 
 
-def load_pileup_df_list(lst, quaich=False):
-    pups = pd.concat([load_pileup_df(path, quaich=quaich) for path in lst])
-    pups['norm'] = np.where(pups['expected'], ['shifts']*pups.shape[0], ['expected']*pups.shape[0]).astype(str)
+def load_pileup_df_list(files, quaich=False, nice_metadata=True):
+    """
+
+    Parameters
+    ----------
+    files : iterable
+        Files to read pileups from.
+    quaich : bool, optional
+        Whether to assume standard quaich file naming to extract sample name and bedname.
+        The default is False.
+    nice_metadata : bool, optional
+        Whether to add nicer metadata for direct plotting. The default is True.
+        Adds a "norm" column ("expected", "shifts" or "none").
+        If any of the pileups were done by-distance, adds a "separation" column with a
+        strign encoding the distance bands
+
+    Returns
+    -------
+    pups : pd.DataFrame
+        Combined dataframe with all pileups and annotations from all files.
+
+    """
+    pups = pd.concat([load_pileup_df(path, quaich=quaich) for path in files])
+    if nice_metadata:
+        pups['norm'] = np.where(pups['expected'], ['expected']*pups.shape[0], ['shifts']*pups.shape[0]).astype(str)
+        pups['norm'][np.logical_not(np.logical_or(pups['nshifts']>0, pups['expected']))] = 'none'
+        if 'distance_band' in pups.columns:
+            pups['separation'] = pups['distance_band'].apply(lambda x: np.nan if pd.isnull(x) else f'{x[0]/1000000}Mb-\n{x[1]/1000000}Mb')
     return pups.reset_index(drop=True)
 
 
