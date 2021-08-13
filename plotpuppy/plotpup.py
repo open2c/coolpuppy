@@ -203,7 +203,7 @@ def make_heatmap_grid(
                 ax.set_xlabel(col_val)
         elif nrows > 1 and ncols == 1:
             for row_val, ax in fg.axes_dict.items():
-                ax.set_ylabel(row_val)
+                ax.set_ylabel(row_val, rotation=0, ha="right")
         else:
             pass
     plt.draw()

@@ -211,7 +211,9 @@ def main():
         pups["data"] = pups["data"].apply(norm_cis, i=int(args.norm_corners))
 
     if args.score:
-        pups["score"] = pups.apply(get_score, center=args.center, ignore_central=args.ignore_central, axis=1)
+        pups["score"] = pups.apply(
+            get_score, center=args.center, ignore_central=args.ignore_central, axis=1
+        )
         score = "score"
     else:
         score = False
