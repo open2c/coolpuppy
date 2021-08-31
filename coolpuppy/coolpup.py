@@ -18,7 +18,7 @@ import os
 import re
 
 
-def save_pileup_df(filename, df, metadata=None, mode='w'):
+def save_pileup_df(filename, df, metadata=None, mode="w"):
     """
     Saves a dataframe with metadata into a binary HDF5 file`
 
@@ -47,16 +47,13 @@ def save_pileup_df(filename, df, metadata=None, mode='w'):
         metadata = {}
     df[df.columns[df.columns != "data"]].to_hdf(filename, "annotation", mode=mode)
     with h5py.File(filename, "a") as f:
-        width = df['data'].iloc[0].shape[0]
-        height = width * df['data'].shape[0]
+        width = df["data"].iloc[0].shape[0]
+        height = width * df["data"].shape[0]
         ds = f.create_dataset(
-                        "data",
-                        compression="lzf",
-                        chunks=(width, width),
-                        shape=(height, width)
-                    )
-        for i, arr in df['data'].reset_index(drop=True).items():
-            ds[i*width:(i+1)*width, :] = arr
+            "data", compression="lzf", chunks=(width, width), shape=(height, width)
+        )
+        for i, arr in df["data"].reset_index(drop=True).items():
+            ds[i * width : (i + 1) * width, :] = arr
         group = f.create_group("attrs")
         if metadata is not None:
             for key, val in metadata.items():
@@ -97,9 +94,11 @@ def load_pileup_df(filename, quaich=False):
         annotation[key] = val
     if quaich:
         basename = os.path.basename(filename)
-        sample, bedname = re.search('^(.*)-(?:[0-9]+)_over_(.*)_(?:[0-9]+-shifts|expected).*\.clpy', basename).groups()
-        annotation['sample'] = sample
-        annotation['bedname'] = bedname
+        sample, bedname = re.search(
+            "^(.*)-(?:[0-9]+)_over_(.*)_(?:[0-9]+-shifts|expected).*\.clpy", basename
+        ).groups()
+        annotation["sample"] = sample
+        annotation["bedname"] = bedname
     return annotation
 
 
@@ -127,10 +126,18 @@ def load_pileup_df_list(files, quaich=False, nice_metadata=True):
     """
     pups = pd.concat([load_pileup_df(path, quaich=quaich) for path in files])
     if nice_metadata:
-        pups['norm'] = np.where(pups['expected'], ['expected']*pups.shape[0], ['shifts']*pups.shape[0]).astype(str)
-        pups['norm'][np.logical_not(np.logical_or(pups['nshifts']>0, pups['expected']))] = 'none'
-        if 'distance_band' in pups.columns:
-            pups['separation'] = pups['distance_band'].apply(lambda x: np.nan if pd.isnull(x) else f'{x[0]/1000000}Mb-\n{x[1]/1000000}Mb')
+        pups["norm"] = np.where(
+            pups["expected"], ["expected"] * pups.shape[0], ["shifts"] * pups.shape[0]
+        ).astype(str)
+        pups["norm"][
+            np.logical_not(np.logical_or(pups["nshifts"] > 0, pups["expected"]))
+        ] = "none"
+        if "distance_band" in pups.columns:
+            pups["separation"] = pups["distance_band"].apply(
+                lambda x: np.nan
+                if pd.isnull(x)
+                else f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
+            )
     return pups.reset_index(drop=True)
 
 
@@ -332,13 +339,14 @@ def get_score(pup, center=3, ignore_central=3):
         Score.
 
     """
-    if not pup['local']:
-        return get_enrichment(pup['data'], center)
+    if not pup["local"]:
+        return get_enrichment(pup["data"], center)
     else:
-        if pup['rescale']:
-            return get_local_enrichment(pup['data'], pup['rescale_pad'])
+        if pup["rescale"]:
+            return get_local_enrichment(pup["data"], pup["rescale_pad"])
         else:
-            return get_insulation_strength(pup['data'], ignore_central)
+            return get_insulation_strength(pup["data"], ignore_central)
+
 
 def prepare_single(item):
     """Generate enrichment and corner CV, reformat into a list
@@ -362,7 +370,7 @@ def prepare_single(item):
     return list(key) + [n, enr1, enr3, cv3, cv5]
 
 
-def bin_distance_intervals(intervals, band_edges='default'):
+def bin_distance_intervals(intervals, band_edges="default"):
     """
     
     Parameters
@@ -380,15 +388,15 @@ def bin_distance_intervals(intervals, band_edges='default'):
         The same dataframe with added ['distance_band'] annotation.
     
     """
-    if band_edges=='default':
-        band_edges=np.append([0], 50000 * 2 ** np.arange(30))
+    if band_edges == "default":
+        band_edges = np.append([0], 50000 * 2 ** np.arange(30))
     edge_ids = np.searchsorted(band_edges, intervals["distance"], side="right")
     bands = [tuple(band_edges[i - 1 : i + 1]) for i in edge_ids]
     intervals["distance_band"] = bands
     return intervals
 
 
-def bin_distance(snip, band_edges='default'):
+def bin_distance(snip, band_edges="default"):
     """
     
 
@@ -406,8 +414,8 @@ def bin_distance(snip, band_edges='default'):
         The same snip with added ['distance_band'] annotation.
 
     """
-    if band_edges=='default':
-        band_edges=np.append([0], 50000 * 2 ** np.arange(30))
+    if band_edges == "default":
+        band_edges = np.append([0], 50000 * 2 ** np.arange(30))
     i = np.searchsorted(band_edges, snip["distance"])
     snip["distance_band"] = tuple(band_edges[i - 1 : i + 1])
     return snip
@@ -1328,7 +1336,7 @@ class PileUpper:
                 self.expected["region"].isin(self.view_df.index)
             ]
             self.ExpSnipper = snipping.ExpectedSnipper(
-                self.clr, self.expected, view_df = self.view_df.reset_index()
+                self.clr, self.expected, view_df=self.view_df.reset_index()
             )
             self.expected_selections = {
                 region_name: self.ExpSnipper.select(region_name, region_name)
@@ -1770,9 +1778,7 @@ class PileUpper:
         normalized_pileups = normalized_pileups.drop(columns="index")
         return normalized_pileups
 
-    def pileupsByDistanceWithControl(
-        self, nproc=1, distance_edges="default"
-    ):
+    def pileupsByDistanceWithControl(self, nproc=1, distance_edges="default"):
         """Perform by-distance pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl
 
@@ -1800,9 +1806,7 @@ class PileUpper:
         normalized_pileups = normalized_pileups.drop(index="all").reset_index()
         return normalized_pileups
 
-    def pileupsByStrandByDistanceWithControl(
-        self, nproc=1, distance_edges="default"
-    ):
+    def pileupsByStrandByDistanceWithControl(self, nproc=1, distance_edges="default"):
         """Perform by-strand by-distance pileups across all chromosomes and applies
         required normalization. Simple wrapper around pileupsWithControl.
         Assumes the baselist in CoordCreator file has a "strand" column.

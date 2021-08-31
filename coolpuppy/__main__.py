@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from coolpuppy.coolpup import CoordCreator, PileUpper, save_pileup_df
+
 # from coolpuppy import *
 from coolpuppy._version import __version__
 import cooler
@@ -344,7 +345,7 @@ def main():
             schema = "bed12"
         bedname = "stdin"
         baselist = bf.read_table(sys.stdin, schema=schema, index_col=False)
-    
+
     if args.regions is not None:
         regions = pd.read_csv(
             args.regions, sep="\t", names=["chrom", "start", "end", "name"]
