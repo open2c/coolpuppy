@@ -1198,7 +1198,7 @@ class PileUpper:
         clr,
         CC,
         *,
-        regions=None,
+        view_df=None,
         balance="weight",
         expected=False,
         ooe=True,
@@ -1223,8 +1223,10 @@ class PileUpper:
         expected : DataFrame, optional
             If using expected, pandas DataFrame with chromosome-wide expected.
             The default is False.
-        regions : DataFrame
-            A datafrome with region coordinates used in expected
+        view_df : DataFrame
+            A datafrome with region coordinates used in expected (see bioframe
+            documentation for details). Can be ommited if no expected is prodiced, or
+            expected is for whole chromosomes.
         ooe : bool, optional
             Whether to normalize each snip by expected value. If False, all snips are
             accumulated, all expected values are accumulated, and then the former
@@ -1260,36 +1262,36 @@ class PileUpper:
         self.__dict__.update(self.CC.__dict__)
         self.balance = balance
         self.expected = expected
-        if regions is None:
+        if view_df is None:
             if self.expected is False:
-                regions = pd.DataFrame(
+                view_df = pd.DataFrame(
                     [(chrom, 0, l, chrom) for chrom, l in clr.chromsizes.items()],
                     columns=["chrom", "start", "end", "name"],
                 )
             elif set(self.expected["region"]).issubset(clr.chromnames):
-                regions = pd.DataFrame(
+                view_df = pd.DataFrame(
                     [(chrom, 0, l, chrom) for chrom, l in clr.chromsizes.items()],
                     columns=["chrom", "start", "end", "name"],
                 )
             else:
                 raise ValueError(
-                    "Please provide the regions table, if region names"
+                    "Please provide the view_df table, if region names"
                     "are not simply chromosome names."
                 )
         else:
-            regions = regions[regions["chrom"].isin(self.clr.chromnames)]
-        self.regions = regions.set_index("name")
-        self.region_extents = {}
-        for region_name, region in self.regions.iterrows():
+            view_df = view_df[view_df["chrom"].isin(self.clr.chromnames)]
+        self.view_df = view_df.set_index("name")
+        self.view_df_extents = {}
+        for region_name, region in self.view_df.iterrows():
             lo, hi = self.clr.extent(region)
             chroffset = self.clr.offset(region[0])
-            self.region_extents[region_name] = lo - chroffset, hi - chroffset
+            self.view_df_extents[region_name] = lo - chroffset, hi - chroffset
 
         if self.expected is not False:
             for region_name, group in self.expected.groupby("region"):
                 n_diags = group.shape[0]
-                region = self.regions.loc[region_name]
-                lo, hi = self.region_extents[region_name]
+                region = self.view_df.loc[region_name]
+                lo, hi = self.view_df_extents[region_name]
                 if n_diags != (hi - lo):
                     raise ValueError(
                         "Region shape mismatch between expected and cooler. "
@@ -1310,7 +1312,7 @@ class PileUpper:
         self.chroms = natsorted(
             list(set(self.CC.final_chroms) & set(self.clr.chromnames))
         )
-        self.regions = self.regions[self.regions["chrom"].isin(self.chroms)]
+        self.view_df = self.view_df[self.view_df["chrom"].isin(self.chroms)]
         # self.regions = {
         #     chrom: (chrom, 0, self.clr.chromsizes[chrom])
         #     for chrom in self.chroms  # cooler.util.parse_region_string(chrom) for chrom in self.chroms
@@ -1323,14 +1325,14 @@ class PileUpper:
                 self.control = False
             assert isinstance(self.expected, pd.DataFrame)
             self.expected = self.expected[
-                self.expected["region"].isin(self.regions.index)
+                self.expected["region"].isin(self.view_df.index)
             ]
             self.ExpSnipper = snipping.ExpectedSnipper(
-                self.clr, self.expected, regions=self.regions.reset_index()
+                self.clr, self.expected, view_df = self.view_df.reset_index()
             )
             self.expected_selections = {
                 region_name: self.ExpSnipper.select(region_name, region_name)
-                for region_name in self.regions.index
+                for region_name in self.view_df.index
             }
             self.expected = True
         self.empty_outmap = self.make_outmap()
@@ -1419,7 +1421,7 @@ class PileUpper:
         """
         logging.debug("Loading data")
         if isinstance(region, str):
-            region = self.regions.loc[region]
+            region = self.view_df.loc[region]
         data = self.clr.matrix(sparse=True, balance=self.balance).fetch(region)
         data = sparse.triu(data)
         return data.tocsr()
@@ -1620,7 +1622,7 @@ class PileUpper:
         pileup : dict
             accumulated snips as a dict
         """
-        region_coords = self.regions.loc[region]
+        region_coords = self.view_df.loc[region]
 
         # mymap = self.make_outmap()
         # cov_start = np.zeros(mymap.shape[0])
@@ -1692,7 +1694,7 @@ class PileUpper:
             modify_2Dintervals_func=modify_2Dintervals_func,
             postprocess_func=postprocess_func,
         )
-        pileups = list(mymap(f, self.regions.index))
+        pileups = list(mymap(f, self.view_df.index))
         roi = (
             pd.DataFrame([pileup["ROI"] for pileup in pileups])
             .apply(lambda x: reduce(sum_pups, x.dropna()))

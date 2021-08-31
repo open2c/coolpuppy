@@ -145,7 +145,7 @@ def parse_args_plotpuppy():
         type=int,
         required=False,
         default=3,
-        help="""ow many central bins to ignore when calculating insulation for
+        help="""How many central bins to ignore when calculating insulation for
                 local (on-diagonal) non-rescaled pileups.""",
     )
     parser.add_argument(

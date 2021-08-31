@@ -344,7 +344,6 @@ def main():
             schema = "bed12"
         bedname = "stdin"
         baselist = bf.read_table(sys.stdin, schema=schema, index_col=False)
-        bedname += "_vs_" + os.path.splitext(os.path.basename(args.bed2))[0]
     
     if args.regions is not None:
         regions = pd.read_csv(
