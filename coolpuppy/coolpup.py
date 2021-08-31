@@ -1465,7 +1465,7 @@ class PileUpper:
         bigdata = self.get_data(
             region
         )  # self.CoolSnipper.select(self.regions[chrom], self.regions[chrom])
-        min_left, max_right = self.region_extents[region]
+        min_left, max_right = self.view_df_extents[region]
         if self.coverage_norm:
             coverage = self.get_coverage(bigdata)
 
