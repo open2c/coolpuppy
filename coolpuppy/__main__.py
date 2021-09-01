@@ -49,7 +49,7 @@ def parse_args_coolpuppy():
         required=False,
     )
     parser.add_argument(
-        "--regions",
+        "--view",
         type=str,
         help="""Path to a file which defines which regions of the chromosomes to use""",
         default=None,
@@ -346,12 +346,12 @@ def main():
         bedname = "stdin"
         baselist = bf.read_table(sys.stdin, schema=schema, index_col=False)
 
-    if args.regions is not None:
-        regions = pd.read_csv(
-            args.regions, sep="\t", names=["chrom", "start", "end", "name"]
+    if args.view is not None:
+        view_df = pd.read_csv(
+            args.view, sep="\t", names=["chrom", "start", "end", "name"]
         )
     else:
-        regions = None
+        view_df = None
 
     if args.nshifts > 0:
         control = True
@@ -441,7 +441,7 @@ def main():
     PU = PileUpper(
         clr=c,
         CC=CC,
-        regions=regions,
+        view_df=view_df,
         balance=balance,
         expected=expected,
         ooe=args.ooe,
