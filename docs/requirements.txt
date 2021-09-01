@@ -4,4 +4,3 @@ sphinx-argparse
 natsort
 sphinx_rtd_theme
 myst_nb
-bash_kernel
