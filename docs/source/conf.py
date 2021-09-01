@@ -110,3 +110,4 @@ html_favicon = 'favicon.ico'
 
 autodoc_docstring_signature = True
 nbsphinx_execute = 'never'
+jupyter_execute_notebooks = "off"
