@@ -32,14 +32,15 @@ release = '0.9.7'
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['sphinx.ext.autodoc',
+extensions = ['myst_nb',
+              #'myst_parser',
+              'sphinx.ext.napoleon',
+              'sphinx.ext.autodoc',
               'sphinx.ext.viewcode',
               'sphinx.ext.githubpages',
-              'nbsphinx',
               'sphinx.ext.mathjax',
-              'sphinx.ext.napoleon',
               'sphinxarg.ext',
-              'm2r2'
+              # 'm2r2'
               ]
 
 
@@ -50,9 +51,10 @@ MOCK_MODULES = ['cooltools',
                 'Cython',
                 'matplotlib',
                 'matplotlib.colors',
-                'matpliotlib.ticker',
+                'matplotlib.ticker',
                 'matplotlib.pyplot',
                 'matplotlib.font_manager',
+                'seaborn',
                 'mpl_toolkits.axes_grid1',
                 'pandas',
                 'h5py',
@@ -64,21 +66,10 @@ MOCK_MODULES = ['cooltools',
                 'more_itertools'
                 ]
 
-for mod_name in MOCK_MODULES:
-    sys.modules[mod_name] = mock.Mock()
+#for mod_name in MOCK_MODULES:
+#    sys.modules[mod_name] = mock.Mock()
 
-# autodoc_mock_imports = [
-#     'cooltools',
-#     'numpy',
-#     'scipy',
-#     'Cython',
-#     'matplotlib',
-#     'pandas',
-#     'h5py',
-#     'cooler',
-#     'pysam',
-#     'natsort'
-# ]
+autodoc_mock_imports = MOCK_MODULES
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -103,7 +94,7 @@ html_static_path = ['_static']
 
 add_module_names = True
 
-master_doc = 'index'
+# master_doc = 'index'
 
 def skip(app, what, name, obj, would_skip, options):
     if name == "__init__":
