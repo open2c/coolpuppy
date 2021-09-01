@@ -25,7 +25,7 @@ Here I averaged all (intra-chromosomal) interactions between highly enriched ChI
 
 What is important, is that in the center we see higher values than on the edges: this means that regions bound by RING1B tend to stick together more, than expected! The actual value in the central pixel is displayed on top left for reference.
 
-This analysis is the default mode when coolpup.py is run with a .bed file, e.g. `coolpup.py my_hic_data.cool my_protein_peaks.bed` (with optional `--expected my_hic_data_expected.tsv` - see details below).
+This analysis is the default mode when coolpup.py is run with a .bed file, e.g. `coolpup.py my_hic_data.cool my_protein_peaks.bed` (with optional `--expected my_hic_data_expected.tsv` for normalization to the background level of interactions).
 
 ## Pile-ups of predefined regions pairs, e.g. loops
 
@@ -40,7 +40,7 @@ And here is a real example of CTCF-associated loops in ES cells:
 
 Comparing with the previous example, you can clearly see that if you average loops that have been previously identified you, of course, get much higher enrichment of interactions, than if you are looking for a tendency of some regions to interact.
 
-This analysis is performed with coolpup.py when instead of a bed file you provide a .bedpe file, so simply `coolpup.py my_hic_data.cool my_loops.bedpe` (with optional `--expected my_hic_data_expected.tsv` - see details below). bedpe is a simple tab-separated 6-column file with chrom1, start1, end1, chrom2, start2, end2.
+This analysis is performed with coolpup.py when instead of a bed file you provide a .bedpe file, so simply `coolpup.py my_hic_data.cool my_loops.bedpe` (with optional `--expected my_hic_data_expected.tsv` for normalization to the background level of interactions). `bedpe` is a simple tab-separated 6-column file with chrom1, start1, end1, chrom2, start2, end2.
 
 ## Local pileups
 
@@ -56,7 +56,7 @@ One can easily observe that these regions on average indeed have some insulating
 
 Average insulation can be quantiifed by dividing signal in two red squares (top left and bottom right corners) by the signal in the more blue squares (top right and bottom left corners), and here it is shown in the top left corner.
 
-This analysis is very easily performed using coolpup.py: simply run `coolpup.py coolpup.py my_hic_data.cool my_insulating_regions.bed --local` (with optional `--expected my_hic_data_expected.tsv` - see details below; note that for local analyses in my experience random shift controls work better).
+This analysis is very easily performed using coolpup.py: simply run `coolpup.py coolpup.py my_hic_data.cool my_insulating_regions.bed --local` (with optional `--expected my_hic_data_expected.tsv`  for normalization to the background level of interactions; note that for local analyses in my experience random shift controls work better).
 
 ### Rescaled pileups
 
@@ -72,4 +72,4 @@ Each TAD was padded with the flanks of the same length as the TAD, and then they
 
 You might notice that I removed the few central diagonals of the matrix here. That is because they are often noisy after this rescaling procedure, depending on the data you use. 
 
-To perform this analysis, you simply need to call `coolpup.py my_hic_data.cool my_domains.bed --rescale --local` (with optional `--expected my_hic_data_expected.tsv` - see details below). To specify the side of the final matrix as 99 bins add `--rescale_size 99`. Another useful option here is `--rescale_pad`, which defines the fraction of the original regions to use when padding them; the default value is 1, so each TAD is flanked on each side by a region of the same size.
+To perform this analysis, you simply need to call `coolpup.py my_hic_data.cool my_domains.bed --rescale --local` (with optional `--expected my_hic_data_expected.tsv`  for normalization to the background level of interactions). To specify the side of the final matrix as 99 bins add `--rescale_size 99`. Another useful option here is `--rescale_pad`, which defines the fraction of the original regions to use when padding them; the default value is 1, so each TAD is flanked on each side by a region of the same size.
