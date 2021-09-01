@@ -118,3 +118,4 @@ source_suffix = ['.rst', '.md', '.ipynb']
 html_favicon = 'favicon.ico'
 
 autodoc_docstring_signature = True
+nbsphinx_execute = 'never'
