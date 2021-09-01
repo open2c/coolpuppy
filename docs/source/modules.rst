@@ -15,10 +15,10 @@ coolpuppy.coolpup module
    :undoc-members:
    :show-inheritance:
 
-coolpuppy.plotpup module
+plotpuppy.plotpup module
 ------------------------
 
-.. automodule:: coolpuppy.plotpup
+.. automodule:: plotpuppy.plotpup
    :members:
    :undoc-members:
    :show-inheritance:
