@@ -14,9 +14,11 @@ import yaml
 import io
 from more_itertools import collapse
 import h5py
+import os
+import re
 
 
-def save_pileup_df(filename, df, metadata=None, mode='w'):
+def save_pileup_df(filename, df, metadata=None, mode="w"):
     """
     Saves a dataframe with metadata into a binary HDF5 file`
 
@@ -45,16 +47,13 @@ def save_pileup_df(filename, df, metadata=None, mode='w'):
         metadata = {}
     df[df.columns[df.columns != "data"]].to_hdf(filename, "annotation", mode=mode)
     with h5py.File(filename, "a") as f:
-        width = df['data'].iloc[0].shape[0]
-        height = width * df['data'].shape[0]
+        width = df["data"].iloc[0].shape[0]
+        height = width * df["data"].shape[0]
         ds = f.create_dataset(
-                        "data",
-                        compression="lzf",
-                        chunks=(width, width),
-                        shape=(height, width)
-                    )
-        for i, arr in df['data'].reset_index(drop=True).items():
-            ds[i*width:(i+1)*width, :] = arr
+            "data", compression="lzf", chunks=(width, width), shape=(height, width)
+        )
+        for i, arr in df["data"].reset_index(drop=True).items():
+            ds[i * width : (i + 1) * width, :] = arr
         group = f.create_group("attrs")
         if metadata is not None:
             for key, val in metadata.items():
@@ -64,7 +63,7 @@ def save_pileup_df(filename, df, metadata=None, mode='w'):
     return
 
 
-def load_pileup_df(filename):
+def load_pileup_df(filename, quaich=False):
     """
     Loads a dataframe saved using `save_pileup_df`
 
@@ -72,11 +71,14 @@ def load_pileup_df(filename):
     ----------
     filename : str
         File to load from.
+    quaich : bool, optional
+        Whether to assume standard quaich file naming to extract sample name and bedname.
+        The default is False.
 
     Returns
     -------
-    metadata : dict
-    data : pd.DataFrame
+    annotation : pd.DataFrame
+        Pileups are in the "data" column, all metadata in other columns
 
     """
     with h5py.File(filename, "r", libver="latest") as f:
@@ -88,7 +90,55 @@ def load_pileup_df(filename):
             data.append(chunk)
         annotation = pd.read_hdf(filename, "annotation")
         annotation["data"] = data
-    return metadata, annotation
+    for key, val in metadata.items():
+        annotation[key] = val
+    if quaich:
+        basename = os.path.basename(filename)
+        sample, bedname = re.search(
+            "^(.*)-(?:[0-9]+)_over_(.*)_(?:[0-9]+-shifts|expected).*\.clpy", basename
+        ).groups()
+        annotation["sample"] = sample
+        annotation["bedname"] = bedname
+    return annotation
+
+
+def load_pileup_df_list(files, quaich=False, nice_metadata=True):
+    """
+
+    Parameters
+    ----------
+    files : iterable
+        Files to read pileups from.
+    quaich : bool, optional
+        Whether to assume standard quaich file naming to extract sample name and bedname.
+        The default is False.
+    nice_metadata : bool, optional
+        Whether to add nicer metadata for direct plotting. The default is True.
+        Adds a "norm" column ("expected", "shifts" or "none").
+        If any of the pileups were done by-distance, adds a "separation" column with a
+        strign encoding the distance bands
+
+    Returns
+    -------
+    pups : pd.DataFrame
+        Combined dataframe with all pileups and annotations from all files.
+
+    """
+    pups = pd.concat([load_pileup_df(path, quaich=quaich) for path in files])
+    if nice_metadata:
+        pups["norm"] = np.where(
+            pups["expected"], ["expected"] * pups.shape[0], ["shifts"] * pups.shape[0]
+        ).astype(str)
+        pups["norm"][
+            np.logical_not(np.logical_or(pups["nshifts"] > 0, pups["expected"]))
+        ] = "none"
+        if "distance_band" in pups.columns:
+            pups["separation"] = pups["distance_band"].apply(
+                lambda x: np.nan
+                if pd.isnull(x)
+                else f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
+            )
+    return pups.reset_index(drop=True)
 
 
 def save_array_with_header(array, header, filename):
@@ -261,6 +311,43 @@ def get_insulation_strength(amap, ignore_central=0, ignore_diags=2):
     return intra / inter
 
 
+def get_score(pup, center=3, ignore_central=3):
+    """Calculate reasonable sclre for any kind of pileup
+    For non-local (off-diagonal) pileups, calculates average signal in the central
+    pixels (based on 'center').
+    For local non-rescaled pileups calculates insulation strength, and ignores the
+    central bins (based on 'ignore_central')
+    For local rescaled pileups calculates enrichment in the central rescaled area
+    relative to the two neighouring areas on the sides.
+
+    Parameters
+    ----------
+    pup : pd.Series or dict
+        Series or dict with pileup in 'data' and annotations in other keys.
+        Will correctly calculate enrichment score with annotations in 'local' (book),
+        'rescale' (bool) and 'rescale_pad' (float)
+    enrichment : int, optional
+        Passed to 'get_enrichment' to calculate the average strength of central pixels.
+        The default is 3.
+    ignore_central : int, optional
+        How many central bins to ignore for calculation of insulation in local pileups.
+        The default is 3.
+
+    Returns
+    -------
+    float
+        Score.
+
+    """
+    if not pup["local"]:
+        return get_enrichment(pup["data"], center)
+    else:
+        if pup["rescale"]:
+            return get_local_enrichment(pup["data"], pup["rescale_pad"])
+        else:
+            return get_insulation_strength(pup["data"], ignore_central)
+
+
 def prepare_single(item):
     """Generate enrichment and corner CV, reformat into a list
 
@@ -283,16 +370,52 @@ def prepare_single(item):
     return list(key) + [n, enr1, enr3, cv3, cv5]
 
 
-def bin_distance_intervals(
-    intervals, band_edges=np.append([0], 50000 * 2 ** np.arange(30))
-):
+def bin_distance_intervals(intervals, band_edges="default"):
+    """
+    
+    Parameters
+    ----------
+    intervals : pd.DataFrame
+        Dataframe containing intervals with any annotations.
+        Has to have a 'distance' column
+    band_edges : list or array-like, or "default", optional
+        Edges of distance bands used to split the intervals into groups.
+        Default is np.append([0], 50000 * 2 ** np.arange(30))
+
+    Returns
+    -------
+    snip : pd.DataFrame
+        The same dataframe with added ['distance_band'] annotation.
+    
+    """
+    if band_edges == "default":
+        band_edges = np.append([0], 50000 * 2 ** np.arange(30))
     edge_ids = np.searchsorted(band_edges, intervals["distance"], side="right")
     bands = [tuple(band_edges[i - 1 : i + 1]) for i in edge_ids]
     intervals["distance_band"] = bands
     return intervals
 
 
-def bin_distance(snip, band_edges=50000 * 2 ** np.arange(30)):
+def bin_distance(snip, band_edges="default"):
+    """
+    
+
+    Parameters
+    ----------
+    snip : pd.Series
+        Series containing any annotations. Has to have ['distance']
+    band_edges : list or array-like, or "default", optional
+        Edges of distance bands used to assign the distance band.
+        Default is np.append([0], 50000 * 2 ** np.arange(30))
+
+    Returns
+    -------
+    snip : pd.Series
+        The same snip with added ['distance_band'] annotation.
+
+    """
+    if band_edges == "default":
+        band_edges = np.append([0], 50000 * 2 ** np.arange(30))
     i = np.searchsorted(band_edges, snip["distance"])
     snip["distance_band"] = tuple(band_edges[i - 1 : i + 1])
     return snip
@@ -307,6 +430,22 @@ def group_by_region(snip):
 
 
 def assign_groups(intervals, groupby=[]):
+    """
+    
+
+    Parameters
+    ----------
+    intervals : TYPE
+        DESCRIPTION.
+    groupby : TYPE, optional
+        DESCRIPTION. The default is [].
+
+    Returns
+    -------
+    intervals : TYPE
+        DESCRIPTION.
+
+    """
     if not groupby:
         intervals["group"] = "all"
     else:
@@ -1067,7 +1206,7 @@ class PileUpper:
         clr,
         CC,
         *,
-        regions=None,
+        view_df=None,
         balance="weight",
         expected=False,
         ooe=True,
@@ -1092,8 +1231,10 @@ class PileUpper:
         expected : DataFrame, optional
             If using expected, pandas DataFrame with chromosome-wide expected.
             The default is False.
-        regions : DataFrame
-            A datafrome with region coordinates used in expected
+        view_df : DataFrame
+            A datafrome with region coordinates used in expected (see bioframe
+            documentation for details). Can be ommited if no expected is prodiced, or
+            expected is for whole chromosomes.
         ooe : bool, optional
             Whether to normalize each snip by expected value. If False, all snips are
             accumulated, all expected values are accumulated, and then the former
@@ -1129,36 +1270,36 @@ class PileUpper:
         self.__dict__.update(self.CC.__dict__)
         self.balance = balance
         self.expected = expected
-        if regions is None:
+        if view_df is None:
             if self.expected is False:
-                regions = pd.DataFrame(
+                view_df = pd.DataFrame(
                     [(chrom, 0, l, chrom) for chrom, l in clr.chromsizes.items()],
                     columns=["chrom", "start", "end", "name"],
                 )
             elif set(self.expected["region"]).issubset(clr.chromnames):
-                regions = pd.DataFrame(
+                view_df = pd.DataFrame(
                     [(chrom, 0, l, chrom) for chrom, l in clr.chromsizes.items()],
                     columns=["chrom", "start", "end", "name"],
                 )
             else:
                 raise ValueError(
-                    "Please provide the regions table, if region names"
+                    "Please provide the view_df table, if region names"
                     "are not simply chromosome names."
                 )
         else:
-            regions = regions[regions["chrom"].isin(self.clr.chromnames)]
-        self.regions = regions.set_index("name")
-        self.region_extents = {}
-        for region_name, region in self.regions.iterrows():
+            view_df = view_df[view_df["chrom"].isin(self.clr.chromnames)]
+        self.view_df = view_df.set_index("name")
+        self.view_df_extents = {}
+        for region_name, region in self.view_df.iterrows():
             lo, hi = self.clr.extent(region)
             chroffset = self.clr.offset(region[0])
-            self.region_extents[region_name] = lo - chroffset, hi - chroffset
+            self.view_df_extents[region_name] = lo - chroffset, hi - chroffset
 
         if self.expected is not False:
             for region_name, group in self.expected.groupby("region"):
                 n_diags = group.shape[0]
-                region = self.regions.loc[region_name]
-                lo, hi = self.region_extents[region_name]
+                region = self.view_df.loc[region_name]
+                lo, hi = self.view_df_extents[region_name]
                 if n_diags != (hi - lo):
                     raise ValueError(
                         "Region shape mismatch between expected and cooler. "
@@ -1179,7 +1320,7 @@ class PileUpper:
         self.chroms = natsorted(
             list(set(self.CC.final_chroms) & set(self.clr.chromnames))
         )
-        self.regions = self.regions[self.regions["chrom"].isin(self.chroms)]
+        self.view_df = self.view_df[self.view_df["chrom"].isin(self.chroms)]
         # self.regions = {
         #     chrom: (chrom, 0, self.clr.chromsizes[chrom])
         #     for chrom in self.chroms  # cooler.util.parse_region_string(chrom) for chrom in self.chroms
@@ -1192,14 +1333,14 @@ class PileUpper:
                 self.control = False
             assert isinstance(self.expected, pd.DataFrame)
             self.expected = self.expected[
-                self.expected["region"].isin(self.regions.index)
+                self.expected["region"].isin(self.view_df.index)
             ]
             self.ExpSnipper = snipping.ExpectedSnipper(
-                self.clr, self.expected, regions=self.regions.reset_index()
+                self.clr, self.expected, view_df=self.view_df.reset_index()
             )
             self.expected_selections = {
                 region_name: self.ExpSnipper.select(region_name, region_name)
-                for region_name in self.regions.index
+                for region_name in self.view_df.index
             }
             self.expected = True
         self.empty_outmap = self.make_outmap()
@@ -1288,7 +1429,7 @@ class PileUpper:
         """
         logging.debug("Loading data")
         if isinstance(region, str):
-            region = self.regions.loc[region]
+            region = self.view_df.loc[region]
         data = self.clr.matrix(sparse=True, balance=self.balance).fetch(region)
         data = sparse.triu(data)
         return data.tocsr()
@@ -1332,7 +1473,7 @@ class PileUpper:
         bigdata = self.get_data(
             region
         )  # self.CoolSnipper.select(self.regions[chrom], self.regions[chrom])
-        min_left, max_right = self.region_extents[region]
+        min_left, max_right = self.view_df_extents[region]
         if self.coverage_norm:
             coverage = self.get_coverage(bigdata)
 
@@ -1443,7 +1584,6 @@ class PileUpper:
             Dictionary of accumulated snips (each as a Series) for each group.
             Always includes "all"
         """
-
         if postprocess_func is not None:
             snip_stream = map(postprocess_func, snip_stream)
         outdict = {"ROI": {}, "control": {}}
@@ -1490,7 +1630,7 @@ class PileUpper:
         pileup : dict
             accumulated snips as a dict
         """
-        region_coords = self.regions.loc[region]
+        region_coords = self.view_df.loc[region]
 
         # mymap = self.make_outmap()
         # cov_start = np.zeros(mymap.shape[0])
@@ -1562,7 +1702,7 @@ class PileUpper:
             modify_2Dintervals_func=modify_2Dintervals_func,
             postprocess_func=postprocess_func,
         )
-        pileups = list(mymap(f, self.regions.index))
+        pileups = list(mymap(f, self.view_df.index))
         roi = (
             pd.DataFrame([pileup["ROI"] for pileup in pileups])
             .apply(lambda x: reduce(sum_pups, x.dropna()))
@@ -1638,9 +1778,7 @@ class PileUpper:
         normalized_pileups = normalized_pileups.drop(columns="index")
         return normalized_pileups
 
-    def pileupsByDistanceWithControl(
-        self, nproc=1, distance_edges=np.append([0], 50000 * 2 ** np.arange(30))
-    ):
+    def pileupsByDistanceWithControl(self, nproc=1, distance_edges="default"):
         """Perform by-distance pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl
 
@@ -1668,9 +1806,7 @@ class PileUpper:
         normalized_pileups = normalized_pileups.drop(index="all").reset_index()
         return normalized_pileups
 
-    def pileupsByStrandByDistanceWithControl(
-        self, nproc=1, distance_edges=np.append([0], 50000 * 2 ** np.arange(30))
-    ):
+    def pileupsByStrandByDistanceWithControl(self, nproc=1, distance_edges="default"):
         """Perform by-strand by-distance pileups across all chromosomes and applies
         required normalization. Simple wrapper around pileupsWithControl.
         Assumes the baselist in CoordCreator file has a "strand" column.
