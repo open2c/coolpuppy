@@ -1272,22 +1272,22 @@ class PileUpper:
         self.expected = expected
         if view_df is None:
             if self.expected is False:
-                view_df = pd.DataFrame(
-                    [(chrom, 0, l, chrom) for chrom, l in clr.chromsizes.items()],
-                    columns=["chrom", "start", "end", "name"],
+                # Generate viewframe from clr.chromsizes:
+                view_df = bioframe.make_viewframe(
+                    [(chrom, 0, clr.chromsizes[chrom]) for chrom in clr.chromnames]
                 )
-            elif set(self.expected["region"]).issubset(clr.chromnames):
-                view_df = pd.DataFrame(
-                    [(chrom, 0, l, chrom) for chrom, l in clr.chromsizes.items()],
-                    columns=["chrom", "start", "end", "name"],
+            elif set(self.expected["region"]).issubset(set(clr.chromnames)):
+                # Generate viewframe from clr.chromsizes:
+                view_df = bioframe.make_viewframe(
+                    [(chrom, 0, clr.chromsizes[chrom]) for chrom in clr.chromnames]
                 )
             else:
                 raise ValueError(
-                    "Please provide the view_df table, if region names"
+                    "Please provide the view_df table if region names "
                     "are not simply chromosome names."
                 )
         else:
-            view_df = view_df[view_df["chrom"].isin(self.clr.chromnames)]
+            view_df = bioframe.make_viewframe(view_df, check_bounds=clr.chromsizes)
         self.view_df = view_df.set_index("name")
         self.view_df_extents = {}
         for region_name, region in self.view_df.iterrows():
