@@ -5,7 +5,7 @@ from coolpuppy.coolpup import CoordCreator, PileUpper, save_pileup_df
 from coolpuppy._version import __version__
 import cooler
 import pandas as pd
-import bioframe as bf
+import bioframe
 import os
 import argparse
 import logging
@@ -317,14 +317,14 @@ def main():
     else:
         nproc = args.n_proc
 
-    c = cooler.Cooler(args.coolfile)
+    clr = cooler.Cooler(args.coolfile)
 
     if args.unbalanced:
         balance = False
     else:
         balance = args.weight_name
 
-    coolname = os.path.splitext(os.path.basename(c.filename))[0]
+    coolname = os.path.splitext(os.path.basename(clr.filename))[0]
     if args.baselist != "-":
         bedname, ext = os.path.splitext(os.path.basename(args.baselist))
         baselist = args.baselist
@@ -334,7 +334,7 @@ def main():
             schema = args.basetype
             if schema == "bed":
                 schema = "bed12"
-        baselist = bf.read_table(baselist, schema=schema, index_col=False)
+        baselist = bioframe.read_table(baselist, schema=schema, index_col=False)
     else:
         if args.basetype == "auto":
             raise ValueError(
@@ -344,14 +344,22 @@ def main():
         if schema == "bed":
             schema = "bed12"
         bedname = "stdin"
-        baselist = bf.read_table(sys.stdin, schema=schema, index_col=False)
+        baselist = bioframe.read_table(sys.stdin, schema=schema, index_col=False)
 
     if args.view is not None:
-        view_df = pd.read_csv(
-            args.view, sep="\t", names=["chrom", "start", "end", "name"]
-        )
-    else:
-        view_df = None
+        # Make viewframe out of table:
+        # Read view_df dataframe:
+        try:
+            view_df = bioframe.read_table(args.view, schema="bed4", index_col=False)
+        except Exception:
+            view_df = bioframe.read_table(args.view, schema="bed3", index_col=False)
+        # Convert view dataframe to viewframe:
+        try:
+            view_df = bioframe.make_viewframe(view_df, check_bounds=clr.chromsizes)
+        except ValueError as e:
+            raise ValueError(
+                "View table is incorrect, please, comply with the format. "
+            ) from e
 
     if args.nshifts > 0:
         control = True
@@ -380,7 +388,7 @@ def main():
         maxdist = args.maxdist
 
     if args.incl_chrs == "all":
-        incl_chrs = np.array(c.chromnames).astype(str)
+        incl_chrs = np.array(clr.chromnames).astype(str)
     else:
         incl_chrs = args.incl_chrs.split(",")
 
@@ -404,7 +412,7 @@ def main():
     if anchor:
         fchroms = [anchor[0]]
     else:
-        chroms = np.array(c.chromnames).astype(str)
+        chroms = np.array(clr.chromnames).astype(str)
         fchroms = []
         for chrom in chroms:
             if chrom not in args.excl_chrs.split(",") and chrom in incl_chrs:
@@ -422,7 +430,7 @@ def main():
 
     CC = CoordCreator(
         baselist=baselist,
-        resolution=c.binsize,
+        resolution=clr.binsize,
         basetype=args.basetype,
         anchor=anchor,
         pad=args.pad * 1000,
@@ -439,7 +447,7 @@ def main():
     )
 
     PU = PileUpper(
-        clr=c,
+        clr=clr,
         CC=CC,
         view_df=view_df,
         balance=balance,
@@ -453,7 +461,7 @@ def main():
     )
 
     if args.outname == "auto":
-        outname = f"{coolname}-{c.binsize / 1000}K_over_{bedname}"
+        outname = f"{coolname}-{clr.binsize / 1000}K_over_{bedname}"
         if args.nshifts > 0 and args.expected is None:
             outname += f"_{args.nshifts}-shifts"
         if args.expected is not None:
@@ -493,6 +501,6 @@ def main():
     else:
         pups = PU.pileupsWithControl(nproc)
     headerdict = vars(args)
-    headerdict["resolution"] = int(c.binsize)
+    headerdict["resolution"] = int(clr.binsize)
     save_pileup_df(outname, pups, headerdict)
     logging.info(f"Saved output to {outname}")

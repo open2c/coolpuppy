@@ -2,7 +2,7 @@
 import numpy as np
 import warnings
 import pandas as pd
-import bioframe as bf
+import bioframe
 import itertools
 from multiprocessing import Pool
 from functools import partial, reduce
@@ -463,7 +463,7 @@ def expand(intervals, pad, resolution, fraction_pad=None):
             np.floor(intervals["center"] / resolution + 1) * resolution + pad
         )
     else:
-        intervals[["exp_start", "exp_end"]] = bf.expand(
+        intervals[["exp_start", "exp_end"]] = bioframe.expand(
             intervals, scale=2 * fraction_pad + 1
         )[["start", "end"]]
     return intervals
@@ -484,10 +484,10 @@ def expand2D(intervals, pad, resolution, fraction_pad=None):
             np.floor(intervals["center2"] / resolution + 1) * resolution + pad
         )
     else:
-        intervals[["exp_start1", "exp_end1"]] = bf.expand(
+        intervals[["exp_start1", "exp_end1"]] = bioframe.expand(
             intervals, scale=2 * fraction_pad + 1, cols=["chrom1", "start1", "end1"]
         )[["start1", "end1"]]
-        intervals[["exp_start2", "exp_end2"]] = bf.expand(
+        intervals[["exp_start2", "exp_end2"]] = bioframe.expand(
             intervals, scale=2 * fraction_pad + 1, cols=["chrom2", "start2", "end2"]
         )[["start2", "end2"]]
     return intervals
@@ -1320,7 +1320,7 @@ class PileUpper:
         self.chroms = natsorted(
             list(set(self.CC.final_chroms) & set(self.clr.chromnames))
         )
-        self.view_df = self.view_df[self.view_df["chrom"].isin(self.chroms)]
+        # self.view_df = self.view_df[self.view_df["chrom"].isin(self.chroms)]
         # self.regions = {
         #     chrom: (chrom, 0, self.clr.chromsizes[chrom])
         #     for chrom in self.chroms  # cooler.util.parse_region_string(chrom) for chrom in self.chroms

@@ -93,13 +93,13 @@ def parse_args_plotpuppy():
         "--col_order",
         type=lambda s: re.split(" |, ", s),
         required=False,
-        help="""Order of columns to use, comma separated""",
+        help="""Order of columns to use, space or comma separated""",
     )
     parser.add_argument(
         "--row_order",
         type=lambda s: re.split(" |, ", s),
         required=False,
-        help="""Order of rows to use, comma separated""",
+        help="""Order of rows to use, space or comma separated""",
     )
     parser.add_argument(
         "--query",

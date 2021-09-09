@@ -9,7 +9,7 @@ from matplotlib.colors import LogNorm, Normalize
 from matplotlib import ticker
 from matplotlib import cm
 import seaborn as sns
-
+from cooltools.lib import plotting
 
 def auto_rows_cols(n):
     """Automatically determines number of rows and cols for n pileups

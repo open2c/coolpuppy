@@ -3,7 +3,8 @@ cooler
 numpy
 pandas
 scipy
-cooltools
+cooltools>=0.4
+bioframe>=0.3
 matplotlib
 natsort
 m2r2
