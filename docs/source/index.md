@@ -16,9 +16,8 @@ walkthrough.md
 coolpup_py_cli.rst
 modules.rst
 Examples/Walkthrough_API.ipynb
+Examples/Walkthrough_CLI.ipynb
 ```
-
-% Examples/Walkthrough_API.ipynb
 
 # Indices and tables
 
