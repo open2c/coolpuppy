@@ -1,2 +1,4 @@
 python:
    setup_py_install: false
+   install:
+   - requirements: requirements.txt
