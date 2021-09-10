@@ -66,8 +66,8 @@ MOCK_MODULES = ['cooltools',
                 'more_itertools'
                 ]
 
-#for mod_name in MOCK_MODULES:
-#    sys.modules[mod_name] = mock.Mock()
+for mod_name in MOCK_MODULES:
+   sys.modules[mod_name] = mock.Mock()
 
 autodoc_mock_imports = MOCK_MODULES
 
