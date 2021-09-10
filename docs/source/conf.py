@@ -45,6 +45,7 @@ extensions = ['myst_nb',
 
 
 MOCK_MODULES = ['cooltools',
+                'cooltools.lib',
                 'numpy',
                 'scipy',
                 'scipy.linalg',
