@@ -45,16 +45,15 @@ extensions = ['myst_nb',
 
 
 MOCK_MODULES = ['cooltools',
-                'cooltools.lib',
                 'numpy',
                 'scipy',
-                'scipy.linalg',
+                # 'scipy.linalg',
                 'Cython',
                 'matplotlib',
-                'matplotlib.colors',
-                'matplotlib.ticker',
-                'matplotlib.pyplot',
-                'matplotlib.font_manager',
+                # 'matplotlib.colors',
+                # 'matplotlib.ticker',
+                # 'matplotlib.pyplot',
+                # 'matplotlib.font_manager',
                 'seaborn',
                 'mpl_toolkits.axes_grid1',
                 'pandas',
@@ -67,10 +66,10 @@ MOCK_MODULES = ['cooltools',
                 'more_itertools'
                 ]
 
-for mod_name in MOCK_MODULES:
-    sys.modules[mod_name] = mock.Mock()
+#for mod_name in MOCK_MODULES:
+#    sys.modules[mod_name] = mock.Mock()
 
-# autodoc_mock_imports = MOCK_MODULES
+autodoc_mock_imports = MOCK_MODULES
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
