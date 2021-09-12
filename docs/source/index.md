@@ -13,8 +13,8 @@ Please feel free to report any problems or contribute.
 :maxdepth: 2
 
 walkthrough.md
-coolpup_py_cli.rst
-modules.rst
+coolpup_py_cli.md
+modules.md
 Examples/Walkthrough_API.ipynb
 Examples/Walkthrough_CLI.ipynb
 ```

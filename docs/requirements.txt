@@ -1,6 +1,8 @@
+yaml
 sphinx>=1.4
 ipykernel
 sphinx-argparse
 natsort
 sphinx_rtd_theme
 myst_nb
+mock

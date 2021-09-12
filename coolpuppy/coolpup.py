@@ -37,7 +37,7 @@ def save_pileup_df(filename, df, metadata=None, mode="w"):
     Returns
     -------
     None.
-    
+
     Notes
     -----
     Replaces `None` in metadata values with `False`, since HDF5 doesn't support `None`
@@ -372,7 +372,7 @@ def prepare_single(item):
 
 def bin_distance_intervals(intervals, band_edges="default"):
     """
-    
+
     Parameters
     ----------
     intervals : pd.DataFrame
@@ -386,7 +386,7 @@ def bin_distance_intervals(intervals, band_edges="default"):
     -------
     snip : pd.DataFrame
         The same dataframe with added ['distance_band'] annotation.
-    
+
     """
     if band_edges == "default":
         band_edges = np.append([0], 50000 * 2 ** np.arange(30))
@@ -398,7 +398,7 @@ def bin_distance_intervals(intervals, band_edges="default"):
 
 def bin_distance(snip, band_edges="default"):
     """
-    
+
 
     Parameters
     ----------
@@ -431,7 +431,7 @@ def group_by_region(snip):
 
 def assign_groups(intervals, groupby=[]):
     """
-    
+
 
     Parameters
     ----------
