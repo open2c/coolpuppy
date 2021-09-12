@@ -36,7 +36,7 @@ release = "0.9.7"
 extensions = [
     "myst_nb",
     # 'sphinx_argparse_cli',
-    #'myst_parser',
+    # 'myst_parser',
     # "sphinx.ext.napoleon",
     "sphinx.ext.autodoc",
     # "sphinx.ext.viewcode",
