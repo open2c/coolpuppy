@@ -1,4 +1,4 @@
-yaml
+pyyaml
 sphinx>=1.4
 ipykernel
 sphinx-argparse
