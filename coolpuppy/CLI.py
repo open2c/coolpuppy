@@ -346,7 +346,12 @@ def main():
         bedname = "stdin"
         baselist = bioframe.read_table(sys.stdin, schema=schema, index_col=False)
 
-    if args.view is not None:
+    if args.view is None:
+        # Generate viewframe from clr.chromsizes:
+        view_df = bioframe.make_viewframe(
+            [(chrom, 0, clr.chromsizes[chrom]) for chrom in clr.chromnames]
+        )
+    else:
         # Make viewframe out of table:
         # Read view_df dataframe:
         try:
