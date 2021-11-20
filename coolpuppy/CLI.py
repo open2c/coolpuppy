@@ -3,6 +3,8 @@ from coolpuppy.coolpup import CoordCreator, PileUpper, save_pileup_df
 
 # from coolpuppy import *
 from coolpuppy._version import __version__
+from cooltools import common
+from .util import validate_csv
 import cooler
 import pandas as pd
 import bioframe
@@ -20,9 +22,9 @@ def parse_args_coolpuppy():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("coolfile", type=str, help="Cooler file with your Hi-C data")
+    parser.add_argument("cool_path", type=str, help="Cooler file with your Hi-C data")
     parser.add_argument(
-        "baselist",
+        "features",
         type=str,
         help="""A 3-column bed file or a 6-column double-bed file
                 i.e. chr1,start1,end1,chr2,start2,end2.
@@ -37,14 +39,14 @@ def parse_args_coolpuppy():
     )
     ##### Extra arguments
     parser.add_argument(
-        "--basetype",
+        "--features-format",
         type=str,
         choices=["bed", "bedpe", "auto"],
-        help="""Format of the baselist. Options:
+        help="""Format of the features. Options:
                 bed: chrom, start, end
                 bedpe: chrom1, start1, end1, chrom2, start2, end2
                 auto (default): determined from the file name extension
-                Has to be explicitly provided is baselist is piped through stdin""",
+                Has to be explicitly provided is features is piped through stdin""",
         default="auto",
         required=False,
     )
@@ -56,13 +58,13 @@ def parse_args_coolpuppy():
         required=False,
     )
     parser.add_argument(
-        "--pad",
+        "--flank",
         default=100,
         type=int,
         required=False,
-        help="""Padding of the windows around the centres of specified features
-                i.e. final size of the matrix is 2×pad+res, in kb.
-                Ignored with ``--rescale``, use ``--rescale_pad`` instead""",
+        help="""Flanking of the windows around the centres of specified features
+                i.e. final size of the matrix is 2 × flank+res, in kb.
+                Ignored with ``--rescale``, use ``--rescale_flank`` instead""",
     )
     ### Control of controls
     parser.add_argument(
@@ -92,7 +94,7 @@ def parse_args_coolpuppy():
     parser.add_argument(
         "--expected",
         default=None,
-        type=str,
+        type=validate_csv,
         required=False,
         help="""File with expected (output of ``cooltools compute-expected``).
                 If None, don't use expected and use randomly shifted controls""",
@@ -112,7 +114,7 @@ def parse_args_coolpuppy():
         type=int,
         required=False,
         help="""Minimal distance of interactions to use, bp.
-                If "auto", uses 2*pad+2 (in bins) as mindist to avoid first two
+                If "auto", uses 2*flank+2 (in bins) as mindist to avoid first two
                 diagonals""",
     )
     parser.add_argument(
@@ -160,7 +162,7 @@ def parse_args_coolpuppy():
         required=False,
         help="""A UCSC-style coordinate.
                 Use as an anchor to create intersections with coordinates in the
-                baselist""",
+                features""",
     )
     parser.add_argument(
         "--by_window",
@@ -168,7 +170,7 @@ def parse_args_coolpuppy():
         default=False,
         required=False,
         help="""Perform by-window pile-ups.
-                Create a pile-up for each coordinate in the baselist.
+                Create a pile-up for each coordinate in the features.
                 Not compatible with --by_strand and --by_distance""",
     )
     parser.add_argument(
@@ -177,7 +179,7 @@ def parse_args_coolpuppy():
         default=False,
         required=False,
         help="""Perform by-strand pile-ups.
-                Create a separate pile-up for each strand combination in the baselist.""",
+                Create a separate pile-up for each strand combination in the features.""",
     )
     parser.add_argument(
         "--by_distance",
@@ -196,19 +198,11 @@ def parse_args_coolpuppy():
         help="""Create local pileups, i.e. along the diagonal""",
     )
     parser.add_argument(
-        "--unbalanced",
-        action="store_true",
-        required=False,
-        help="""Do not use balanced data.
-                Useful for single-cell Hi-C data together with ``--coverage_norm``,
-                not recommended otherwise""",
-    )
-    parser.add_argument(
         "--coverage_norm",
         action="store_true",
         required=False,
         help="""
-        If ``--unbalanced``, add coverage normalization using chromosome marginals""",
+        If empty `clr_weight_name`, add coverage normalization using chromosome marginals""",
     )
     # Rescaling
     parser.add_argument(
@@ -217,15 +211,15 @@ def parse_args_coolpuppy():
         default=False,
         required=False,
         help="""Rescale all features to the same size.
-                Do not use centres of features and pad, and rather use the actual
+                Do not use centres of features and flank, and rather use the actual
                 feature sizes and rescale pileups to the same shape and size""",
     )
     parser.add_argument(
-        "--rescale_pad",
+        "--rescale_flank",
         default=1.0,
         required=False,
         type=float,
-        help="""If --rescale, padding in fraction of feature length""",
+        help="""If --rescale, flanking in fraction of feature length""",
     )
     parser.add_argument(
         "--rescale_size",
@@ -238,11 +232,13 @@ def parse_args_coolpuppy():
                 implementation, has to be an odd number""",
     )
     parser.add_argument(
-        "--weight_name",
+        "--clr_weight_name",
         default="weight",
         type=str,
         required=False,
-        help="""Name of the norm to use for getting balanced data""",
+        help="""Name of the norm to use for getting balanced data.
+                Provide empty argument to calculate pileups on raw data
+                (no masking bad pixels).""",
     )
     parser.add_argument(
         "--n_proc",
@@ -256,6 +252,7 @@ def parse_args_coolpuppy():
     )
     # Output
     parser.add_argument(
+        "-o",
         "--outname",
         default="auto",
         type=str,
@@ -317,71 +314,57 @@ def main():
     else:
         nproc = args.n_proc
 
-    clr = cooler.Cooler(args.coolfile)
-
-    if args.unbalanced:
-        balance = False
-    else:
-        balance = args.weight_name
+    clr = cooler.Cooler(args.cool_path)
 
     coolname = os.path.splitext(os.path.basename(clr.filename))[0]
-    if args.baselist != "-":
-        bedname, ext = os.path.splitext(os.path.basename(args.baselist))
-        baselist = args.baselist
-        if args.basetype == "auto":
+    if args.features != "-":
+        bedname, ext = os.path.splitext(os.path.basename(args.features))
+        features = args.features
+        if args.features_format == "auto":
             schema = ext[1:]
         else:
-            schema = args.basetype
+            schema = args.features_format
             if schema == "bed":
                 schema = "bed12"
-        baselist = bioframe.read_table(baselist, schema=schema, index_col=False)
+        features = bioframe.read_table(features, schema=schema, index_col=False)
     else:
-        if args.basetype == "auto":
+        if args.features_format == "auto":
             raise ValueError(
-                "Can't determine format when baselist is piped in, please specify"
+                "Can't determine format when features is piped in, please specify"
             )
-        schema = args.basetype
+        schema = args.features_format
         if schema == "bed":
             schema = "bed12"
         bedname = "stdin"
-        baselist = bioframe.read_table(sys.stdin, schema=schema, index_col=False)
+        features = bioframe.read_table(sys.stdin, schema=schema, index_col=False)
 
     if args.view is None:
-        # Generate viewframe from clr.chromsizes:
-        view_df = bioframe.make_viewframe(
-            [(chrom, 0, clr.chromsizes[chrom]) for chrom in clr.chromnames]
-        )
+        # full chromosome case
+        view_df = common.make_cooler_view(clr)
     else:
-        # Make viewframe out of table:
-        # Read view_df dataframe:
-        try:
-            view_df = bioframe.read_table(args.view, schema="bed4", index_col=False)
-        except Exception:
-            view_df = bioframe.read_table(args.view, schema="bed3", index_col=False)
-        # Convert view dataframe to viewframe:
-        try:
-            view_df = bioframe.make_viewframe(view_df, check_bounds=clr.chromsizes)
-        except ValueError as e:
-            raise ValueError(
-                "View table is incorrect, please, comply with the format. "
-            ) from e
+        # Read view_df dataframe, and verify against cooler
+        view_df = common.read_viewframe(args.view, clr, check_sorting=True)
 
     if args.nshifts > 0:
         control = True
     else:
         control = False
 
-    if args.expected is not None:
-        if args.nshifts > 0:
-            logging.warning("With specified expected will not use controls")
-            control = False
-        if not os.path.isfile(args.expected):
-            raise FileExistsError("Expected file doesn't exist")
-        expected = pd.read_csv(
-            args.expected, sep="\t", header=0, dtype={"region": str, "chrom": str}
-        )
+    if args.expected is None:
+        expected_value_col = None
     else:
-        expected = False
+        expected_path, expected_value_col = args.expected
+        expected_value_cols = [
+            expected_value_col,
+        ]
+        expected = common.read_expected(
+            expected_path,
+            contact_type="cis",
+            expected_value_cols=expected_value_cols,
+            verify_view=view_df,
+            verify_cooler=clr,
+        )
+
     if args.mindist is None:
         mindist = 0
     else:
@@ -400,9 +383,9 @@ def main():
     if args.rescale and args.rescale_size % 2 == 0:
         raise ValueError("Please provide an odd rescale_size")
     if not args.rescale:
-        rescale_pad = None
+        rescale_flank = None
     else:
-        rescale_pad = args.rescale_pad
+        rescale_flank = args.rescale_flank
 
     if args.anchor is not None:
         if "_" in args.anchor:
@@ -434,12 +417,12 @@ def main():
             raise ValueError("Can't make by-window combinations with an anchor")
 
     CC = CoordCreator(
-        baselist=baselist,
+        features=features,
         resolution=clr.binsize,
-        basetype=args.basetype,
+        features_format=args.features_format,
         anchor=anchor,
-        pad=args.pad * 1000,
-        fraction_pad=rescale_pad,
+        flank=args.flank * 1000,
+        fraction_flank=rescale_flank,
         chroms=fchroms,
         minshift=args.minshift,
         maxshift=args.maxshift,
@@ -455,7 +438,7 @@ def main():
         clr=clr,
         CC=CC,
         view_df=view_df,
-        balance=balance,
+        clr_weight_name=args.clr_weight_name,
         expected=expected,
         ooe=args.ooe,
         control=control,
@@ -481,8 +464,6 @@ def main():
             outname += f"_dist_{mindist}-{maxdist}"
         if args.rescale:
             outname += "_rescaled"
-        if args.unbalanced:
-            outname += "_unbalanced"
         if args.coverage_norm:
             outname += "_covnorm"
         if args.subset > 0:

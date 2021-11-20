@@ -9,7 +9,9 @@ from functools import partial, reduce
 import logging
 from natsort import natsorted
 from scipy import sparse
-from cooltools import numutils, snipping
+from cooltools import numutils
+from cooltools.lib import common
+from cooltools.api import snipping
 import yaml
 import io
 from more_itertools import collapse
@@ -258,14 +260,14 @@ def get_enrichment(amap, n):
     return np.nanmean(amap[c - n // 2 : c + n // 2 + 1, c - n // 2 : c + n // 2 + 1])
 
 
-def get_local_enrichment(amap, pad=1):
+def get_local_enrichment(amap, flank=1):
     """Get values from the central part of a pileup for a square, ignoring padding
 
     Parameters
     ----------
     amap : 2D array
         Pileup.
-    pad : int
+    flank : int
         Relative padding used, i.e. if 1 the central third is used, if 2 the central
         fifth is used.
         The default is 1.
@@ -276,7 +278,7 @@ def get_local_enrichment(amap, pad=1):
         Mean of the pixels in the central square.
 
     """
-    c = amap.shape[0] / (pad * 2 + 1)
+    c = amap.shape[0] / (flank * 2 + 1)
     assert int(c) == c
     c = int(c)
     return np.nanmean(amap[c:-c, c:-c])
@@ -453,14 +455,14 @@ def assign_groups(intervals, groupby=[]):
     return intervals
 
 
-def expand(intervals, pad, resolution, fraction_pad=None):
+def expand(intervals, flank, resolution, fraction_pad=None):
     intervals = intervals.copy()
     if fraction_pad is None:
         intervals["exp_start"] = (
-            np.floor(intervals["center"] / resolution) * resolution - pad
+            np.floor(intervals["center"] / resolution) * resolution - flank
         )
         intervals["exp_end"] = (
-            np.floor(intervals["center"] / resolution + 1) * resolution + pad
+            np.floor(intervals["center"] / resolution + 1) * resolution + flank
         )
     else:
         intervals[["exp_start", "exp_end"]] = bioframe.expand(
@@ -469,19 +471,19 @@ def expand(intervals, pad, resolution, fraction_pad=None):
     return intervals
 
 
-def expand2D(intervals, pad, resolution, fraction_pad=None):
+def expand2D(intervals, flank, resolution, fraction_pad=None):
     if fraction_pad is None:
         intervals["exp_start1"] = (
-            np.floor(intervals["center1"] // resolution) * resolution - pad
+            np.floor(intervals["center1"] // resolution) * resolution - flank
         )
         intervals["exp_end1"] = (
-            np.floor(intervals["center1"] / resolution + 1) * resolution + pad
+            np.floor(intervals["center1"] / resolution + 1) * resolution + flank
         )
         intervals["exp_start2"] = (
-            np.floor(intervals["center2"] // resolution) * resolution - pad
+            np.floor(intervals["center2"] // resolution) * resolution - flank
         )
         intervals["exp_end2"] = (
-            np.floor(intervals["center2"] / resolution + 1) * resolution + pad
+            np.floor(intervals["center2"] / resolution + 1) * resolution + flank
         )
     else:
         intervals[["exp_start1", "exp_end1"]] = bioframe.expand(
@@ -571,12 +573,12 @@ def norm_coverage(snip):
 class CoordCreator:
     def __init__(
         self,
-        baselist,
+        features,
         resolution,
         *,
-        basetype="auto",
+        features_format="auto",
         anchor=False,
-        pad=100000,
+        flank=100000,
         fraction_pad=None,
         chroms="all",
         minshift=10 ** 5,
@@ -592,26 +594,26 @@ class CoordCreator:
 
         Parameters
         ----------
-        baselist : DataFrame
+        features : DataFrame
             A bed- or bedpe-style file with coordinates.
         resolution : int, optional
             Data resolution.
-        basetype : str, optional
-            Format of the baselist. Options:
+        features_format : str, optional
+            Format of the features. Options:
                 bed: chrom, start, end
                 bedpe: chrom1, start1, end1, chrom2, start2, end2
                 auto (default): determined from the columns in the DataFrame
         anchor : tuple of (str, int, int), optional
             Coordinates (chr, start, end) of an anchor region used to create
-            interactions with baselist (in bp). Anchor is on the left of the final pileup.
+            interactions with features (in bp). Anchor is on the left of the final pileup.
             The default is False.
-        pad : int, optional
+        flank : int, optional
             Padding around the central bin, in bp. For example, with 5000 bp resolution
-            and 100000 pad, final pileup is 205000×205000 bp.
+            and 100000 flank, final pileup is 205000×205000 bp.
             The default is 100000.
         fraction_pad : float, optional
             Fraction of ROI size added on each end when extracting snippets, if rescale.
-            The default is None. If specified, overrides pad.
+            The default is None. If specified, overrides flank.
         chroms : str or list, optional
             Which chromosomes to use for pileups. Has to be in a list even for a
             single chromosome, e.g. ['chr1'].
@@ -629,7 +631,7 @@ class CoordCreator:
         mindist : int, optional
             Shortest interactions to consider. Uses midpoints of regions of interest.
             "auto" selects it to avoid the two shortest diagonals of the matrix, i.e.
-            2 * pad + 2 * resolution
+            2 * flank + 2 * resolution
             The default is "auto".
         maxdist : int, optional
             Longest interactions to consider.
@@ -649,20 +651,20 @@ class CoordCreator:
         Object that generates coordinates for pileups required for PileUpper.
 
         """
-        self.intervals = baselist
+        self.intervals = features
         # self.stdin = self.intervals == sys.stdin
         self.resolution = resolution
-        self.basetype = basetype
+        self.features_format = features_format
         self.anchor = anchor
-        self.pad = pad
-        # self.pad_bins = pad // self.resolution
+        self.flank = flank
+        # self.pad_bins = flank // self.resolution
         self.fraction_pad = fraction_pad
         self.chroms = chroms
         self.minshift = minshift
         self.maxshift = maxshift
         self.nshifts = nshifts
         if mindist == "auto":
-            self.mindist = 2 * self.pad + 2 * self.resolution
+            self.mindist = 2 * self.flank + 2 * self.resolution
         else:
             self.mindist = mindist
         if maxdist is None:
@@ -675,7 +677,7 @@ class CoordCreator:
         self.process()
 
     def process(self):
-        if self.basetype is None or self.basetype == "auto":
+        if self.features_format is None or self.features_format == "auto":
             if all(
                 [
                     name in self.intervals.columns
@@ -694,10 +696,10 @@ class CoordCreator:
                     "'chrom', 'start', 'end' for bed kind"
                 )
         else:
-            self.kind = self.basetype
+            self.kind = self.features_format
 
         if self.intervals.shape[0] == 0:
-            warnings.warn("No regions in baselist, returning empty output")
+            warnings.warn("No regions in features, returning empty output")
             self.pos_stream = self.empty_stream
             self.final_chroms = []
             return
@@ -723,7 +725,7 @@ class CoordCreator:
                 self.intervals["start"] + self.intervals["end"]
             ) / 2
             self.intervals = expand(
-                self.intervals, self.pad, self.resolution, self.fraction_pad
+                self.intervals, self.flank, self.resolution, self.fraction_pad
             )
         else:
             assert all(
@@ -746,7 +748,7 @@ class CoordCreator:
                 & (self.intervals["distance"].abs() <= self.maxdist)
             ]
             self.intervals = expand2D(
-                self.intervals, self.pad, self.resolution, self.fraction_pad
+                self.intervals, self.flank, self.resolution, self.fraction_pad
             )
 
         if self.nshifts > 0 and self.kind == "bedpe":
@@ -757,7 +759,7 @@ class CoordCreator:
             # if self.anchor:
             #     if self.anchor[0] not in basechroms:
             #         raise ValueError(
-            #             """The anchor chromosome is not found in the baselist.
+            #             """The anchor chromosome is not found in the features.
             #                Are they in the same format, e.g. starting with "chrom"?
             #                Alternatively, all regions in that chromosome might have
             #                been filtered by some filters."""
@@ -885,7 +887,7 @@ class CoordCreator:
     #                 kind = "bedpe"
     #             except:
     #                 raise ValueError(
-    #                     "Can't determine the type of baselist file,"
+    #                     "Can't determine the type of features file,"
     #                     "please specify bed or bedpe"
     #                 )
     #         elif len(row1) == 3:
@@ -894,7 +896,7 @@ class CoordCreator:
     #                 kind = "bed"
     #             except:
     #                 raise ValueError(
-    #                     "Can't determine the type of baselist file,"
+    #                     "Can't determine the type of features file,"
     #                     "please specify bed or bedpe"
     #                 )
     #         else:
@@ -1207,8 +1209,9 @@ class PileUpper:
         CC,
         *,
         view_df=None,
-        balance="weight",
+        clr_weight_name="weight",
         expected=False,
+        expected_value_col='balanced.avg',
         ooe=True,
         control=False,
         coverage_norm=False,
@@ -1225,9 +1228,9 @@ class PileUpper:
             Cool file with Hi-C data.
         CC : CoordCreator
             CoordCreator object with correct settings.
-        balance : bool or str, optional
+        clr_weight_name : bool or str, optional
             Whether to use balanced data, and which column to use as weights.
-            The default is "weight".
+            The default is "weight". Provide False to use raw data.
         expected : DataFrame, optional
             If using expected, pandas DataFrame with chromosome-wide expected.
             The default is False.
@@ -1268,51 +1271,61 @@ class PileUpper:
         self.CC = CC
         assert self.resolution == self.CC.resolution
         self.__dict__.update(self.CC.__dict__)
-        self.balance = balance
+        self.clr_weight_name = clr_weight_name
         self.expected = expected
+        self.expected_value_col = expected_value_col
+        self.ooe = ooe
+        self.control = control
+        self.pad_bins = self.CC.flank // self.resolution
+        self.coverage_norm = coverage_norm
+        self.rescale = rescale
+        self.rescale_size = rescale_size
+        self.ignore_diags = ignore_diags
+
         if view_df is None:
-            if self.expected is False:
-                # Generate viewframe from clr.chromsizes:
-                view_df = bioframe.make_viewframe(
-                    [(chrom, 0, clr.chromsizes[chrom]) for chrom in clr.chromnames]
-                )
-            elif set(self.expected["region"]).issubset(set(clr.chromnames)):
-                # Generate viewframe from clr.chromsizes:
-                view_df = bioframe.make_viewframe(
-                    [(chrom, 0, clr.chromsizes[chrom]) for chrom in clr.chromnames]
-                )
-            else:
-                raise ValueError(
-                    "Please provide the view_df table if region names "
-                    "are not simply chromosome names."
-                )
+            # Generate viewframe from clr.chromsizes:
+            self.view_df = common.make_cooler_view(clr)
         else:
-            view_df = bioframe.make_viewframe(view_df, check_bounds=clr.chromsizes)
-        self.view_df = view_df.set_index("name")
+            self.view_df = bioframe.make_viewframe(view_df, check_bounds=clr.chromsizes)
+
+        if self.expected is not False:
+            self.expected = self.expected[self.expected['region1']==self.expected['region2']]
+            try:
+                _ = common.is_compatible_expected(
+                    expected,
+                    "cis",
+                    self.view_df,
+                    verify_cooler=clr,
+                    expected_value_cols=[
+                        self.expected_value_col,
+                    ],
+                    raise_errors=True,
+                )
+            except Exception as e:
+                raise ValueError("provided expected is not valid") from e
+            if self.control:
+                warnings.warn(
+                    "Can't do both expected and control shifts; defaulting to expected"
+                )
+                self.control = False
+            self.ExpSnipper = snipping.ExpectedSnipper(
+                self.clr, self.expected, view_df=self.view_df
+            )
+            self.expected_selections = {
+                region_name: self.ExpSnipper.select(region_name, region_name)
+                for region_name in self.view_df['name']
+            }
+            self.expected = True
+
+        self.view_df = self.view_df.set_index("name")
         self.view_df_extents = {}
+
         for region_name, region in self.view_df.iterrows():
             lo, hi = self.clr.extent(region)
             chroffset = self.clr.offset(region[0])
             self.view_df_extents[region_name] = lo - chroffset, hi - chroffset
 
-        if self.expected is not False:
-            for region_name, group in self.expected.groupby("region"):
-                n_diags = group.shape[0]
-                region = self.view_df.loc[region_name]
-                lo, hi = self.view_df_extents[region_name]
-                if n_diags != (hi - lo):
-                    raise ValueError(
-                        "Region shape mismatch between expected and cooler. "
-                        "Are they using the same resolution?"
-                    )
 
-        self.ooe = ooe
-        self.control = control
-        self.pad_bins = self.CC.pad // self.resolution
-        self.coverage_norm = coverage_norm
-        self.rescale = rescale
-        self.rescale_size = rescale_size
-        self.ignore_diags = ignore_diags
         # self.CoolSnipper = snipping.CoolerSnipper(
         #     self.clr, cooler_opts=dict(balance=self.balance)
         # )
@@ -1325,24 +1338,7 @@ class PileUpper:
         #     chrom: (chrom, 0, self.clr.chromsizes[chrom])
         #     for chrom in self.chroms  # cooler.util.parse_region_string(chrom) for chrom in self.chroms
         # }
-        if self.expected is not False:
-            if self.control:
-                warnings.warn(
-                    "Can't do both expected and control shifts; defaulting to expected"
-                )
-                self.control = False
-            assert isinstance(self.expected, pd.DataFrame)
-            self.expected = self.expected[
-                self.expected["region"].isin(self.view_df.index)
-            ]
-            self.ExpSnipper = snipping.ExpectedSnipper(
-                self.clr, self.expected, view_df=self.view_df.reset_index()
-            )
-            self.expected_selections = {
-                region_name: self.ExpSnipper.select(region_name, region_name)
-                for region_name in self.view_df.index
-            }
-            self.expected = True
+
         self.empty_outmap = self.make_outmap()
         self.empty_pup = pd.Series(
             {
@@ -1430,7 +1426,7 @@ class PileUpper:
         logging.debug("Loading data")
         if isinstance(region, str):
             region = self.view_df.loc[region]
-        data = self.clr.matrix(sparse=True, balance=self.balance).fetch(region)
+        data = self.clr.matrix(sparse=True, balance=self.clr_weight_name).fetch(region)
         data = sparse.triu(data)
         return data.tocsr()
 
@@ -1809,7 +1805,7 @@ class PileUpper:
     def pileupsByStrandByDistanceWithControl(self, nproc=1, distance_edges="default"):
         """Perform by-strand by-distance pileups across all chromosomes and applies
         required normalization. Simple wrapper around pileupsWithControl.
-        Assumes the baselist in CoordCreator file has a "strand" column.
+        Assumes the features in CoordCreator file has a "strand" column.
 
         Parameters
         ----------
@@ -1846,7 +1842,7 @@ class PileUpper:
     def pileupsByStrandWithControl(self, nproc=1):
         """Perform by-strand pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl.
-        Assumes the baselist in CoordCreator file has a "strand" column.
+        Assumes the features in CoordCreator file has a "strand" column.
 
         Parameters
         ----------
