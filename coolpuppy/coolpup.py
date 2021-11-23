@@ -455,9 +455,9 @@ def assign_groups(intervals, groupby=[]):
     return intervals
 
 
-def expand(intervals, flank, resolution, fraction_pad=None):
+def expand(intervals, flank, resolution, fraction_flank=None):
     intervals = intervals.copy()
-    if fraction_pad is None:
+    if fraction_flank is None:
         intervals["exp_start"] = (
             np.floor(intervals["center"] / resolution) * resolution - flank
         )
@@ -466,13 +466,13 @@ def expand(intervals, flank, resolution, fraction_pad=None):
         )
     else:
         intervals[["exp_start", "exp_end"]] = bioframe.expand(
-            intervals, scale=2 * fraction_pad + 1
+            intervals, scale=2 * fraction_flank + 1
         )[["start", "end"]]
     return intervals
 
 
-def expand2D(intervals, flank, resolution, fraction_pad=None):
-    if fraction_pad is None:
+def expand2D(intervals, flank, resolution, fraction_flank=None):
+    if fraction_flank is None:
         intervals["exp_start1"] = (
             np.floor(intervals["center1"] // resolution) * resolution - flank
         )
@@ -487,10 +487,10 @@ def expand2D(intervals, flank, resolution, fraction_pad=None):
         )
     else:
         intervals[["exp_start1", "exp_end1"]] = bioframe.expand(
-            intervals, scale=2 * fraction_pad + 1, cols=["chrom1", "start1", "end1"]
+            intervals, scale=2 * fraction_flank + 1, cols=["chrom1", "start1", "end1"]
         )[["start1", "end1"]]
         intervals[["exp_start2", "exp_end2"]] = bioframe.expand(
-            intervals, scale=2 * fraction_pad + 1, cols=["chrom2", "start2", "end2"]
+            intervals, scale=2 * fraction_flank + 1, cols=["chrom2", "start2", "end2"]
         )[["start2", "end2"]]
     return intervals
 
@@ -579,7 +579,7 @@ class CoordCreator:
         features_format="auto",
         anchor=False,
         flank=100000,
-        fraction_pad=None,
+        fraction_flank=None,
         chroms="all",
         minshift=10 ** 5,
         maxshift=10 ** 6,
@@ -611,7 +611,7 @@ class CoordCreator:
             Padding around the central bin, in bp. For example, with 5000 bp resolution
             and 100000 flank, final pileup is 205000×205000 bp.
             The default is 100000.
-        fraction_pad : float, optional
+        fraction_flank : float, optional
             Fraction of ROI size added on each end when extracting snippets, if rescale.
             The default is None. If specified, overrides flank.
         chroms : str or list, optional
@@ -658,7 +658,7 @@ class CoordCreator:
         self.anchor = anchor
         self.flank = flank
         # self.pad_bins = flank // self.resolution
-        self.fraction_pad = fraction_pad
+        self.fraction_flank = fraction_flank
         self.chroms = chroms
         self.minshift = minshift
         self.maxshift = maxshift
@@ -725,7 +725,7 @@ class CoordCreator:
                 self.intervals["start"] + self.intervals["end"]
             ) / 2
             self.intervals = expand(
-                self.intervals, self.flank, self.resolution, self.fraction_pad
+                self.intervals, self.flank, self.resolution, self.fraction_flank
             )
         else:
             assert all(
@@ -748,7 +748,7 @@ class CoordCreator:
                 & (self.intervals["distance"].abs() <= self.maxdist)
             ]
             self.intervals = expand2D(
-                self.intervals, self.flank, self.resolution, self.fraction_pad
+                self.intervals, self.flank, self.resolution, self.fraction_flank
             )
 
         if self.nshifts > 0 and self.kind == "bedpe":
@@ -1504,8 +1504,6 @@ class PileUpper:
                 < self.ignore_diags
             )
             data[D] = np.nan
-            if self.local:
-                data = np.nansum(np.dstack((data, data.T)), 2)
             if self.coverage_norm:
                 cov_start = coverage[snip["stBin1"] : snip["endBin1"]]
                 cov_end = coverage[snip["stBin2"] : snip["endBin2"]]
@@ -1726,6 +1724,9 @@ class PileUpper:
         if nproc > 1:
             p.close()
         # pileup[~np.isfinite(pileup)] = 0
+        if self.local:
+            normalized_roi['data'] = normalized_roi['data'].apply(lambda x:
+            np.nanmean(np.dstack((x, x.T)), 2))
 
         if groupby:
             normalized_roi = normalized_roi.reset_index()

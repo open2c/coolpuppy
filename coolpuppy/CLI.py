@@ -3,7 +3,7 @@ from coolpuppy.coolpup import CoordCreator, PileUpper, save_pileup_df
 
 # from coolpuppy import *
 from coolpuppy._version import __version__
-from cooltools import common
+from cooltools.lib import common
 from .util import validate_csv
 import cooler
 import pandas as pd
@@ -12,6 +12,7 @@ import os
 import argparse
 import logging
 import numpy as np
+from collections import Iterable
 import sys
 import pdb, traceback
 
@@ -39,7 +40,7 @@ def parse_args_coolpuppy():
     )
     ##### Extra arguments
     parser.add_argument(
-        "--features-format",
+        "--features_format", "--basetype",
         type=str,
         choices=["bed", "bedpe", "auto"],
         help="""Format of the features. Options:
@@ -58,12 +59,12 @@ def parse_args_coolpuppy():
         required=False,
     )
     parser.add_argument(
-        "--flank",
-        default=100,
+        "--flank", "--pad",
+        default=100_000,
         type=int,
         required=False,
         help="""Flanking of the windows around the centres of specified features
-                i.e. final size of the matrix is 2 × flank+res, in kb.
+                i.e. final size of the matrix is 2 × flank+res, in bp.
                 Ignored with ``--rescale``, use ``--rescale_flank`` instead""",
     )
     ### Control of controls
@@ -215,7 +216,7 @@ def parse_args_coolpuppy():
                 feature sizes and rescale pileups to the same shape and size""",
     )
     parser.add_argument(
-        "--rescale_flank",
+        "--rescale_flank", "--rescale_pad",
         default=1.0,
         required=False,
         type=float,
@@ -232,7 +233,7 @@ def parse_args_coolpuppy():
                 implementation, has to be an odd number""",
     )
     parser.add_argument(
-        "--clr_weight_name",
+        "--clr_weight_name", "--weight_name",
         default="weight",
         type=str,
         required=False,
@@ -241,10 +242,12 @@ def parse_args_coolpuppy():
                 (no masking bad pixels).""",
     )
     parser.add_argument(
+        "-p", "--nproc",
         "--n_proc",
         default=1,
         type=int,
         required=False,
+        dest='n_proc',
         help="""Number of processes to use.
                 Each process works on a separate chromosome, so might require quite a
                 bit more memory, although the data are always stored as sparse matrices
@@ -351,7 +354,9 @@ def main():
         control = False
 
     if args.expected is None:
+        expected = False
         expected_value_col = None
+
     else:
         expected_path, expected_value_col = args.expected
         expected_value_cols = [
@@ -421,7 +426,7 @@ def main():
         resolution=clr.binsize,
         features_format=args.features_format,
         anchor=anchor,
-        flank=args.flank * 1000,
+        flank=args.flank,
         fraction_flank=rescale_flank,
         chroms=fchroms,
         minshift=args.minshift,
@@ -487,6 +492,12 @@ def main():
     else:
         pups = PU.pileupsWithControl(nproc)
     headerdict = vars(args)
+    if "expected" in headerdict:
+        if not isinstance(headerdict['expected'], str) and isinstance(headerdict['expected'], Iterable):
+            headerdict['expected_file'] = headerdict['expected'][0]
+            headerdict['expected_col'] = headerdict['expected'][1]
+            headerdict['expected'] = True
     headerdict["resolution"] = int(clr.binsize)
     save_pileup_df(outname, pups, headerdict)
     logging.info(f"Saved output to {outname}")
+

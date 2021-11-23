@@ -104,3 +104,6 @@ venv.bak/
 .mypy_cache/
 
 docs/jupyter_execute
+tests/testing_*
+tests/test_*.pdf
+.vscode/
