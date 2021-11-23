@@ -1211,7 +1211,7 @@ class PileUpper:
         view_df=None,
         clr_weight_name="weight",
         expected=False,
-        expected_value_col='balanced.avg',
+        expected_value_col="balanced.avg",
         ooe=True,
         control=False,
         coverage_norm=False,
@@ -1289,7 +1289,9 @@ class PileUpper:
             self.view_df = bioframe.make_viewframe(view_df, check_bounds=clr.chromsizes)
 
         if self.expected is not False:
-            self.expected = self.expected[self.expected['region1']==self.expected['region2']]
+            self.expected = self.expected[
+                self.expected["region1"] == self.expected["region2"]
+            ]
             try:
                 _ = common.is_compatible_expected(
                     expected,
@@ -1313,7 +1315,7 @@ class PileUpper:
             )
             self.expected_selections = {
                 region_name: self.ExpSnipper.select(region_name, region_name)
-                for region_name in self.view_df['name']
+                for region_name in self.view_df["name"]
             }
             self.expected = True
 
@@ -1324,7 +1326,6 @@ class PileUpper:
             lo, hi = self.clr.extent(region)
             chroffset = self.clr.offset(region[0])
             self.view_df_extents[region_name] = lo - chroffset, hi - chroffset
-
 
         # self.CoolSnipper = snipping.CoolerSnipper(
         #     self.clr, cooler_opts=dict(balance=self.balance)
@@ -1393,7 +1394,9 @@ class PileUpper:
         )
         return exp_matrix
 
-    def make_outmap(self,):
+    def make_outmap(
+        self,
+    ):
         """Generate zero-filled array of the right shape
 
         Returns
@@ -1450,7 +1453,9 @@ class PileUpper:
         return coverage
 
     def _stream_snips(
-        self, intervals, region,
+        self,
+        intervals,
+        region,
     ):
         mymap = self.make_outmap()
         cov_start = np.zeros(mymap.shape[0])
@@ -1600,7 +1605,11 @@ class PileUpper:
         return outdict
 
     def pileup_region(
-        self, region, groupby=[], modify_2Dintervals_func=None, postprocess_func=None,
+        self,
+        region,
+        groupby=[],
+        modify_2Dintervals_func=None,
+        postprocess_func=None,
     ):
         """
 
@@ -1645,7 +1654,10 @@ class PileUpper:
             modify_2Dintervals_func=modify_2Dintervals_func,
         )
         final = self.accumulate_stream(
-            self._stream_snips(intervals=intervals, region=region,),
+            self._stream_snips(
+                intervals=intervals,
+                region=region,
+            ),
             postprocess_func=postprocess_func,
         )
         logging.info(f"{region}: {final['ROI']['all']['n']}")
@@ -1725,8 +1737,9 @@ class PileUpper:
             p.close()
         # pileup[~np.isfinite(pileup)] = 0
         if self.local:
-            normalized_roi['data'] = normalized_roi['data'].apply(lambda x:
-            np.nanmean(np.dstack((x, x.T)), 2))
+            normalized_roi["data"] = normalized_roi["data"].apply(
+                lambda x: np.nanmean(np.dstack((x, x.T)), 2)
+            )
 
         if groupby:
             normalized_roi = normalized_roi.reset_index()
@@ -1746,7 +1759,8 @@ class PileUpper:
         return normalized_roi
 
     def pileupsByWindowWithControl(
-        self, nproc=1,
+        self,
+        nproc=1,
     ):
         """Perform by-window pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl
@@ -1863,7 +1877,8 @@ class PileUpper:
             Each distance band is a row, annotated in columns `separation`
         """
         normalized_pileups = self.pileupsWithControl(
-            nproc=nproc, groupby=["strand1", "strand2"],
+            nproc=nproc,
+            groupby=["strand1", "strand2"],
         )
         normalized_pileups = normalized_pileups.drop(index=("all", "all")).reset_index()
         normalized_pileups["orientation"] = (

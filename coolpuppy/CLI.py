@@ -40,7 +40,8 @@ def parse_args_coolpuppy():
     )
     ##### Extra arguments
     parser.add_argument(
-        "--features_format", "--basetype",
+        "--features_format",
+        "--basetype",
         type=str,
         choices=["bed", "bedpe", "auto"],
         help="""Format of the features. Options:
@@ -59,7 +60,8 @@ def parse_args_coolpuppy():
         required=False,
     )
     parser.add_argument(
-        "--flank", "--pad",
+        "--flank",
+        "--pad",
         default=100_000,
         type=int,
         required=False,
@@ -216,7 +218,8 @@ def parse_args_coolpuppy():
                 feature sizes and rescale pileups to the same shape and size""",
     )
     parser.add_argument(
-        "--rescale_flank", "--rescale_pad",
+        "--rescale_flank",
+        "--rescale_pad",
         default=1.0,
         required=False,
         type=float,
@@ -233,7 +236,8 @@ def parse_args_coolpuppy():
                 implementation, has to be an odd number""",
     )
     parser.add_argument(
-        "--clr_weight_name", "--weight_name",
+        "--clr_weight_name",
+        "--weight_name",
         default="weight",
         type=str,
         required=False,
@@ -242,12 +246,13 @@ def parse_args_coolpuppy():
                 (no masking bad pixels).""",
     )
     parser.add_argument(
-        "-p", "--nproc",
+        "-p",
+        "--nproc",
         "--n_proc",
         default=1,
         type=int,
         required=False,
-        dest='n_proc',
+        dest="n_proc",
         help="""Number of processes to use.
                 Each process works on a separate chromosome, so might require quite a
                 bit more memory, although the data are always stored as sparse matrices
@@ -493,11 +498,12 @@ def main():
         pups = PU.pileupsWithControl(nproc)
     headerdict = vars(args)
     if "expected" in headerdict:
-        if not isinstance(headerdict['expected'], str) and isinstance(headerdict['expected'], Iterable):
-            headerdict['expected_file'] = headerdict['expected'][0]
-            headerdict['expected_col'] = headerdict['expected'][1]
-            headerdict['expected'] = True
+        if not isinstance(headerdict["expected"], str) and isinstance(
+            headerdict["expected"], Iterable
+        ):
+            headerdict["expected_file"] = headerdict["expected"][0]
+            headerdict["expected_col"] = headerdict["expected"][1]
+            headerdict["expected"] = True
     headerdict["resolution"] = int(clr.binsize)
     save_pileup_df(outname, pups, headerdict)
     logging.info(f"Saved output to {outname}")
-
