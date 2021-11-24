@@ -107,3 +107,5 @@ docs/jupyter_execute
 tests/testing_*
 tests/test_*.pdf
 .vscode/
+docs/Examples/*.clpy
+
