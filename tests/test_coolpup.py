@@ -6,7 +6,8 @@ Created on Fri Jul  5 13:24:55 2019
 @author: Ilya Flyamer
 """
 
-from coolpuppy import PileUpper, CoordCreator
+from coolpuppy.coolpup import PileUpper, CoordCreator
+from cooltools.lib import common
 import pandas as pd
 import numpy as np
 import cooler
@@ -19,18 +20,21 @@ def test_bystrand_pileups_with_expected(request):
     """
     # Read cool file and create regions out of it:
     clr = cooler.Cooler(op.join(request.fspath.dirname, "data/CN.mm9.1000kb.cool"))
-    exp = pd.read_table(op.join(request.fspath.dirname, "data/CN.mm9.toy_expected.tsv"))
-    regions = bf.read_table(
-        op.join(request.fspath.dirname, "data/CN.mm9.toy_regions.bed"), schema="bed4"
+    exp = common.read_expected(op.join(request.fspath.dirname,
+                                        "data/CN.mm9.toy_expected.tsv"),
+                                        expected_value_cols=['balanced.avg'])
+    regions = common.read_viewframe(
+        op.join(request.fspath.dirname, "data/CN.mm9.toy_regions.bed"),
+        verify_cooler=clr
     )
     features = bf.read_table(op.join(request.fspath.dirname, 'data/toy_features.bed'), schema='bed')
-    cc = CoordCreator(features, 1_000_000, basetype='bed', local=False, pad=2_000_000, mindist=0)
+    cc = CoordCreator(features, 1_000_000, features_format='bed', local=False, flank=2_000_000, mindist=0)
     # Test with ooe=True
-    pu = PileUpper(clr, cc, expected=exp, regions=regions, ooe=True)
+    pu = PileUpper(clr, cc, expected=exp, view_df=regions, ooe=True)
     pup = pu.pileupsByStrandWithControl()
     assert np.all(pup.sort_values('orientation')['n'] == [1, 3, 1, 1])
     # Test with ooe=False
-    pu = PileUpper(clr, cc, expected=exp, regions=regions, ooe=False)
+    pu = PileUpper(clr, cc, expected=exp, view_df=regions, ooe=False)
     pup = pu.pileupsByStrandWithControl()
     assert np.all(pup.sort_values('orientation')['n'] == [1, 3, 1, 1])
     # No regions provided without expected
@@ -48,8 +52,8 @@ def test_bystrand_pileups_with_controls(request):
         op.join(request.fspath.dirname, "data/CN.mm9.toy_regions.bed"), schema="bed4"
     )
     features = bf.read_table(op.join(request.fspath.dirname, 'data/toy_features.bed'), schema='bed')
-    cc = CoordCreator(features, 1_000_000, basetype='bed', local=False, pad=2_000_000, mindist=0)
-    pu = PileUpper(clr, cc, expected=False, regions=regions, control=True)
+    cc = CoordCreator(features, 1_000_000, features_format='bed', local=False, flank=2_000_000, mindist=0)
+    pu = PileUpper(clr, cc, expected=False, view_df=regions, control=True)
     pup = pu.pileupsByStrandWithControl()
     assert np.all(pup.sort_values('orientation')['n'] == [1, 3, 1, 1])
     
@@ -63,7 +67,7 @@ def test_bystrand_bydistance_pileups_with_controls(request):
         op.join(request.fspath.dirname, "data/CN.mm9.toy_regions.bed"), schema="bed4"
     )
     features = bf.read_table(op.join(request.fspath.dirname, 'data/toy_features.bed'), schema='bed')
-    cc = CoordCreator(features, 1_000_000, basetype='bed', local=False, pad=2_000_000, mindist=0)
-    pu = PileUpper(clr, cc, expected=False, regions=regions, control=True)
+    cc = CoordCreator(features, 1_000_000, features_format='bed', local=False, flank=2_000_000, mindist=0)
+    pu = PileUpper(clr, cc, expected=False, view_df=regions, control=True)
     pup = pu.pileupsByStrandByDistanceWithControl()
     assert np.all(pup.sort_values(['orientation', 'distance_band'])['n'] == [1, 2, 1, 1, 1])
