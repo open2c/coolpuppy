@@ -53,6 +53,7 @@ MOCK_MODULES = [
     "cooler",
     "cooltools",
     "cooltools.lib",
+    "cooltools.api",
     "h5py",
     "matplotlib",
     "matplotlib.colors",
