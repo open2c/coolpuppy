@@ -21,7 +21,7 @@ if on_rtd:
 else:
     INSTALL_REQUIRES = ['Cython', 'cooler', 'natsort', 'numpy>=1.16.5',
                         'scipy', 'cooltools>=0.4.0', 'pyyaml', 'more_itertools',
-                        'seaborn', 'natsort'
+                        'seaborn', 'natsort', 'tables'
                         ]
 
 setup(
