@@ -334,7 +334,12 @@ def main():
             schema = args.features_format
             if schema == "bed":
                 schema = "bed12"
-        features = bioframe.read_table(features, schema=schema, index_col=False)
+                dtype = {"chrom": str}
+            else:
+                dtype = {"chrom1": str, "chrom2": str}
+        features = bioframe.read_table(
+            features, schema=schema, index_col=False, dtype=dtype
+        )
     else:
         if args.features_format == "auto":
             raise ValueError(
