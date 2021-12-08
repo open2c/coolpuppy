@@ -332,11 +332,11 @@ def main():
             schema = ext[1:]
         else:
             schema = args.features_format
-            if schema == "bed":
-                schema = "bed12"
-                dtype = {"chrom": str}
-            else:
-                dtype = {"chrom1": str, "chrom2": str}
+        if schema == "bed":
+            schema = "bed12"
+            dtype = {"chrom": str}
+        else:
+            dtype = {"chrom1": str, "chrom2": str}
         features = bioframe.read_table(
             features, schema=schema, index_col=False, dtype=dtype
         )
