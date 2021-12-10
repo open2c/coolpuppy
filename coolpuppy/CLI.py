@@ -174,7 +174,10 @@ def parse_args_coolpuppy():
         required=False,
         help="""Perform by-window pile-ups.
                 Create a pile-up for each coordinate in the features.
-                Not compatible with --by_strand and --by_distance""",
+                Not compatible with --by_strand and --by_distance.
+
+                Only works with bed format features, and generates pairwise
+                combinations of each feature against the rest.""",
     )
     parser.add_argument(
         "--by_strand",
@@ -192,6 +195,15 @@ def parse_args_coolpuppy():
         help="""Perform by-distance pile-ups.
                 Create a separate pile-up for each distance band using 
                 [0, 50000, 100000, 200000, ...) as edges.""",
+    )
+    parser.add_argument(
+        "--flip_negative_strand",
+        action="store_true",
+        default=False,
+        required=False,
+        help="""Flip snippets so the positive strand always points to bottom-right.
+                Requires strands to be annotated for each feature (or two strands for
+                bedpe format features)""",
     )
     parser.add_argument(
         "--local",
@@ -460,6 +472,7 @@ def main():
         coverage_norm=args.coverage_norm,
         rescale=args.rescale,
         rescale_size=args.rescale_size,
+        flip_negative_strand=args.flip_negative_strand,
         ignore_diags=args.ignore_diags,
     )
 

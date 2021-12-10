@@ -34,7 +34,7 @@ def save_pileup_df(filename, df, metadata=None, mode="w"):
         Dictionary with meatadata.
     mode : str, optional
         Mode for the first time access to the output file: 'w' to overwrite if file
-        exists, or 'a' to fail if outpout file already exists
+        exists, or 'a' to fail if output file already exists
 
     Returns
     -------
@@ -1217,6 +1217,7 @@ class PileUpper:
         coverage_norm=False,
         rescale=False,
         rescale_size=99,
+        flip_negative_strand=False,
         ignore_diags=2,
     ):
         """Creates pileups
@@ -1257,6 +1258,10 @@ class PileUpper:
             Final shape of rescaled pileups. E.g. if 99, pileups will be squares of
             99×99 pixels.
             The default is 99.
+        flip_negative_strand : bool, optional
+            Flip snippets so the positive strand always points to bottom-right.
+            Requires strands to be annotated for each feature (or two strands for
+            bedpe format features)
         ignore_diags : int, optional
             How many diagonals to ignore to avoid short-distance artefacts.
             The default is 2.
@@ -1280,6 +1285,7 @@ class PileUpper:
         self.coverage_norm = coverage_norm
         self.rescale = rescale
         self.rescale_size = rescale_size
+        self.flip_negative_strand = flip_negative_strand
         self.ignore_diags = ignore_diags
 
         if view_df is None:
@@ -1522,6 +1528,25 @@ class PileUpper:
                 snip = self._rescale_snip(snip)
                 if self.expected and not self.ooe:
                     exp_snip = self._rescale_snip(exp_snip)
+
+            if (
+                self.flip_negative_strand
+                and "strand1" in snip.index
+                and "strand2" in snip.index
+            ):
+                if snip["strand1"] == "-" and snip["strand2"] == "-":
+                    axes = (0, 1)
+                elif snip["strand1"] == "-":
+                    axes = 0
+                elif snip["strand2"] == "-":
+                    axes = 1
+                else:
+                    axes = None
+
+                if axes is not None:
+                    snip["data"] = np.flip(snip["data"], axes)
+                    if self.expected and not self.ooe:
+                        exp_data = np.flip(exp_data, axes)
 
             yield snip
 
