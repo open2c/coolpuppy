@@ -32,13 +32,9 @@ What's not shown here is normalization to the expected values. This can be done 
 # Getting started
 
 ## Installation
-All requirements apart from `cooltools` are available from PyPI or conda. For `cooltools`, do
+All requirements apart are available from PyPI or conda. 
 
-`
-pip install https://github.com/mirnylab/cooltools/archive/master.zip
-`
-
-For coolpuppy (and other dependencies) simply do:
+Before installing everything you need to obtain `cython` using either pip or conda. Then for coolpuppy (and other dependencies) simply do:
 
 `pip install coolpuppy`
 
