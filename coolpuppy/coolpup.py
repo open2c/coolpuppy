@@ -1409,35 +1409,57 @@ class PileUpper:
             raise ValueError("Coverage function is not implemented for trans interactions")
         
         if self.expected is not False:
-            self.expected = self.expected[
-                self.expected["region1"] == self.expected["region2"]
-            ]
-            try:
-                _ = common.is_compatible_expected(
-                    expected,
-                    "cis",
-                    self.view_df,
-                    verify_cooler=clr,
-                    expected_value_cols=[
-                        self.expected_value_col,
-                    ],
-                    raise_errors=True,
+            if self.trans:
+                try:
+                    _ = common.is_compatible_expected(
+                        self.expected,
+                        "trans",
+                        self.view_df,
+                        verify_cooler=clr,
+                        expected_value_cols=[
+                            self.expected_value_col,
+                        ],
+                        raise_errors=True,
+                    )
+                except Exception as e:
+                    raise ValueError("provided expected is not valid") from e
+                if self.control:
+                    warnings.warn(
+                        "Can't do both expected and control shifts; defaulting to expected"
+                    )
+                    self.control = False
+                self.expected_df = self.expected
+                self.expected = True
+            else:
+                self.expected = self.expected[
+                    self.expected["region1"] == self.expected["region2"]
+                ]
+                try:
+                    _ = common.is_compatible_expected(
+                        self.expected,
+                        "cis",
+                        self.view_df,
+                        verify_cooler=clr,
+                        expected_value_cols=[
+                            self.expected_value_col,
+                        ],
+                        raise_errors=True,
+                    )
+                except Exception as e:
+                    raise ValueError("provided expected is not valid") from e
+                if self.control:
+                    warnings.warn(
+                        "Can't do both expected and control shifts; defaulting to expected"
+                    )
+                    self.control = False
+                self.ExpSnipper = snipping.ExpectedSnipper(
+                    self.clr, self.expected, view_df=self.view_df
                 )
-            except Exception as e:
-                raise ValueError("provided expected is not valid") from e
-            if self.control:
-                warnings.warn(
-                    "Can't do both expected and control shifts; defaulting to expected"
-                )
-                self.control = False
-            self.ExpSnipper = snipping.ExpectedSnipper(
-                self.clr, self.expected, view_df=self.view_df
-            )
-            self.expected_selections = {
-                region_name: self.ExpSnipper.select(region_name, region_name)
-                for region_name in self.view_df["name"]
-            }
-            self.expected = True
+                self.expected_selections = {
+                    region_name: self.ExpSnipper.select(region_name, region_name)
+                    for region_name in self.view_df["name"]
+                }
+                self.expected = True
 
         self.view_df = self.view_df.set_index("name")
         self.view_df_extents = {}
@@ -1513,6 +1535,11 @@ class PileUpper:
             (lo_left, hi_left, lo_right, hi_right),
         )
         return exp_matrix
+    
+    def get_expected_trans(self, region1, region2):
+        exp_value = self.expected_df.loc[(self.expected_df["region1"] == "chr1") & 
+                                       (self.expected_df["region2"] == "chr2"), "balanced.avg"].item()
+        return exp_value
 
     def make_outmap(
         self,
@@ -1654,16 +1681,19 @@ class PileUpper:
                 .astype(float)
             )
             if self.expected:
-                exp_data = self.get_expected_matrix(
-                    region,
-                    (snip["exp_start1"], snip["exp_end1"]),
-                    (snip["exp_start2"], snip["exp_end2"]),
-                )
-                if not self.ooe:
-                    exp_snip = snip.copy()
-                    exp_snip["kind"] = "control"
-                    exp_snip["data"] = exp_data
-            
+                if self.trans:
+                    exp_data = self.get_expected_trans(region1, region2)
+                else:
+                    exp_data = self.get_expected_matrix(
+                        region,
+                        (snip["exp_start1"], snip["exp_end1"]),
+                        (snip["exp_start2"], snip["exp_end2"]),
+                    )
+                    if not self.ooe:
+                        exp_snip = snip.copy()
+                        exp_snip["kind"] = "control"
+                        exp_snip["data"] = exp_data
+
             if self.trans == False:
                 D = (
                     diag_indicator[
