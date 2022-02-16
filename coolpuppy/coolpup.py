@@ -1537,8 +1537,8 @@ class PileUpper:
         return exp_matrix
     
     def get_expected_trans(self, region1, region2):
-        exp_value = self.expected_df.loc[(self.expected_df["region1"] == "chr1") & 
-                                       (self.expected_df["region2"] == "chr2"), "balanced.avg"].item()
+        exp_value = self.expected_df.loc[(self.expected_df["region1"] == region1) & 
+                                       (self.expected_df["region2"] == region2), "balanced.avg"].item()
         return exp_value
 
     def make_outmap(
