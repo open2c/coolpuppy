@@ -812,17 +812,45 @@ class CoordCreator:
                 self.minshift, self.maxshift, control_intervals.shape[0]
             )
             sign = np.random.choice([-1, 1], control_intervals.shape[0])
-            shift *= sign
-            control_intervals[
-                [
-                    "exp_start1",
-                    "exp_end1",
-                    "center1",
-                    "exp_start2",
-                    "exp_end2",
-                    "center2",
-                ]
-            ] = (
+            
+            if self.trans: #The two trans coordinates can shift in different directions 
+                sign2 = np.random.choice([-1, 1], control_intervals.shape[0])
+                shift *= sign
+                shift2 = shift*sign2
+                control_intervals[
+                    [
+                        "exp_start1",
+                        "exp_end1",
+                        "center1"
+                    ]
+                ] = (
+                    control_intervals[
+                        [
+                            "exp_start1",
+                            "exp_end1",
+                            "center1",
+                        ]
+                    ]
+                    + shift[:, np.newaxis]
+                )
+                control_intervals[
+                    [
+                        "exp_start2",
+                        "exp_end2",
+                        "center2"
+                    ]
+                ] = (
+                    control_intervals[
+                        [
+                            "exp_start2",
+                            "exp_end2",
+                            "center2"
+                        ]
+                    ]
+                    + shift2[:, np.newaxis]
+                )
+            else:
+                shift *= sign
                 control_intervals[
                     [
                         "exp_start1",
@@ -832,9 +860,19 @@ class CoordCreator:
                         "exp_end2",
                         "center2",
                     ]
-                ]
-                + shift[:, np.newaxis]
-            )
+                ] = (
+                    control_intervals[
+                        [
+                            "exp_start1",
+                            "exp_end1",
+                            "center1",
+                            "exp_start2",
+                            "exp_end2",
+                            "center2",
+                        ]
+                    ]
+                    + shift[:, np.newaxis]
+                )
             control_intervals[
                 ["stBin1", "endBin1", "stBin2", "endBin2"]
             ] = control_intervals[
