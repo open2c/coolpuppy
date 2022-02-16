@@ -1184,7 +1184,6 @@ class CoordCreator:
                     + ["data", "cov_start", "cov_end"]
                 )
                 for _, row in combinations.iterrows():
-                    print(row)
                     yield row
 
     def get_combinations_trans(
@@ -1198,8 +1197,12 @@ class CoordCreator:
     ):
         if intervals is None:
             intervals = self.intervals
-        intervals_left = filter_func1(self.intervals)
-        intervals_right = filter_func2(self.intervals)
+        if not len(intervals) >= 1:
+            logging.debug("Empty selection")
+            yield None
+                          
+        intervals_left = filter_func1(intervals)
+        intervals_right = filter_func2(intervals)
         
         intervals_left = intervals_left.rename(columns=lambda x: x + "1").reset_index(drop=True)
         intervals_right = intervals_right.rename(columns=lambda x: x + "2").reset_index(drop=True)
@@ -1207,8 +1210,8 @@ class CoordCreator:
         for x,y in itertools.product(intervals_left.index, intervals_right.index):
             combinations = pd.concat(
                 [
-                    intervals_left.iloc[x:].reset_index(drop=True),
-                    intervals_right.iloc[y:].reset_index(drop=True),
+                    intervals_left.iloc[[x]].reset_index(drop=True),
+                    intervals_right.iloc[[y]].reset_index(drop=True),
                 ],
                 axis=1,
             )
@@ -1219,11 +1222,10 @@ class CoordCreator:
                 combinations = modify_2Dintervals_func(combinations)
             combinations = assign_groups(combinations, groupby=groupby)
             combinations = combinations.reindex(
-                columns=list(combinations.columns)
-                + ["data", "cov_start", "cov_end"]
+                    columns=list(combinations.columns)
+                    + ["data", "cov_start", "cov_end"]
             )
             for _, row in combinations.iterrows():
-                    print(row)
                     yield row
 
 #     def get_combinations(
@@ -1596,7 +1598,8 @@ class PileUpper:
         for snip in intervals:
             if self.trans:
                 snip[["stBin1", "endBin1"]] -= min_left1
-                snip[["stBin2", "endBin2"]] -= min_left2
+                snip[["stBin2", "endBin2"]] -= min_left2 
+                snip[["stBin1", "endBin1", "stBin2", "endBin2"]] = snip[["stBin1", "endBin1", "stBin2", "endBin2"]].dropna().astype(int)
                 if (snip["stBin1"] < 0 or snip["endBin1"] > 
                     (max_right1 - min_left1)) | (snip["stBin2"] < 0 or snip["endBin2"] > 
                                                  (max_right2 - min_left2)):
