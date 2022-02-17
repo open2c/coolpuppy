@@ -18,6 +18,7 @@ from more_itertools import collapse
 import h5py
 import os
 import re
+from math import comb
 
 
 def save_pileup_df(filename, df, metadata=None, mode="w"):
@@ -794,6 +795,23 @@ class CoordCreator:
             )
 
         self.intervals = self._binnify(self.intervals)
+        
+        if self.kind == "bed":
+            if self.local:
+                self.combs = len(self.intervals)
+                logging.info(f"{self.combs} local regions will be used for pileup")
+            else:
+                cis_combs = sum([comb(row, 2) for row in self.intervals.groupby('chrom').size()])-1
+                if self.trans:
+                    self.combs = comb(len(self.intervals), 2)-cis_combs-1
+                    logging.info(f"{self.combs} trans pairs (between chromsomomes) will be used for pileup")
+                    if self.combs > 10**6:
+                        warnings.warn("More than one million combinations, consider splitting file or using the subset option (will still work but may be slow)")
+                else:
+                    self.combs = cis_combs
+                    logging.info(f"{self.combs} cis pairs (within chromosomes) will be used for pileup")
+                    if cis_combs > 10**6:
+                        warnings.warn("More than one million combinations, consider splitting file or using the subset option (will still work but may be slow)")
 
         if self.kind == "bed":
             if self.trans:
@@ -802,6 +820,8 @@ class CoordCreator:
                 self.pos_stream = self.get_combinations
         else:
             self.pos_stream = self.get_intervals_stream
+        
+
 
     def _control_regions(self, intervals2d, nshifts=0):
         if nshifts > 0:
@@ -1244,7 +1264,26 @@ class CoordCreator:
         
         intervals_left = intervals_left.rename(columns=lambda x: x + "1").reset_index(drop=True)
         intervals_right = intervals_right.rename(columns=lambda x: x + "2").reset_index(drop=True)
-
+        
+#         longest_side = max(intervals_left.shape[0], intervals_right.shape[0])
+#         for i in range(0, longest_side):
+#             combinations = pd.concat(
+#                 [
+#                     intervals_left.iloc[:].reset_index(drop=True),
+#                     intervals_right.iloc[i:].reset_index(drop=True),
+#                 ],
+#                 axis=1,
+#             ).dropna().reset_index(drop=True)
+#             
+#             combinations2 = pd.concat(
+#                 [
+#                     intervals_left.iloc[i:].reset_index(drop=True),
+#                     intervals_right.iloc[:].reset_index(drop=True),
+#                 ],
+#                 axis=1,
+#             ).dropna().reset_index(drop=True)
+#             
+#             combinations = pd.concat([combinations, combinations2]).drop_duplicates()
         for x,y in itertools.product(intervals_left.index, intervals_right.index):
             combinations = pd.concat(
                 [
@@ -1253,6 +1292,7 @@ class CoordCreator:
                 ],
                 axis=1,
             )
+
             combinations = self._control_regions(
                 combinations, self.nshifts * control
             )
@@ -1263,8 +1303,10 @@ class CoordCreator:
                     columns=list(combinations.columns)
                     + ["data", "cov_start", "cov_end"]
             )
+
             for _, row in combinations.iterrows():
                     yield row
+            
 
 #     def get_combinations(
 #         self,
@@ -1398,7 +1440,7 @@ class PileUpper:
         self.rescale_size = rescale_size
         self.flip_negative_strand = flip_negative_strand
         self.ignore_diags = ignore_diags
-
+        
         if view_df is None:
             # Generate viewframe from clr.chromsizes:
             self.view_df = common.make_cooler_view(clr)
@@ -1492,6 +1534,8 @@ class PileUpper:
                 "cov_end": np.zeros((self.empty_outmap.shape[1])),
             }
         )
+        
+
 
     # def get_matrix(self, matrix, chrom, left_interval, right_interval):
     #     lo_left, hi_left = left_interval
