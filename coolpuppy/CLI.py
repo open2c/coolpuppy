@@ -219,6 +219,20 @@ def parse_args_coolpuppy():
         help="""
         If empty `clr_weight_name`, add coverage normalization using chromosome marginals""",
     )
+    parser.add_argument(
+        "--trans",
+        action="store_true",
+        default=False,
+        required=False,
+        help="""Perform inter-chromosomal (trans) pileups""",
+    )
+    parser.add_argument(
+        "--by_chroms",
+        action="store_true",
+        default=False,
+        required=False,
+        help="""Perform by-chromosome pileups for trans interactions""",
+    )
     # Rescaling
     parser.add_argument(
         "--rescale",
@@ -459,6 +473,7 @@ def main():
         local=args.local,
         subset=args.subset,
         seed=args.seed,
+        trans=args.trans,
     )
 
     PU = PileUpper(
@@ -500,6 +515,10 @@ def main():
             outname += "_by-window"
         if args.by_strand:
             outname += "_by-strand"
+        if args.trans:
+            outname += "_trans"
+        if args.by_chroms:
+            outname += "_by-chroms"
         outname += ".clpy"
     else:
         outname = args.outname
@@ -512,6 +531,8 @@ def main():
         pups = PU.pileupsByStrandWithControl(nproc=nproc)
     elif args.by_distance:
         pups = PU.pileupsByDistanceWithControl(nproc=nproc)
+    elif args.by_chroms:
+        pups = PU.pileupsWithControl(nproc=nproc, groupby=["chrom1", "chrom2"])
     else:
         pups = PU.pileupsWithControl(nproc)
     headerdict = vars(args)
