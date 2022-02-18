@@ -513,21 +513,32 @@ def combine_rows(row1, row2, normalize_order=True):
     return double_row
 
 
-def _add_snip(outdict, key, snip):
+def _add_snip(outdict, key, snip, stripe=False):
     if key not in outdict:
         outdict[key] = snip[["data", "cov_start", "cov_end"]]
         outdict[key]["num"] = np.isfinite(snip["data"]).astype(int)
         outdict[key]["n"] = 1
     else:
-        outdict[key]["data"] = np.nansum([outdict[key]["data"], snip["data"]], axis=0)
-        outdict[key]["num"] += np.isfinite(snip["data"]).astype(int)
-        outdict[key]["cov_start"] = np.nansum(
-            [outdict[key]["cov_start"], snip["cov_start"]], axis=0
-        )
-        outdict[key]["cov_end"] = np.nansum(
-            [outdict[key]["cov_end"], snip["cov_end"]], axis=0
-        )
-        outdict[key]["n"] += 1
+        if stripe:
+            outdict[key]["data"] = np.concatenate((outdict[key]["data"], snip["data"]))
+            outdict[key]["num"] = np.concatenate((outdict[key]["num"], np.isfinite(snip["data"]).astype(int)))
+            outdict[key]["cov_start"] = np.nansum(
+                [outdict[key]["cov_start"], snip["cov_start"]], axis=0
+            )
+            outdict[key]["cov_end"] = np.nansum(
+                [outdict[key]["cov_end"], snip["cov_end"]], axis=0
+            )
+            outdict[key]["n"] += 1
+        else:
+            outdict[key]["data"] = np.nansum([outdict[key]["data"], snip["data"]], axis=0)
+            outdict[key]["num"] += np.isfinite(snip["data"]).astype(int)
+            outdict[key]["cov_start"] = np.nansum(
+                [outdict[key]["cov_start"], snip["cov_start"]], axis=0
+            )
+            outdict[key]["cov_end"] = np.nansum(
+                [outdict[key]["cov_end"], snip["cov_end"]], axis=0
+            )
+            outdict[key]["n"] += 1
 
 
 def sum_pups(pup1, pup2):
@@ -545,6 +556,20 @@ def sum_pups(pup1, pup2):
     }
     return pd.Series(pup)
 
+def concat_stripes(pup1, pup2):
+    """
+    Only preserves data, cov_start, cov_end, n and num
+    Assumes n=1 if not present, and calculates num if not present
+    """
+    pup = {
+        "data": np.concatenate((pup1["data"], pup2["data"])),
+        "cov_start": pup1["cov_start"] + pup2["cov_start"],
+        "cov_end": pup1["cov_end"] + pup2["cov_end"],
+        "n": pup1.get("n", 1) + pup2.get("n", 1),
+        "num": np.concatenate((pup1.get("num", np.isfinite(pup1["data"]).astype(int)),
+                               pup2.get("num", np.isfinite(pup2["data"]).astype(int))))
+    }
+    return pd.Series(pup)
 
 def norm_coverage(snip):
     """Normalize a pileup by coverage arrays
@@ -590,6 +615,7 @@ class CoordCreator:
         local=False,
         subset=0,
         trans=False,
+        stripe=False,        
         seed=None,
     ):
         """Generator of coordinate pairs for pileups.
@@ -676,6 +702,7 @@ class CoordCreator:
         self.local = local
         self.subset = subset
         self.trans = trans
+        self.stripe = stripe
         self.seed = seed
         self.process()
 
@@ -800,6 +827,8 @@ class CoordCreator:
             if self.local:
                 self.combs = len(self.intervals)
                 logging.info(f"{self.combs} local regions will be used for pileup")
+                if self.combs > 10**6:
+                    warnings.warn("More than one million combinations, consider splitting file or using the subset option (will still work but may be slow)")
             else:
                 cis_combs = sum([comb(row, 2) for row in self.intervals.groupby('chrom').size()])-1
                 if self.trans:
@@ -812,7 +841,15 @@ class CoordCreator:
                     logging.info(f"{self.combs} cis pairs (within chromosomes) will be used for pileup")
                     if cis_combs > 10**6:
                         warnings.warn("More than one million combinations, consider splitting file or using the subset option (will still work but may be slow)")
-
+                        
+        if self.stripe:
+            if self.local:
+                raise ValueError("Cannot do stripes for local pileups")
+            elif self.trans:
+                logging.info("Performing stripe pileup between chromosomes. Note that this only yields the stripe from the first chromosome, based on name, e.g. chr1 stripes in chr2 but not vice versa")
+            else:
+                logging.info("Performing stripe pileup within chromosomes")
+                
         if self.kind == "bed":
             if self.trans:
                 self.pos_stream = self.get_combinations_trans
@@ -820,8 +857,6 @@ class CoordCreator:
                 self.pos_stream = self.get_combinations
         else:
             self.pos_stream = self.get_intervals_stream
-        
-
 
     def _control_regions(self, intervals2d, nshifts=0):
         if nshifts > 0:
@@ -1216,6 +1251,10 @@ class CoordCreator:
         else:  # all combinations
             intervals_left = intervals.rename(columns=lambda x: x + "1")
             intervals_right = intervals.rename(columns=lambda x: x + "2")
+            if self.stripe:
+                intervals_left["stBin1"] = np.floor((intervals_left["stBin1"]+intervals_left["endBin1"])/2).astype(int)
+                intervals_left["endBin1"] = intervals_left["stBin1"] + 1
+                
             for i in range(1, intervals.shape[0]):
                 combinations = pd.concat(
                     [
@@ -1265,25 +1304,6 @@ class CoordCreator:
         intervals_left = intervals_left.rename(columns=lambda x: x + "1").reset_index(drop=True)
         intervals_right = intervals_right.rename(columns=lambda x: x + "2").reset_index(drop=True)
         
-#         longest_side = max(intervals_left.shape[0], intervals_right.shape[0])
-#         for i in range(0, longest_side):
-#             combinations = pd.concat(
-#                 [
-#                     intervals_left.iloc[:].reset_index(drop=True),
-#                     intervals_right.iloc[i:].reset_index(drop=True),
-#                 ],
-#                 axis=1,
-#             ).dropna().reset_index(drop=True)
-#             
-#             combinations2 = pd.concat(
-#                 [
-#                     intervals_left.iloc[i:].reset_index(drop=True),
-#                     intervals_right.iloc[:].reset_index(drop=True),
-#                 ],
-#                 axis=1,
-#             ).dropna().reset_index(drop=True)
-#             
-#             combinations = pd.concat([combinations, combinations2]).drop_duplicates()
         for x,y in itertools.product(intervals_left.index, intervals_right.index):
             combinations = pd.concat(
                 [
@@ -1307,7 +1327,27 @@ class CoordCreator:
             for _, row in combinations.iterrows():
                     yield row
             
+#         longest_side = max(intervals_left.shape[0], intervals_right.shape[0])
+#         for i in range(0, longest_side):
+#             combinations = pd.concat(
+#                 [
+#                     intervals_left.iloc[:].reset_index(drop=True),
+#                     intervals_right.iloc[i:].reset_index(drop=True),
+#                 ],
+#                 axis=1,
+#             ).dropna().reset_index(drop=True)
+#             
+#             combinations2 = pd.concat(
+#                 [
+#                     intervals_left.iloc[i:].reset_index(drop=True),
+#                     intervals_right.iloc[:].reset_index(drop=True),
+#                 ],
+#                 axis=1,
+#             ).dropna().reset_index(drop=True)
+#             
+#             combinations = pd.concat([combinations, combinations2]).drop_duplicates()
 
+           
 #     def get_combinations(
 #         self,
 #         filter_func,
@@ -1599,7 +1639,10 @@ class PileUpper:
         if self.rescale:
             outmap = np.zeros((self.rescale_size, self.rescale_size))
         else:
-            outmap = np.zeros((2 * self.pad_bins + 1, 2 * self.pad_bins + 1))
+            if self.stripe:
+                outmap = np.zeros((1, 2 * self.pad_bins + 1))
+            else:
+                outmap = np.zeros((2 * self.pad_bins + 1, 2 * self.pad_bins + 1))
         return outmap
 
     def get_data(self, region1, region2=None):
@@ -1724,15 +1767,25 @@ class PileUpper:
                 .toarray()
                 .astype(float)
             )
+            
             if self.expected:
                 if self.trans:
                     exp_data = self.get_expected_trans(region1, region2)
                 else:
-                    exp_data = self.get_expected_matrix(
-                        region,
-                        (snip["exp_start1"], snip["exp_end1"]),
-                        (snip["exp_start2"], snip["exp_end2"]),
-                    )
+                    if self.stripe:
+                        stripe_left = np.floor(snip["center1"] / self.resolution) * self.resolution
+                        stripe_right = stripe_left + self.resolution
+                        exp_data = self.get_expected_matrix(
+                            region,
+                            stripe_left.astype(int), stripe_right.astype(int),
+                            (snip["exp_start2"], snip["exp_end2"]),
+                        )
+                    else:
+                        exp_data = self.get_expected_matrix(
+                            region,
+                            (snip["exp_start1"], snip["exp_end1"]),
+                            (snip["exp_start2"], snip["exp_end2"]),
+                        )
                     if not self.ooe:
                         exp_snip = snip.copy()
                         exp_snip["kind"] = "control"
@@ -1847,9 +1900,9 @@ class PileUpper:
             kind = snip["kind"]
             key = snip["group"]
             if isinstance(key, str):
-                _add_snip(outdict[kind], key, snip)
+                _add_snip(outdict[kind], key, snip, self.stripe)
             else:
-                _add_snip(outdict[kind], tuple(key), snip)
+                _add_snip(outdict[kind], tuple(key), snip, self.stripe)
         if "all" not in outdict["ROI"]:
             outdict["ROI"]["all"] = reduce(
                 sum_pups, outdict["ROI"].values(), self.empty_pup
@@ -2016,18 +2069,31 @@ class PileUpper:
                 postprocess_func=postprocess_func,
             )
             pileups = list(mymap(f, self.view_df.index))
-            
-        roi = (
-            pd.DataFrame([pileup["ROI"] for pileup in pileups])
-            .apply(lambda x: reduce(sum_pups, x.dropna()))
-            .T
-        )
-        if self.control or (self.expected and not self.ooe):
-            ctrl = (
-                pd.DataFrame([pileup["control"] for pileup in pileups])
+        
+        if self.stripe:
+            roi = (
+                pd.DataFrame([pileup["ROI"] for pileup in pileups])
+                .apply(lambda x: reduce(concat_stripes, x.dropna()))
+                .T
+            )
+            if self.control or (self.expected and not self.ooe):
+                ctrl = (
+                    pd.DataFrame([pileup["control"] for pileup in pileups])
+                    .apply(lambda x: reduce(concat_stripes, x.dropna()))
+                    .T
+                )
+        else:
+            roi = (
+                pd.DataFrame([pileup["ROI"] for pileup in pileups])
                 .apply(lambda x: reduce(sum_pups, x.dropna()))
                 .T
             )
+            if self.control or (self.expected and not self.ooe):
+                ctrl = (
+                    pd.DataFrame([pileup["control"] for pileup in pileups])
+                    .apply(lambda x: reduce(sum_pups, x.dropna()))
+                    .T
+                )
         if self.coverage_norm:
             roi = roi.apply(norm_coverage, axis=1)
             if self.control:
@@ -2039,8 +2105,18 @@ class PileUpper:
             normalized_control = pd.DataFrame(
                 ctrl["data"] / ctrl["num"], columns=["data"]
             )
+            if self.stripe:
+                arr = normalized_control["data"]["all"]
+                arr[~np.isfinite(arr)] = np.nan
+                arr = np.nansum(arr, axis=0) / arr.shape[0]
+                normalized_control["data"]["all"] = arr
             normalized_roi = normalized_roi / normalized_control
         normalized_roi["n"] = roi["n"]
+        if self.stripe:
+            arr = normalized_roi["data"]["all"]
+            arr[~np.isfinite(arr)] = np.nan
+            arr = arr[np.argsort(np.nansum(arr.T, axis=0))[::-1],:]
+            normalized_roi["data"]["all"] = arr
         if nproc > 1:
             p.close()
         # pileup[~np.isfinite(pileup)] = 0
