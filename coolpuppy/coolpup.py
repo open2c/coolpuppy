@@ -1378,6 +1378,9 @@ class CoordCreator:
         if intervals is None:
             intervals = self.intervals
         intervals = filter_func(intervals)
+        if self.stripe:
+            intervals["stBin1"] = np.floor((intervals["stBin1"]+intervals["endBin1"])/2).astype(int)
+            intervals["endBin1"] = intervals["stBin1"] + 1
         intervals = self._control_regions(intervals, self.nshifts * control)
         if modify_2Dintervals_func is not None:
             intervals = modify_2Dintervals_func(intervals)
