@@ -66,6 +66,13 @@ def parse_args_plotpuppy():
         choices={"linear", "log"},
         help="""Whether to use linear or log scaling for mapping colours""",
     )
+    parser.add_argument(
+        "--stripe", 
+        action="store_true", 
+        default=False,
+        required=False, 
+        help="""For plotting stripe stackups"""
+    )
     # parser.add_argument(
     #     "--cbar_mode",
     #     type=str,
@@ -250,6 +257,7 @@ def main():
         sym=args.symmetric,
         cmap=args.cmap,
         scale=args.scale,
+        stripe=args.stripe,
     )
-
+    
     plt.savefig(args.output, bbox_inches="tight", dpi=args.dpi)

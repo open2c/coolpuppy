@@ -89,6 +89,18 @@ def add_heatmap(data, color=None, cmap="coolwarm", norm=LogNorm(0.5, 2)):
 #     sns.heatmap(data.values[0], cmap=cmap, norm=norm, ax=ax, square=True, cbar=False,
 #                xticklabels=False, yticklabels=False)
 
+def add_stripe_heatmap(data, color=None, cmap="inferno", norm=LogNorm(0.5, 2)):
+    """
+    Adds the array contained in data.values[0] to the current axes as a heatmap of stripes
+    """
+    if len(data) > 1:
+        raise ValueError(
+            "Multiple pileups for one of the conditions, ensure unique correspondence for each col/row combination"
+        )
+    elif len(data) == 0:
+        return
+    ax = plt.gca()
+    ax.imshow(data.values[0], cmap=cmap, norm=norm, aspect='auto', interpolation='none')    
 
 def add_score(score, color=None):
     """
@@ -121,14 +133,16 @@ def make_heatmap_grid(
     cmap="coolwarm",
     scale="log",
     height=1,
+    stripe=False,
     **kwargs,
 ):
     pupsdf = pupsdf.copy()
 
     if norm_corners:
-        pupsdf["data"] = pupsdf.apply(
-            lambda x: coolpup.norm_cis(x["data"], norm_corners), axis=1
-        )
+        if not stripe:
+            pupsdf["data"] = pupsdf.apply(
+                lambda x: coolpup.norm_cis(x["data"], norm_corners), axis=1
+            )
 
     if cols is not None and col_order is None:
         col_order = list(set(pupsdf[cols].dropna()))
@@ -185,9 +199,17 @@ def make_heatmap_grid(
         **kwargs,
     )
     norm = norm(vmin, vmax)
-    fg.map(add_heatmap, "data", norm=norm, cmap=cmap)
+    
+    
+    if stripe:
+        fg.map(add_stripe_heatmap, "data", norm=norm, cmap=cmap)
+    else:
+        fg.map(add_heatmap, "data", norm=norm, cmap=cmap)
     if score:
-        fg.map(add_score, "score")
+        if stripe:
+            pass
+        else:
+            fg.map(add_score, "score")
     fg.map(lambda color: plt.gca().set_xticks([]))
     fg.map(lambda color: plt.gca().set_yticks([]))
     fg.set_titles(col_template="", row_template="")
@@ -214,7 +236,10 @@ def make_heatmap_grid(
     top = ax_top.get_position().y1
     height = top - bottom
     right = ax_top.get_position().x1
-    cax = fg.fig.add_axes([right + 0.005, bottom, (1 - right - 0.005) / 5, height])
+    if not stripe:
+        cax = fg.fig.add_axes([right + 0.005, bottom, (1 - right - 0.005) / 5, height])
+    else:
+        cax = fg.fig.add_axes([right + 0.1, bottom, (1 - right - 0.1) / 5, height])    
     if sym:
         ticks = [vmin, 1, vmax]
     else:
@@ -224,6 +249,6 @@ def make_heatmap_grid(
         ticks=ticks,
         cax=cax,
         format=ticker.FuncFormatter(lambda x, pos: f"{x:.2g}"),
-    )
+        )
     cax.minorticks_off()
     return fg
