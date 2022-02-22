@@ -50,13 +50,13 @@ def save_pileup_df(filename, df, metadata=None, mode="w"):
         metadata = {}
     df[df.columns[df.columns != "data"]].to_hdf(filename, "annotation", mode=mode)
     with h5py.File(filename, "a") as f:
-        width = df["data"].iloc[0].shape[0]
-        height = width * df["data"].shape[0]
+        height = df["data"].iloc[0].shape[0]
+        width = df["data"].iloc[0].shape[1] * df["data"].shape[0]
         ds = f.create_dataset(
-            "data", compression="lzf", chunks=(width, width), shape=(height, width)
+            "data", compression="lzf", chunks=(height, width), shape=(height, width)
         )
         for i, arr in df["data"].reset_index(drop=True).items():
-            ds[i * width : (i + 1) * width, :] = arr
+            ds[i * height : (i + 1) * height, :] = arr
         group = f.create_group("attrs")
         if metadata is not None:
             for key, val in metadata.items():
