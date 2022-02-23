@@ -792,10 +792,12 @@ class CoordCreator:
             self.intervals = expand2D(
                 self.intervals, self.flank, self.resolution, self.fraction_flank
             )
-            if self.keepsortorder:
-                coords = self.intervals[['chrom1', 'start1', 'end1', 'chrom2', 'exp_start2', 'exp_end2']]
-                coords[['start1', 'end1', 'exp_start2', 'exp_end2']] = coords[['start1', 'end1', 'exp_start2', 'exp_end2']].astype(int)
-                self.sortorder = coords.apply(lambda x: '.'.join(x.astype(str)),axis=1)
+            if self.stripe:
+                if self.keepsortorder:
+                    coords = self.intervals[['chrom1', 'start1', 'end1', 'chrom2', 'start2', 'end2']]
+                    coords[['start1', 'end1', 'start2', 'end2']] = coords[['start1', 'end1', 'start2', 'end2']].astype(int)
+                    self.sortorder = coords.apply(lambda x: '.'.join(x.astype(str)),axis=1)
+                    logging.info("Using order in provided bedpe for stripe stackups")
         if self.nshifts > 0 and self.kind == "bedpe":
             self.intervals = self._control_regions(self.intervals)
 
@@ -1263,7 +1265,7 @@ class CoordCreator:
                     combinations, self.nshifts * control
                 )
                 if self.stripe:
-                    combinations["coordinates"] = combinations.apply(lambda x: '.'.join(x[['chrom1', 'start1', 'end1', 'chrom2', 'exp_start2', 'exp_end2']].astype(str)),axis=1)
+                    combinations["coordinates"] = combinations.apply(lambda x: '.'.join(x[['chrom1', 'start1', 'end1', 'chrom2', 'start2', 'end2']].astype(str)),axis=1)
                 if modify_2Dintervals_func is not None:
                     combinations = modify_2Dintervals_func(combinations)
                 combinations = assign_groups(combinations, groupby=groupby)
@@ -1372,7 +1374,7 @@ class CoordCreator:
         if self.stripe:
             intervals["stBin1"] = np.floor((intervals["stBin1"]+intervals["endBin1"])/2).astype(int)
             intervals["endBin1"] = intervals["stBin1"] + 1
-            intervals["coordinates"] = intervals.apply(lambda x: '.'.join(x[['chrom1', 'start1', 'end1', 'chrom2', 'exp_start2', 'exp_end2']].astype(str)),axis=1)
+            intervals["coordinates"] = intervals.apply(lambda x: '.'.join(x[['chrom1', 'start1', 'end1', 'chrom2', 'start2', 'end2']].astype(str)),axis=1)
         intervals = self._control_regions(intervals, self.nshifts * control)
         if modify_2Dintervals_func is not None:
             intervals = modify_2Dintervals_func(intervals)
@@ -2150,7 +2152,8 @@ class PileUpper:
                 if isinstance(self.outfilesorted, str):
                     outbedpe = pd.DataFrame([x.split(".") for x in normalized_roi["coordinates"][0]])
                     outbedpe.columns = ["chrom1", "start1", "end1", "chrom2", "start2", "end2"]
-                    outbedpe.to_csv(self.outfilesorted, index=False, sep="\t")
+                    outbedpe.to_csv(self.outfilesorted, index=False, sep="\t", header=False)
+                    logging.info(f"Saved sorted bedpe output at: {self.outfilesorted}")
         if groupby:
             normalized_roi = normalized_roi.reset_index()
             normalized_roi[groupby] = pd.DataFrame(

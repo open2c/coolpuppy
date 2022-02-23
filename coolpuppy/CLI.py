@@ -245,14 +245,14 @@ def parse_args_coolpuppy():
         action="store_true",
         default=False,
         required=False,
-        help="""Keep sort order of input BEDPE file when generating stripes""",
+        help="""Keep sort order of input bedpe file when generating stripes""",
     )
     parser.add_argument(
         "--out_file_sorted",
-        action="store_true",
+        type=str,
         default=None,
         required=False,
-        help="""Output file location to save BEDPE of stripes after sorting""",
+        help="""Output file location to save bedpe of stripes after sorting""",
     )
     
     # Rescaling
