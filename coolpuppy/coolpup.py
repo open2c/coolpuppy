@@ -515,7 +515,10 @@ def combine_rows(row1, row2, normalize_order=True):
 
 def _add_snip(outdict, key, snip, stripe=False):
     if key not in outdict:
-        outdict[key] = snip[["data", "cov_start", "cov_end"]]
+        if stripe:
+            outdict[key] = snip[["data", "cov_start", "cov_end", "coordinates"]]
+        else:
+            outdict[key] = snip[["data", "cov_start", "cov_end"]]
         outdict[key]["num"] = np.isfinite(snip["data"]).astype(int)
         outdict[key]["n"] = 1
     else:
@@ -529,6 +532,7 @@ def _add_snip(outdict, key, snip, stripe=False):
                 [outdict[key]["cov_end"], snip["cov_end"]], axis=0
             )
             outdict[key]["n"] += 1
+            outdict[key]["coordinates"] = list(itertools.chain.from_iterable(itertools.repeat(x,1) if isinstance(x,str) else x for x in list(itertools.chain([outdict[key]["coordinates"], snip["coordinates"]]))))
         else:
             outdict[key]["data"] = np.nansum([outdict[key]["data"], snip["data"]], axis=0)
             outdict[key]["num"] += np.isfinite(snip["data"]).astype(int)
@@ -567,7 +571,8 @@ def concat_stripes(pup1, pup2):
         "cov_end": pup1["cov_end"] + pup2["cov_end"],
         "n": pup1.get("n", 1) + pup2.get("n", 1),
         "num": np.concatenate((pup1.get("num", np.isfinite(pup1["data"]).astype(int)),
-                               pup2.get("num", np.isfinite(pup2["data"]).astype(int))))
+                               pup2.get("num", np.isfinite(pup2["data"]).astype(int)))),
+        "coordinates": list(itertools.chain.from_iterable(itertools.repeat(x,1) if isinstance(x,str) else x for x in list(itertools.chain([pup1["coordinates"], pup2["coordinates"]]))))
     }
     return pd.Series(pup)
 
@@ -615,7 +620,8 @@ class CoordCreator:
         local=False,
         subset=0,
         trans=False,
-        stripe=False,        
+        stripe=False,     
+        keepsortorder=False,
         seed=None,
     ):
         """Generator of coordinate pairs for pileups.
@@ -704,6 +710,7 @@ class CoordCreator:
         self.trans = trans
         self.stripe = stripe
         self.seed = seed
+        self.keepsortorder = keepsortorder
         self.process()
 
     def process(self):
@@ -737,7 +744,10 @@ class CoordCreator:
             return
 
         if self.subset > 0:
-            self.intervals = self._subset(self.intervals)
+            if self.keepsortorder:
+                raise ValueError("Cannot keep sort order with subset selected, as it includes a randomization step")
+            else:
+                self.intervals = self._subset(self.intervals)
 
         if self.anchor:
             assert self.kind == "bed"
@@ -782,7 +792,10 @@ class CoordCreator:
             self.intervals = expand2D(
                 self.intervals, self.flank, self.resolution, self.fraction_flank
             )
-
+            if self.keepsortorder:
+                coords = self.intervals[['chrom1', 'start1', 'end1', 'chrom2', 'exp_start2', 'exp_end2']]
+                coords[['start1', 'end1', 'exp_start2', 'exp_end2']] = coords[['start1', 'end1', 'exp_start2', 'exp_end2']].astype(int)
+                self.sortorder = coords.apply(lambda x: '.'.join(x.astype(str)),axis=1)
         if self.nshifts > 0 and self.kind == "bedpe":
             self.intervals = self._control_regions(self.intervals)
 
@@ -1186,30 +1199,6 @@ class CoordCreator:
             & (intervals["end2"] < end)
         ].reset_index(drop=True)
 
-#     def _filter_func_trans(self, intervals, region1, region2):
-#         chrom1, start1, end1 = region1
-#         chrom2, start2, end2 = region2
-#         return intervals[
-#             ((intervals["chrom"] == chrom1)
-#             & (intervals["start"] >= start1)
-#             & (intervals["end"] < end1)) | 
-#             ((intervals["chrom"] == chrom2)
-#             & (intervals["start"] >= start2)
-#             & (intervals["end"] < end2))
-#         ].reset_index(drop=True) 
-# 
-#     def _filter_func_trans_pairs(self, intervals, region1, region2):
-#         chrom1, start1, end1 = region1
-#         chrom2, start2, end2 = region2
-#         return intervals[
-#             (intervals["chrom1"] == chrom1)
-#             & (intervals["chrom2"] == chrom2)
-#             & (intervals["start1"] >= start1)
-#             & (intervals["end1"] < end1)
-#             & (intervals["start2"] >= start2)
-#             & (intervals["end2"] < end2)
-#         ].reset_index(drop=True)
-
     def filter_func_region(self, region):
         if self.kind == "bed":
             return partial(self._filter_func_region, region=region)
@@ -1273,6 +1262,8 @@ class CoordCreator:
                 combinations = self._control_regions(
                     combinations, self.nshifts * control
                 )
+                if self.stripe:
+                    combinations["coordinates"] = combinations.apply(lambda x: '.'.join(x[['chrom1', 'start1', 'end1', 'chrom2', 'exp_start2', 'exp_end2']].astype(str)),axis=1)
                 if modify_2Dintervals_func is not None:
                     combinations = modify_2Dintervals_func(combinations)
                 combinations = assign_groups(combinations, groupby=groupby)
@@ -1381,6 +1372,7 @@ class CoordCreator:
         if self.stripe:
             intervals["stBin1"] = np.floor((intervals["stBin1"]+intervals["endBin1"])/2).astype(int)
             intervals["endBin1"] = intervals["stBin1"] + 1
+            intervals["coordinates"] = intervals.apply(lambda x: '.'.join(x[['chrom1', 'start1', 'end1', 'chrom2', 'exp_start2', 'exp_end2']].astype(str)),axis=1)
         intervals = self._control_regions(intervals, self.nshifts * control)
         if modify_2Dintervals_func is not None:
             intervals = modify_2Dintervals_func(intervals)
@@ -1415,6 +1407,7 @@ class PileUpper:
         rescale_size=99,
         flip_negative_strand=False,
         ignore_diags=2,
+        outfilesorted=None,
     ):
         """Creates pileups
 
@@ -1483,6 +1476,7 @@ class PileUpper:
         self.rescale_size = rescale_size
         self.flip_negative_strand = flip_negative_strand
         self.ignore_diags = ignore_diags
+        self.outfilesorted = outfilesorted
         
         if view_df is None:
             # Generate viewframe from clr.chromsizes:
@@ -1568,15 +1562,27 @@ class PileUpper:
         }
 
         self.empty_outmap = self.make_outmap()
-        self.empty_pup = pd.Series(
-            {
-                "data": self.empty_outmap,
-                "n": 0,
-                "num": self.empty_outmap,
-                "cov_start": np.zeros((self.empty_outmap.shape[0])),
-                "cov_end": np.zeros((self.empty_outmap.shape[1])),
-            }
-        )
+        if self.stripe:
+            self.empty_pup = pd.Series(
+                {
+                    "data": self.empty_outmap,
+                    "n": 0,
+                    "num": self.empty_outmap,
+                    "cov_start": np.zeros((self.empty_outmap.shape[0])),
+                    "cov_end": np.zeros((self.empty_outmap.shape[1])),
+                    "coordinates": "",
+                }
+            )
+        else:
+            self.empty_pup = pd.Series(
+                {
+                    "data": self.empty_outmap,
+                    "n": 0,
+                    "num": self.empty_outmap,
+                    "cov_start": np.zeros((self.empty_outmap.shape[0])),
+                    "cov_end": np.zeros((self.empty_outmap.shape[1])),
+                }
+            )
         
 
 
@@ -2115,11 +2121,22 @@ class PileUpper:
                 normalized_control["data"]["all"] = arr
             normalized_roi = normalized_roi / normalized_control
         normalized_roi["n"] = roi["n"]
+        normalized_roi["coordinates"] = roi["coordinates"]
         if self.stripe:
-            arr = normalized_roi["data"]["all"]
-            arr[~np.isfinite(arr)] = np.nan
-            arr = arr[np.argsort(np.nansum(arr.T, axis=0))[::-1],:]
-            normalized_roi["data"]["all"] = arr
+            if not self.keepsortorder:
+                normalized_roi["data"]["all"][~np.isfinite(normalized_roi["data"]["all"])] = np.nan
+                myorder = np.argsort(np.nansum(normalized_roi["data"]["all"].T, axis=0))
+                normalized_roi["data"]["all"] = normalized_roi["data"]["all"][myorder[::-1],:]
+                normalized_roi["coordinates"]["all"] = [normalized_roi["coordinates"]["all"][i] for i in myorder[::-1]]
+            else:
+                #test_list1 = pup["coordinates"]["all"]#[5, 7, 8, 9, 10, 11]
+                #test_list2 = cc.sortorder
+                #set_ = set(test_list1)
+                #res = [i for i, val in enumerate(self.sortorder) if val in set(normalized_roi["coordinates"]["all"])]
+                sort_order = [normalized_roi["coordinates"]["all"].index(x) for x in self.sortorder]
+                normalized_roi["coordinates"]["all"] = [normalized_roi["coordinates"]["all"][i] for i in sort_order]
+                normalized_roi["data"]["all"] = normalized_roi["data"]["all"][sort_order,:]
+                #normalized_roi["data"]["all"] = [normalized_roi["data"]["all"][i] for i in sort_order]
         if nproc > 1:
             p.close()
         # pileup[~np.isfinite(pileup)] = 0
@@ -2127,7 +2144,13 @@ class PileUpper:
             normalized_roi["data"] = normalized_roi["data"].apply(
                 lambda x: np.nanmean(np.dstack((x, x.T)), 2)
             )
-
+        
+        if self.stripe:
+            if self.kind == "bed":
+                if isinstance(self.outfilesorted, str):
+                    outbedpe = pd.DataFrame([x.split(".") for x in normalized_roi["coordinates"][0]])
+                    outbedpe.columns = ["chrom1", "start1", "end1", "chrom2", "start2", "end2"]
+                    outbedpe.to_csv(self.outfilesorted, index=False, sep="\t")
         if groupby:
             normalized_roi = normalized_roi.reset_index()
             normalized_roi[groupby] = pd.DataFrame(
