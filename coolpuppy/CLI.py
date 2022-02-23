@@ -233,6 +233,28 @@ def parse_args_coolpuppy():
         required=False,
         help="""Perform by-chromosome pileups for trans interactions""",
     )
+    parser.add_argument(
+        "--stripe",
+        action="store_true",
+        default=False,
+        required=False,
+        help="""Perform stripe stackups instead of pileups""",
+    )
+    parser.add_argument(
+        "--keep_sort_order",
+        action="store_true",
+        default=False,
+        required=False,
+        help="""Keep sort order of input BEDPE file when generating stripes""",
+    )
+    parser.add_argument(
+        "--out_file_sorted",
+        action="store_true",
+        default=None,
+        required=False,
+        help="""Output file location to save BEDPE of stripes after sorting""",
+    )
+    
     # Rescaling
     parser.add_argument(
         "--rescale",
@@ -474,6 +496,8 @@ def main():
         subset=args.subset,
         seed=args.seed,
         trans=args.trans,
+        stripe=args.stripe,
+        keepsortorder=args.keep_sort_order,
     )
 
     PU = PileUpper(
@@ -489,6 +513,7 @@ def main():
         rescale_size=args.rescale_size,
         flip_negative_strand=args.flip_negative_strand,
         ignore_diags=args.ignore_diags,
+        outfilesorted=args.out_file_sorted
     )
 
     if args.outname == "auto":
@@ -519,6 +544,8 @@ def main():
             outname += "_trans"
         if args.by_chroms:
             outname += "_by-chroms"
+        if args.stripe:
+            outname += "_stripe"
         outname += ".clpy"
     else:
         outname = args.outname
