@@ -512,19 +512,21 @@ def combine_rows(row1, row2, normalize_order=True):
     # double_row['distance'] = d
     return double_row
 
-
-def _add_snip(outdict, key, snip, stripe=False):
+def _add_snip(outdict, key, snip, store_stripes=False):
     if key not in outdict:
-        if stripe:
-            outdict[key] = snip[["data", "cov_start", "cov_end", "coordinates"]]
+        if store_stripes:
+            outdict[key] = snip[["data", "left_stripe", "right_stripe", "corner_stripe", "cov_start", "cov_end", "coordinates"]]
         else:
             outdict[key] = snip[["data", "cov_start", "cov_end"]]
         outdict[key]["num"] = np.isfinite(snip["data"]).astype(int)
         outdict[key]["n"] = 1
     else:
-        if stripe:
-            outdict[key]["data"] = np.concatenate((outdict[key]["data"], snip["data"]))
-            outdict[key]["num"] = np.concatenate((outdict[key]["num"], np.isfinite(snip["data"]).astype(int)))
+        if store_stripes:
+            outdict[key]["data"] = np.nansum([outdict[key]["data"], snip["data"]], axis=0)
+            outdict[key]["left_stripe"] = np.concatenate((outdict[key]["left_stripe"], snip["left_stripe"]))
+            outdict[key]["right_stripe"] = np.concatenate((outdict[key]["right_stripe"], snip["right_stripe"]))
+            outdict[key]["corner_stripe"] = np.concatenate((outdict[key]["corner_stripe"], snip["corner_stripe"]))
+            outdict[key]["num"] += np.isfinite(snip["data"]).astype(int)
             outdict[key]["cov_start"] = np.nansum(
                 [outdict[key]["cov_start"], snip["cov_start"]], axis=0
             )
@@ -560,18 +562,22 @@ def sum_pups(pup1, pup2):
     }
     return pd.Series(pup)
 
-def concat_stripes(pup1, pup2):
+def sum_pups_stripes(pup1, pup2):
     """
     Only preserves data, cov_start, cov_end, n and num
     Assumes n=1 if not present, and calculates num if not present
     """
+    
     pup = {
-        "data": np.concatenate((pup1["data"], pup2["data"])),
+        "data": pup1["data"] + pup2["data"],
+        "left_stripe": np.concatenate((pup1["left_stripe"], pup2["left_stripe"])),
+        "right_stripe": np.concatenate((pup1["right_stripe"], pup2["right_stripe"])),
+        "corner_stripe": np.concatenate((pup1["corner_stripe"], pup2["corner_stripe"])),
         "cov_start": pup1["cov_start"] + pup2["cov_start"],
         "cov_end": pup1["cov_end"] + pup2["cov_end"],
         "n": pup1.get("n", 1) + pup2.get("n", 1),
-        "num": np.concatenate((pup1.get("num", np.isfinite(pup1["data"]).astype(int)),
-                               pup2.get("num", np.isfinite(pup2["data"]).astype(int)))),
+        "num": pup1.get("num", np.isfinite(pup1["data"]).astype(int))
+        + pup2.get("num", np.isfinite(pup2["data"]).astype(int)),
         "coordinates": list(itertools.chain.from_iterable(itertools.repeat(x,1) if isinstance(x,str) else x for x in list(itertools.chain([pup1["coordinates"], pup2["coordinates"]]))))
     }
     return pd.Series(pup)
@@ -620,8 +626,7 @@ class CoordCreator:
         local=False,
         subset=0,
         trans=False,
-        stripe=False,     
-        keepsortorder=False,
+        store_stripes=False,     
         seed=None,
     ):
         """Generator of coordinate pairs for pileups.
@@ -708,9 +713,8 @@ class CoordCreator:
         self.local = local
         self.subset = subset
         self.trans = trans
-        self.stripe = stripe
+        self.store_stripes = store_stripes
         self.seed = seed
-        self.keepsortorder = keepsortorder
         self.process()
 
     def process(self):
@@ -744,10 +748,7 @@ class CoordCreator:
             return
 
         if self.subset > 0:
-            if self.keepsortorder:
-                raise ValueError("Cannot keep sort order with subset selected, as it includes a randomization step")
-            else:
-                self.intervals = self._subset(self.intervals)
+            self.intervals = self._subset(self.intervals)
 
         if self.anchor:
             assert self.kind == "bed"
@@ -792,12 +793,7 @@ class CoordCreator:
             self.intervals = expand2D(
                 self.intervals, self.flank, self.resolution, self.fraction_flank
             )
-            if self.stripe:
-                if self.keepsortorder:
-                    coords = self.intervals[['chrom1', 'start1', 'end1', 'chrom2', 'start2', 'end2']]
-                    coords[['start1', 'end1', 'start2', 'end2']] = coords[['start1', 'end1', 'start2', 'end2']].astype(int)
-                    self.sortorder = coords.apply(lambda x: '.'.join(x.astype(str)),axis=1)
-                    logging.info("Using order in provided bedpe for stripe stackups")
+
         if self.nshifts > 0 and self.kind == "bedpe":
             self.intervals = self._control_regions(self.intervals)
 
@@ -837,33 +833,6 @@ class CoordCreator:
             )
 
         self.intervals = self._binnify(self.intervals)
-        
-        if self.kind == "bed":
-            if self.local:
-                self.combs = len(self.intervals)
-                logging.info(f"{self.combs} local regions will be used for pileup")
-                if self.combs > 10**6:
-                    warnings.warn("More than one million combinations, consider splitting file or using the subset option (will still work but may be slow)")
-            else:
-                cis_combs = sum([comb(row, 2) for row in self.intervals.groupby('chrom').size()])-1
-                if self.trans:
-                    self.combs = comb(len(self.intervals), 2)-cis_combs-1
-                    logging.info(f"{self.combs} trans pairs (between chromsomomes) will be used for pileup")
-                    if self.combs > 10**6:
-                        warnings.warn("More than one million combinations, consider splitting file or using the subset option (will still work but may be slow)")
-                else:
-                    self.combs = cis_combs
-                    logging.info(f"{self.combs} cis pairs (within chromosomes) will be used for pileup")
-                    if cis_combs > 10**6:
-                        warnings.warn("More than one million combinations, consider splitting file or using the subset option (will still work but may be slow)")
-                        
-        if self.stripe:
-            if self.local:
-                raise ValueError("Cannot do stripes for local pileups")
-            elif self.trans:
-                logging.info("Performing stripe pileup between chromosomes. Note that this only yields the stripe from the first chromosome, based on name, e.g. chr1 stripes in chr2 but not vice versa")
-            else:
-                logging.info("Performing stripe pileup within chromosomes")
                 
         if self.kind == "bed":
             if self.trans:
@@ -1242,9 +1211,6 @@ class CoordCreator:
         else:  # all combinations
             intervals_left = intervals.rename(columns=lambda x: x + "1")
             intervals_right = intervals.rename(columns=lambda x: x + "2")
-            if self.stripe:
-                intervals_left["stBin1"] = np.floor((intervals_left["stBin1"]+intervals_left["endBin1"])/2).astype(int)
-                intervals_left["endBin1"] = intervals_left["stBin1"] + 1
                 
             for i in range(1, intervals.shape[0]):
                 combinations = pd.concat(
@@ -1264,7 +1230,7 @@ class CoordCreator:
                 combinations = self._control_regions(
                     combinations, self.nshifts * control
                 )
-                if self.stripe:
+                if self.store_stripes:
                     combinations["coordinates"] = combinations.apply(lambda x: '.'.join(x[['chrom1', 'start1', 'end1', 'chrom2', 'start2', 'end2']].astype(str)),axis=1)
                 if modify_2Dintervals_func is not None:
                     combinations = modify_2Dintervals_func(combinations)
@@ -1309,6 +1275,8 @@ class CoordCreator:
             combinations = self._control_regions(
                 combinations, self.nshifts * control
             )
+            if self.store_stripes:
+                    combinations["coordinates"] = combinations.apply(lambda x: '.'.join(x[['chrom1', 'start1', 'end1', 'chrom2', 'start2', 'end2']].astype(str)),axis=1)
             if modify_2Dintervals_func is not None:
                 combinations = modify_2Dintervals_func(combinations)
             combinations = assign_groups(combinations, groupby=groupby)
@@ -1371,10 +1339,12 @@ class CoordCreator:
         if intervals is None:
             intervals = self.intervals
         intervals = filter_func(intervals)
-        if self.stripe:
-            intervals["stBin1"] = np.floor((intervals["stBin1"]+intervals["endBin1"])/2).astype(int)
-            intervals["endBin1"] = intervals["stBin1"] + 1
+        
+        if self.store_stripes:
+#             intervals["stBin1"] = np.floor((intervals["stBin1"]+intervals["endBin1"])/2).astype(int)
+#             intervals["endBin1"] = intervals["stBin1"] + 1
             intervals["coordinates"] = intervals.apply(lambda x: '.'.join(x[['chrom1', 'start1', 'end1', 'chrom2', 'start2', 'end2']].astype(str)),axis=1)
+    
         intervals = self._control_regions(intervals, self.nshifts * control)
         if modify_2Dintervals_func is not None:
             intervals = modify_2Dintervals_func(intervals)
@@ -1409,7 +1379,6 @@ class PileUpper:
         rescale_size=99,
         flip_negative_strand=False,
         ignore_diags=2,
-        outfilesorted=None,
     ):
         """Creates pileups
 
@@ -1478,7 +1447,6 @@ class PileUpper:
         self.rescale_size = rescale_size
         self.flip_negative_strand = flip_negative_strand
         self.ignore_diags = ignore_diags
-        self.outfilesorted = outfilesorted
         
         if view_df is None:
             # Generate viewframe from clr.chromsizes:
@@ -1564,10 +1532,13 @@ class PileUpper:
         }
 
         self.empty_outmap = self.make_outmap()
-        if self.stripe:
+        if self.store_stripes:
             self.empty_pup = pd.Series(
                 {
                     "data": self.empty_outmap,
+                    "left_stripe": np.zeros((1, 2 * self.pad_bins + 1)),
+                    "right_stripe": np.zeros((1, 2 * self.pad_bins + 1)),
+                    "center_stripe": np.zeros((1, 2 * self.pad_bins + 1)),
                     "n": 0,
                     "num": self.empty_outmap,
                     "cov_start": np.zeros((self.empty_outmap.shape[0])),
@@ -1650,10 +1621,7 @@ class PileUpper:
         if self.rescale:
             outmap = np.zeros((self.rescale_size, self.rescale_size))
         else:
-            if self.stripe:
-                outmap = np.zeros((1, 2 * self.pad_bins + 1))
-            else:
-                outmap = np.zeros((2 * self.pad_bins + 1, 2 * self.pad_bins + 1))
+            outmap = np.zeros((2 * self.pad_bins + 1, 2 * self.pad_bins + 1))
         return outmap
 
     def get_data(self, region1, region2=None):
@@ -1783,20 +1751,19 @@ class PileUpper:
                 if self.trans:
                     exp_data = self.get_expected_trans(region1, region2)
                 else:
-                    if self.stripe:
-                        stripe_left = np.floor(snip["center1"] / self.resolution) * self.resolution
-                        stripe_right = stripe_left + self.resolution
-                        exp_data = self.get_expected_matrix(
-                            region,
-                            stripe_left.astype(int), stripe_right.astype(int),
-                            (snip["exp_start2"], snip["exp_end2"]),
-                        )
-                    else:
-                        exp_data = self.get_expected_matrix(
-                            region,
-                            (snip["exp_start1"], snip["exp_end1"]),
-                            (snip["exp_start2"], snip["exp_end2"]),
-                        )
+#                     if self.stripe:
+#                         stripe_left = np.floor(snip["center1"] / self.resolution) * self.resolution
+#                         stripe_right = stripe_left + self.resolution
+#                         exp_data = self.get_expected_matrix(
+#                             region,
+#                             stripe_left.astype(int), stripe_right.astype(int),
+#                             (snip["exp_start2"], snip["exp_end2"]),
+#                         )
+                    exp_data = self.get_expected_matrix(
+                        region,
+                        (snip["exp_start1"], snip["exp_end1"]),
+                        (snip["exp_start2"], snip["exp_end2"]),
+                    )
                     if not self.ooe:
                         exp_snip = snip.copy()
                         exp_snip["kind"] = "control"
@@ -1819,6 +1786,12 @@ class PileUpper:
             if self.expected and self.ooe:
                 data = data / exp_data
             snip["data"] = data
+            
+            if self.store_stripes:
+                    snip["left_stripe"] = np.array([snip["data"][int(np.floor(snip["data"].shape[0]/2))]], dtype=float)
+                    snip["right_stripe"] = np.array([snip["data"].T[int(np.floor(snip["data"].shape[0]/2))]], dtype=float)
+                    snip["corner_stripe"] = np.concatenate((snip["left_stripe"][:int(int(np.floor(snip["data"].shape[0]/2+1)))], 
+                                     snip["right_stripe"][-int(int(np.floor(snip["data"].shape[0]/2))):][::-1]))
 
             if self.rescale:
                 snip = self._rescale_snip(snip)
@@ -1911,9 +1884,9 @@ class PileUpper:
             kind = snip["kind"]
             key = snip["group"]
             if isinstance(key, str):
-                _add_snip(outdict[kind], key, snip, self.stripe)
+                _add_snip(outdict[kind], key, snip, self.store_stripes)
             else:
-                _add_snip(outdict[kind], tuple(key), snip, self.stripe)
+                _add_snip(outdict[kind], tuple(key), snip, self.store_stripes)
         if "all" not in outdict["ROI"]:
             outdict["ROI"]["all"] = reduce(
                 sum_pups, outdict["ROI"].values(), self.empty_pup
@@ -2081,16 +2054,16 @@ class PileUpper:
             )
             pileups = list(mymap(f, self.view_df.index))
         
-        if self.stripe:
+        if self.store_stripes:
             roi = (
                 pd.DataFrame([pileup["ROI"] for pileup in pileups])
-                .apply(lambda x: reduce(concat_stripes, x.dropna()))
+                .apply(lambda x: reduce(sum_stripes, x.dropna()))
                 .T
             )
             if self.control or (self.expected and not self.ooe):
                 ctrl = (
                     pd.DataFrame([pileup["control"] for pileup in pileups])
-                    .apply(lambda x: reduce(concat_stripes, x.dropna()))
+                    .apply(lambda x: reduce(sum_stripes, x.dropna()))
                     .T
                 )
         else:
@@ -2116,29 +2089,15 @@ class PileUpper:
             normalized_control = pd.DataFrame(
                 ctrl["data"] / ctrl["num"], columns=["data"]
             )
-            if self.stripe:
-                arr = normalized_control["data"]["all"]
-                arr[~np.isfinite(arr)] = np.nan
-                arr = np.nansum(arr, axis=0) / arr.shape[0]
-                normalized_control["data"]["all"] = arr
             normalized_roi = normalized_roi / normalized_control
         normalized_roi["n"] = roi["n"]
-        normalized_roi["coordinates"] = roi["coordinates"]
-        if self.stripe:
-            if not self.keepsortorder:
-                normalized_roi["data"]["all"][~np.isfinite(normalized_roi["data"]["all"])] = np.nan
-                myorder = np.argsort(np.nansum(normalized_roi["data"]["all"].T, axis=0))
-                normalized_roi["data"]["all"] = normalized_roi["data"]["all"][myorder[::-1],:]
-                normalized_roi["coordinates"]["all"] = [normalized_roi["coordinates"]["all"][i] for i in myorder[::-1]]
-            else:
-                #test_list1 = pup["coordinates"]["all"]#[5, 7, 8, 9, 10, 11]
-                #test_list2 = cc.sortorder
-                #set_ = set(test_list1)
-                #res = [i for i, val in enumerate(self.sortorder) if val in set(normalized_roi["coordinates"]["all"])]
-                sort_order = [normalized_roi["coordinates"]["all"].index(x) for x in self.sortorder]
-                normalized_roi["coordinates"]["all"] = [normalized_roi["coordinates"]["all"][i] for i in sort_order]
-                normalized_roi["data"]["all"] = normalized_roi["data"]["all"][sort_order,:]
-                #normalized_roi["data"]["all"] = [normalized_roi["data"]["all"][i] for i in sort_order]
+        if self.store_stripes:
+            normalized_roi["coordinates"] = roi["coordinates"]
+            normalized_roi["coordinates"] = [[x.split(".") for x in normalized_roi["coordinates"][0]]]
+            normalized_roi["left_stripe"] = roi["left_stripe"] #/ roi["num"]
+            normalized_roi["right_stripe"] = roi["right_stripe"]
+            normalized_roi["corner_stripe"] = roi["corner_stripe"]
+
         if nproc > 1:
             p.close()
         # pileup[~np.isfinite(pileup)] = 0
@@ -2147,13 +2106,6 @@ class PileUpper:
                 lambda x: np.nanmean(np.dstack((x, x.T)), 2)
             )
         
-        if self.stripe:
-            if self.kind == "bed":
-                if isinstance(self.outfilesorted, str):
-                    outbedpe = pd.DataFrame([x.split(".") for x in normalized_roi["coordinates"][0]])
-                    outbedpe.columns = ["chrom1", "start1", "end1", "chrom2", "start2", "end2"]
-                    outbedpe.to_csv(self.outfilesorted, index=False, sep="\t", header=False)
-                    logging.info(f"Saved sorted bedpe output at: {self.outfilesorted}")
         if groupby:
             normalized_roi = normalized_roi.reset_index()
             normalized_roi[groupby] = pd.DataFrame(

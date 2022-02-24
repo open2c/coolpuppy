@@ -234,25 +234,11 @@ def parse_args_coolpuppy():
         help="""Perform by-chromosome pileups for trans interactions""",
     )
     parser.add_argument(
-        "--stripe",
+        "--stripes",
         action="store_true",
         default=False,
         required=False,
-        help="""Perform stripe stackups instead of pileups""",
-    )
-    parser.add_argument(
-        "--keep_sort_order",
-        action="store_true",
-        default=False,
-        required=False,
-        help="""Keep sort order of input bedpe file when generating stripes""",
-    )
-    parser.add_argument(
-        "--out_file_sorted",
-        type=str,
-        default=None,
-        required=False,
-        help="""Output file location to save bedpe of stripes after sorting""",
+        help="""Store left, right, and corner stripes in pileup output""",
     )
     
     # Rescaling
@@ -496,7 +482,7 @@ def main():
         subset=args.subset,
         seed=args.seed,
         trans=args.trans,
-        stripe=args.stripe,
+        store_stripes=args.stripes,
         keepsortorder=args.keep_sort_order,
     )
 
@@ -544,8 +530,6 @@ def main():
             outname += "_trans"
         if args.by_chroms:
             outname += "_by-chroms"
-        if args.stripe:
-            outname += "_stripe"
         outname += ".clpy"
     else:
         outname = args.outname
