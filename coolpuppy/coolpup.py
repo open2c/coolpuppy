@@ -1231,7 +1231,8 @@ class CoordCreator:
                     combinations, self.nshifts * control
                 )
                 if self.store_stripes:
-                    combinations["coordinates"] = combinations.apply(lambda x: '.'.join(x[['chrom1', 'start1', 'end1', 'chrom2', 'start2', 'end2']].astype(str)),axis=1)
+                    if not combinations.empty:
+                        combinations["coordinates"] = combinations.apply(lambda x: '.'.join(x[['chrom1', 'start1', 'end1', 'chrom2', 'start2', 'end2']].astype(str)),axis=1)
                 if modify_2Dintervals_func is not None:
                     combinations = modify_2Dintervals_func(combinations)
                 combinations = assign_groups(combinations, groupby=groupby)
@@ -1537,7 +1538,7 @@ class PileUpper:
                     "data": self.empty_outmap,
                     "left_stripe": np.zeros((1, 2 * self.pad_bins + 1)),
                     "right_stripe": np.zeros((1, 2 * self.pad_bins + 1)),
-                    "center_stripe": np.zeros((1, 2 * self.pad_bins + 1)),
+                    "corner_stripe": np.zeros((1, 2 * self.pad_bins + 1)),
                     "n": 0,
                     "num": self.empty_outmap,
                     "cov_start": np.zeros((self.empty_outmap.shape[0])),

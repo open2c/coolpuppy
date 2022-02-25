@@ -68,10 +68,17 @@ def parse_args_plotpuppy():
     )
     parser.add_argument(
         "--stripe", 
-        action="store_true", 
-        default=False,
+        type=str, 
+        default=None,
         required=False, 
         help="""For plotting stripe stackups"""
+    )
+    parser.add_argument(
+        "--no_sort_stripe", 
+        action='store_false',
+        default=True,
+        required=False, 
+        help="""Whether or not to sort stripe stackups by total signal"""
     )
     # parser.add_argument(
     #     "--cbar_mode",
@@ -131,13 +138,11 @@ def parse_args_plotpuppy():
                 squares whose values are averaged""",
     )
     parser.add_argument(
-        "--score",
-        type=bool,
+        "--no_score",
+        action='store_true',
         required=False,
-        default=True,
-        help="""Whether to calculate score and add it to the top right corner of each
-                pileup. Will use the 'coolpup.get_score' function with 'center' and
-                'ignore_central' arguments.""",
+        default=False,
+        help="""If central pixel score should not be shown in top left corner""",
     )
     parser.add_argument(
         "--center",
@@ -217,7 +222,7 @@ def main():
     if args.norm_corners > 0:
         pups["data"] = pups["data"].apply(norm_cis, i=int(args.norm_corners))
 
-    if args.score:
+    if not args.no_score:
         pups["score"] = pups.apply(
             get_score, center=args.center, ignore_central=args.ignore_central, axis=1
         )
@@ -258,6 +263,7 @@ def main():
         cmap=args.cmap,
         scale=args.scale,
         stripe=args.stripe,
+        stripe_sort=args.no_sort_stripe,
     )
     
     plt.savefig(args.output, bbox_inches="tight", dpi=args.dpi)

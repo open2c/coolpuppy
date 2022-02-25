@@ -10,6 +10,7 @@ from matplotlib import ticker
 from matplotlib import cm
 import seaborn as sns
 from cooltools.lib import plotting
+import random
 
 
 def auto_rows_cols(n):
@@ -133,7 +134,8 @@ def make_heatmap_grid(
     cmap="coolwarm",
     scale="log",
     height=1,
-    stripe=False,
+    stripe=None,
+    stripe_sort=True,
     **kwargs,
 ):
     pupsdf = pupsdf.copy()
@@ -178,7 +180,14 @@ def make_heatmap_grid(
     vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym)
 
     right = ncols / (ncols + 0.25)
-
+    
+    if stripe in ["left_stripe", "right_stripe", "corner_stripe"]:
+        if stripe_sort:
+            pupsdf = pupsdf.reset_index()
+            pupsdf["coordinates"][0] = np.array(pupsdf["coordinates"][0])
+            ind = np.argsort(-np.nansum(pupsdf[stripe][0], axis=1))
+            pupsdf.loc[0,["coordinates", "right_stripe", "left_stripe", "corner_stripe"]] = pupsdf.iloc[0][["coordinates", "right_stripe", "left_stripe", "corner_stripe"]].apply(lambda x: x[ind])
+        
     # sns.set(font_scale=5)
     fg = sns.FacetGrid(
         pupsdf,
@@ -200,11 +209,12 @@ def make_heatmap_grid(
     )
     norm = norm(vmin, vmax)
     
-    
-    if stripe:
-        fg.map(add_stripe_heatmap, "data", norm=norm, cmap=cmap)
-    else:
+    if stripe in ["left_stripe", "right_stripe", "corner_stripe"]:
+        fg.map(add_stripe_heatmap, stripe, norm=norm, cmap=cmap)
+    elif stripe == None:
         fg.map(add_heatmap, "data", norm=norm, cmap=cmap)
+    else:
+        raise ValueError("stripe can only be 'right_stripe', 'left_stripe', 'corner_stripe' or None")
     if score:
         if stripe:
             pass

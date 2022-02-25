@@ -483,7 +483,6 @@ def main():
         seed=args.seed,
         trans=args.trans,
         store_stripes=args.stripes,
-        keepsortorder=args.keep_sort_order,
     )
 
     PU = PileUpper(
@@ -499,7 +498,6 @@ def main():
         rescale_size=args.rescale_size,
         flip_negative_strand=args.flip_negative_strand,
         ignore_diags=args.ignore_diags,
-        outfilesorted=args.out_file_sorted
     )
 
     if args.outname == "auto":
