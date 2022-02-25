@@ -1509,7 +1509,6 @@ class PileUpper:
                     for region_name in self.view_df["name"]
                 }
                 self.expected = True
-
         self.view_df = self.view_df.set_index("name")
         self.view_df_extents = {}
 
@@ -1574,33 +1573,30 @@ class PileUpper:
     #     )
     #     return matrix
 
-    def get_expected_matrix(self, region, left_interval, right_interval):
-        """Generate expected matrix for a region
-
-        Parameters
-        ----------
-        region : str
-            Region name.
-        left_interval : tuple
-            Tuple of (chrom, start, end) of the snip on the left side
-        right_interval : tuple
-            Tuple of (chrom, start, end) of the snip on the right side
-
-        Returns
-        -------
-        exp_matrix : array
-            Array of expected values for the selected coordinates.
-
-        """
-        lo_left, hi_left = left_interval
-        lo_right, hi_right = right_interval
-        exp_matrix = self.ExpSnipper.snip(
-            self.expected_selections[region],
-            region,
-            region,
-            (lo_left, hi_left, lo_right, hi_right),
-        )
-        return exp_matrix
+#     def get_expected_matrix(self, region, left_interval, right_interval):
+#         """Generate expected matrix for a region
+#         Parameters
+#         ----------
+#         region : str
+#             Region name.
+#         left_interval : tuple
+#             Tuple of (chrom, start, end) of the snip on the left side
+#         right_interval : tuple
+#             Tuple of (chrom, start, end) of the snip on the right side
+#         Returns
+#         -------
+#         exp_matrix : array
+#             Array of expected values for the selected coordinates.
+#         """
+#         lo_left, hi_left = left_interval
+#         lo_right, hi_right = right_interval
+#         exp_matrix = self.ExpSnipper.snip(
+#             self.expected_selections[region],
+#             region,
+#             region,
+#             (lo_left, hi_left, lo_right, hi_right),
+#         )
+#         return exp_matrix
     
     def get_expected_trans(self, region1, region2):
         exp_value = self.expected_df.loc[(self.expected_df["region1"] == region1) & 
@@ -1759,16 +1755,28 @@ class PileUpper:
 #                             stripe_left.astype(int), stripe_right.astype(int),
 #                             (snip["exp_start2"], snip["exp_end2"]),
 #                         )
-                    exp_data = self.get_expected_matrix(
-                        region,
-                        (snip["exp_start1"], snip["exp_end1"]),
-                        (snip["exp_start2"], snip["exp_end2"]),
-                    )
-                    if not self.ooe:
-                        exp_snip = snip.copy()
-                        exp_snip["kind"] = "control"
-                        exp_snip["data"] = exp_data
-
+                    exp_data = self.expected_selections[region][snip["stBin1"]:snip["endBin1"],
+                                                                snip["stBin2"]:snip["endBin2"]]
+#                     exp_data = self.get_expected_matrix(
+#                         region,
+#                         (snip["exp_start1"], snip["exp_end1"]),
+#                         (snip["exp_start2"], snip["exp_end2"]),
+#                     )
+                if not self.ooe:
+                    exp_snip = snip.copy()
+                    exp_snip["kind"] = "control"
+                    exp_snip["data"] = exp_data
+                    if self.store_stripes:
+                        if self.trans:
+                            exp_snip["left_stripe"] = [np.ones(len(data))*exp_data]
+                            exp_snip["right_stripe"] = [np.ones(len(data))*exp_data]
+                            exp_snip["corner_stripe"] = [np.ones(len(data))*exp_data]
+                        else:
+                            exp_snip["left_stripe"] = np.array([exp_snip["data"][int(np.floor(exp_snip["data"].shape[0]/2))]], dtype=float)
+                            exp_snip["right_stripe"] = np.array([exp_snip["data"].T[int(np.floor(exp_snip["data"].shape[0]/2))]], dtype=float)
+                            exp_snip["corner_stripe"] = [np.concatenate((exp_snip["left_stripe"][0][:int(int(np.floor(exp_snip["data"].shape[0]/2+1)))], 
+                                         exp_snip["right_stripe"][0][-int(int(np.floor(exp_snip["data"].shape[0]/2))):][::-1]))]
+                    
             if self.trans == False:
                 D = (
                     diag_indicator[
@@ -1790,8 +1798,8 @@ class PileUpper:
             if self.store_stripes:
                     snip["left_stripe"] = np.array([snip["data"][int(np.floor(snip["data"].shape[0]/2))]], dtype=float)
                     snip["right_stripe"] = np.array([snip["data"].T[int(np.floor(snip["data"].shape[0]/2))]], dtype=float)
-                    snip["corner_stripe"] = np.concatenate((snip["left_stripe"][:int(int(np.floor(snip["data"].shape[0]/2+1)))], 
-                                     snip["right_stripe"][-int(int(np.floor(snip["data"].shape[0]/2))):][::-1]))
+                    snip["corner_stripe"] = [np.concatenate((snip["left_stripe"][0][:int(int(np.floor(snip["data"].shape[0]/2+1)))], 
+                                     snip["right_stripe"][0][-int(int(np.floor(snip["data"].shape[0]/2))):][::-1]))]
 
             if self.rescale:
                 snip = self._rescale_snip(snip)
@@ -1820,7 +1828,6 @@ class PileUpper:
             yield snip
 
             if self.expected and not self.ooe:
-                exp_snip["data"] = exp_data
                 yield exp_snip
 
     def _rescale_snip(self, snip):
@@ -2057,13 +2064,13 @@ class PileUpper:
         if self.store_stripes:
             roi = (
                 pd.DataFrame([pileup["ROI"] for pileup in pileups])
-                .apply(lambda x: reduce(sum_stripes, x.dropna()))
+                .apply(lambda x: reduce(sum_pups_stripes, x.dropna()))
                 .T
             )
             if self.control or (self.expected and not self.ooe):
                 ctrl = (
                     pd.DataFrame([pileup["control"] for pileup in pileups])
-                    .apply(lambda x: reduce(sum_stripes, x.dropna()))
+                    .apply(lambda x: reduce(sum_pups_stripes, x.dropna()))
                     .T
                 )
         else:
@@ -2085,19 +2092,37 @@ class PileUpper:
             elif self.expected:
                 warnings.warn("Expected can not be normalized to coverage")
         normalized_roi = pd.DataFrame(roi["data"] / roi["num"], columns=["data"])
+        
         if self.control or (self.expected and not self.ooe):
             normalized_control = pd.DataFrame(
                 ctrl["data"] / ctrl["num"], columns=["data"]
             )
             normalized_roi = normalized_roi / normalized_control
         normalized_roi["n"] = roi["n"]
+        
         if self.store_stripes:
             normalized_roi["coordinates"] = roi["coordinates"]
             normalized_roi["coordinates"] = [[x.split(".") for x in normalized_roi["coordinates"][0]]]
-            normalized_roi["left_stripe"] = roi["left_stripe"] #/ roi["num"]
+            normalized_roi["left_stripe"] = roi["left_stripe"] 
             normalized_roi["right_stripe"] = roi["right_stripe"]
-            normalized_roi["corner_stripe"] = roi["corner_stripe"]
+            normalized_roi["corner_stripe"] = roi["corner_stripe"] 
+       
+            if (self.expected and not self.ooe):
+                normalized_roi["left_stripe"]["all"] = normalized_roi["left_stripe"]["all"] / ctrl["left_stripe"]["all"]
+                normalized_roi["right_stripe"]["all"] = normalized_roi["right_stripe"]["all"] / ctrl["right_stripe"]["all"]
+                normalized_roi["corner_stripe"]["all"] = normalized_roi["corner_stripe"]["all"] / ctrl["corner_stripe"]["all"]
+        
+            elif self.control:
+                #Generate stripes of normalized control arrays
+                control_leftstripe = np.array([normalized_control["data"]["all"][int(np.floor(normalized_control["data"]["all"].shape[0]/2))]], dtype=float)
+                control_rightstripe = np.array([normalized_control["data"]["all"].T[int(np.floor(normalized_control["data"]["all"].shape[0]/2))]], dtype=float)
+                control_cornerstripe = [np.concatenate((control_leftstripe[0][:int(np.floor(normalized_control["data"]["all"].shape[0]/2+1))],
+                                                       control_rightstripe[0][-int(np.floor(normalized_control["data"]["all"].shape[0]/2)):][::-1]))]                
 
+                normalized_roi["left_stripe"]["all"] = normalized_roi["left_stripe"]["all"] / control_leftstripe
+                normalized_roi["right_stripe"]["all"] = normalized_roi["right_stripe"]["all"] / control_rightstripe 
+                normalized_roi["corner_stripe"]["all"] = normalized_roi["corner_stripe"]["all"] / control_cornerstripe
+        
         if nproc > 1:
             p.close()
         # pileup[~np.isfinite(pileup)] = 0
