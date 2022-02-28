@@ -74,12 +74,20 @@ def parse_args_plotpuppy():
         help="""For plotting stripe stackups"""
     )
     parser.add_argument(
-        "--no_sort_stripe", 
+        "--no_stripe_sort", 
         action='store_false',
         default=True,
         required=False, 
         help="""Whether or not to sort stripe stackups by total signal"""
     )
+    parser.add_argument(
+        "--out_sorted_bedpe", 
+        type=str, 
+        default=None,
+        required=False, 
+        help="""Output bedpe of sorted stripe regions"""
+    )
+    
     # parser.add_argument(
     #     "--cbar_mode",
     #     type=str,
@@ -236,7 +244,7 @@ def main():
         elif args.cols == "separation":
             col_order = sort_separation(pups["separation"])
         else:
-            col_order = natsorted(pups[args.cols].unique())
+            col_order = pups[args.cols].unique()
     else:
         col_order = None
 
@@ -246,7 +254,7 @@ def main():
         elif args.rows == "separation":
             row_order = sort_separation(pups["separation"])
         else:
-            row_order = natsorted(pups[args.rows].unique())
+            row_order = pups[args.rows].unique()
     else:
         row_order = None
 
@@ -263,7 +271,8 @@ def main():
         cmap=args.cmap,
         scale=args.scale,
         stripe=args.stripe,
-        stripe_sort=args.no_sort_stripe,
+        stripe_sort=args.no_stripe_sort,
+        out_sorted_bedpe=args.out_sorted_bedpe,
     )
     
     plt.savefig(args.output, bbox_inches="tight", dpi=args.dpi)
