@@ -3,6 +3,7 @@
 import numpy as np
 from coolpuppy import coolpup
 import matplotlib.pyplot as plt
+import pandas as pd
 
 # from mpl_toolkits.axes_grid1 import ImageGrid
 from matplotlib.colors import LogNorm, Normalize
@@ -11,7 +12,9 @@ from matplotlib import cm
 import seaborn as sns
 from cooltools.lib import plotting
 import random
-
+import logging
+import warnings
+import natsort
 
 def auto_rows_cols(n):
     """Automatically determines number of rows and cols for n pileups
@@ -136,6 +139,7 @@ def make_heatmap_grid(
     height=1,
     stripe=None,
     stripe_sort=True,
+    out_sorted_bedpe=None,
     **kwargs,
 ):
     pupsdf = pupsdf.copy()
@@ -184,9 +188,21 @@ def make_heatmap_grid(
     if stripe in ["left_stripe", "right_stripe", "corner_stripe"]:
         if stripe_sort:
             pupsdf = pupsdf.reset_index()
-            pupsdf["coordinates"][0] = np.array(pupsdf["coordinates"][0])
-            ind = np.argsort(-np.nansum(pupsdf[stripe][0], axis=1))
-            pupsdf.loc[0,["coordinates", "right_stripe", "left_stripe", "corner_stripe"]] = pupsdf.iloc[0][["coordinates", "right_stripe", "left_stripe", "corner_stripe"]].apply(lambda x: x[ind])
+            different = False
+            for i in range(len(pupsdf)):
+                pupsdf["coordinates"][i] = np.array(pupsdf["coordinates"][i], dtype=object)
+                ind_regions = natsort.index_natsorted(pupsdf["coordinates"][i])
+                pupsdf.loc[i,["coordinates", "right_stripe", "left_stripe", "corner_stripe"]] = pupsdf.iloc[i][["coordinates", "right_stripe", "left_stripe", "corner_stripe"]].apply(lambda x: x[ind_regions])
+            for i in range(len(pupsdf)):
+                if not (np.all(pupsdf["coordinates"][0] == pupsdf["coordinates"][i])):
+                    different = True
+                    warnings.warn("Cannot sort, samples have different regions. Plot one by one if you want to sort")
+            if not different:
+                ind_sum = np.argsort(-np.nansum(pupsdf[stripe][0], axis=1))
+                for i in range(len(pupsdf)):
+                        pupsdf.loc[i,["coordinates", "right_stripe", "left_stripe", "corner_stripe"]] = pupsdf.iloc[i][["coordinates", "right_stripe", "left_stripe", "corner_stripe"]].apply(lambda x: x[ind_sum])
+                if isinstance(out_sorted_bedpe, str):
+                    pd.DataFrame(pupsdf.loc[0, "coordinates"]).to_csv(out_sorted_bedpe, sep="\t", header=None, index=False)
         
     # sns.set(font_scale=5)
     fg = sns.FacetGrid(
@@ -249,7 +265,7 @@ def make_heatmap_grid(
     if not stripe:
         cax = fg.fig.add_axes([right + 0.005, bottom, (1 - right - 0.005) / 5, height])
     else:
-        cax = fg.fig.add_axes([right + 0.1, bottom, (1 - right - 0.1) / 5, height])    
+        cax = fg.fig.add_axes([right + 0.01, bottom, (1 - right - 0.01) / 5, height])    
     if sym:
         ticks = [vmin, 1, vmax]
     else:
