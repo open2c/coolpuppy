@@ -1191,6 +1191,8 @@ class CoordCreator:
             yield None
 
         if self.local:
+            if self.store_stripes:
+                raise ValueError("Cannot do stripe stackups with local=True") 
             merged = pd.merge(
                 intervals,
                 intervals,
