@@ -406,13 +406,22 @@ def main():
         expected_value_cols = [
             expected_value_col,
         ]
-        expected = common.read_expected(
-            expected_path,
-            contact_type="cis",
-            expected_value_cols=expected_value_cols,
-            verify_view=view_df,
-            verify_cooler=clr,
-        )
+        if args.trans:
+            expected = common.read_expected(
+                expected_path,
+                contact_type="trans",
+                expected_value_cols=expected_value_cols,
+                verify_view=view_df,
+                verify_cooler=clr,
+            )
+        else:
+            expected = common.read_expected(
+                expected_path,
+                contact_type="cis",
+                expected_value_cols=expected_value_cols,
+                verify_view=view_df,
+                verify_cooler=clr,
+            )
 
     if args.mindist is None:
         mindist = 0
