@@ -50,13 +50,13 @@ def save_pileup_df(filename, df, metadata=None, mode="w"):
         metadata = {}
     df[df.columns[df.columns != "data"]].to_hdf(filename, "annotation", mode=mode)
     with h5py.File(filename, "a") as f:
-        height = df["data"].iloc[0].shape[0]
-        width = df["data"].iloc[0].shape[1] * df["data"].shape[0]
+        width = df["data"].iloc[0].shape[0]
+        height = width * df["data"].shape[0]
         ds = f.create_dataset(
-            "data", compression="lzf", chunks=(height, width), shape=(height, width)
+            "data", compression="lzf", chunks=(width, width), shape=(height, width)
         )
         for i, arr in df["data"].reset_index(drop=True).items():
-            ds[i * height : (i + 1) * height, :] = arr
+            ds[i * width : (i + 1) * width, :] = arr
         group = f.create_group("attrs")
         if metadata is not None:
             for key, val in metadata.items():
@@ -64,7 +64,6 @@ def save_pileup_df(filename, df, metadata=None, mode="w"):
                     val = False
                 group.attrs[key] = val
     return
-
 
 def load_pileup_df(filename, quaich=False):
     """
@@ -1236,10 +1235,16 @@ class CoordCreator:
                 if modify_2Dintervals_func is not None:
                     combinations = modify_2Dintervals_func(combinations)
                 combinations = assign_groups(combinations, groupby=groupby)
-                combinations = combinations.reindex(
-                    columns=list(combinations.columns)
-                    + ["data", "cov_start", "cov_end"]
-                )
+                if self.store_stripes:
+                    combinations = combinations.reindex(
+                        columns=list(combinations.columns)
+                        + ["data", "left_stripe", "right_stripe", "corner_stripe", "cov_start", "cov_end"]
+                    )
+                else:
+                    combinations = combinations.reindex(
+                        columns=list(combinations.columns)
+                        + ["data", "cov_start", "cov_end"]
+                    )
                 for _, row in combinations.iterrows():
                     yield row
 
@@ -1350,9 +1355,15 @@ class CoordCreator:
         if modify_2Dintervals_func is not None:
             intervals = modify_2Dintervals_func(intervals)
         intervals = assign_groups(intervals, groupby)
-        intervals = intervals.reindex(
-            columns=list(intervals.columns) + ["data", "cov_start", "cov_end"]
-        )
+        if self.store_stripes:
+            intervals = intervals.reindex(
+                columns=list(intervals.columns) + ["data", "cov_start", "cov_end", 
+                                                   "left_stripe", "right_stripe", "corner_stripe"]
+            )
+        else:
+            intervals = intervals.reindex(
+                columns=list(intervals.columns) + ["data", "cov_start", "cov_end"]
+            )
         if not len(intervals) >= 1:
             logging.debug("Empty selection")
             yield None
@@ -1895,15 +1906,26 @@ class PileUpper:
                 _add_snip(outdict[kind], key, snip, self.store_stripes)
             else:
                 _add_snip(outdict[kind], tuple(key), snip, self.store_stripes)
-        if "all" not in outdict["ROI"]:
-            outdict["ROI"]["all"] = reduce(
-                sum_pups, outdict["ROI"].values(), self.empty_pup
-            )
-        if self.control or (self.expected and not self.ooe):
-            if "all" not in outdict["control"]:
-                outdict["control"]["all"] = reduce(
-                    sum_pups, outdict["control"].values(), self.empty_pup
+        if self.store_stripes:
+            if "all" not in outdict["ROI"]:
+                outdict["ROI"]["all"] = reduce(
+                    sum_pups_stripes, outdict["ROI"].values(), self.empty_pup
                 )
+            if self.control or (self.expected and not self.ooe):
+                if "all" not in outdict["control"]:
+                    outdict["control"]["all"] = reduce(
+                        sum_pups_stripes, outdict["control"].values(), self.empty_pup
+                    )
+        else:
+            if "all" not in outdict["ROI"]:
+                outdict["ROI"]["all"] = reduce(
+                    sum_pups, outdict["ROI"].values(), self.empty_pup
+                )
+            if self.control or (self.expected and not self.ooe):
+                if "all" not in outdict["control"]:
+                    outdict["control"]["all"] = reduce(
+                        sum_pups, outdict["control"].values(), self.empty_pup
+                    )
         return outdict
 
     def pileup_region(
@@ -2086,6 +2108,7 @@ class PileUpper:
                     .apply(lambda x: reduce(sum_pups, x.dropna()))
                     .T
                 )
+
         if self.coverage_norm:
             roi = roi.apply(norm_coverage, axis=1)
             if self.control:
@@ -2103,7 +2126,8 @@ class PileUpper:
         
         if self.store_stripes:
             normalized_roi["coordinates"] = roi["coordinates"]
-            normalized_roi["coordinates"] = [[x.split(".") for x in normalized_roi["coordinates"][0]]]
+            #normalized_roi["coordinates"] = [[x.split(".") for x in normalized_roi["coordinates"][0]]]
+            normalized_roi["coordinates"] = [[x.split(".") for x in y] for y in normalized_roi["coordinates"]]
             normalized_roi["left_stripe"] = roi["left_stripe"] 
             normalized_roi["right_stripe"] = roi["right_stripe"]
             normalized_roi["corner_stripe"] = roi["corner_stripe"] 
@@ -2170,6 +2194,10 @@ class PileUpper:
             combined (the regions of interest, not control regions). Each window is a
             row, plus an additional row `all` is created with all data.
         """
+        if self.trans:
+            raise ValueError("Cannot do by-window pileups for trans")
+        if self.store_stripes:
+            raise ValueError("Cannot do by-window pileups with stripes in the current implementation")
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc, postprocess_func=group_by_region
         )
@@ -2201,6 +2229,8 @@ class PileUpper:
             combined (the regions of interest, not control regions).
             Each distance band is a row, annotated in column `distance_band`
         """
+        if self.trans:
+            raise ValueError("Cannot do by-distance pileups for trans")
         bin_func = partial(bin_distance_intervals, band_edges=distance_edges)
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc, modify_2Dintervals_func=bin_func, groupby=["distance_band"]
@@ -2230,6 +2260,11 @@ class PileUpper:
             combined (the regions of interest, not control regions).
             Each distance band is a row, annotated in columns `separation`
         """
+        if self.trans:
+            raise ValueError("Cannot do by-distance pileups for trans")
+        if self.store_stripes:
+            raise ValueError("Cannot do by-strand and by-distance with stripes in the current implementation, do either")
+            
         bin_func = partial(bin_distance_intervals, band_edges=distance_edges)
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc,
@@ -2243,6 +2278,7 @@ class PileUpper:
         normalized_pileups = normalized_pileups[
             ["orientation", "distance_band", "data", "n"]
         ]
+        
         return normalized_pileups
 
     def pileupsByStrandWithControl(self, nproc=1):
@@ -2275,5 +2311,9 @@ class PileUpper:
         normalized_pileups["orientation"] = (
             normalized_pileups["strand1"] + normalized_pileups["strand2"]
         )
-        normalized_pileups = normalized_pileups[["orientation", "data", "n"]]
+        if self.store_stripes:
+            normalized_pileups = normalized_pileups[["orientation", "data", "n", 
+                                                     "left_stripe", "right_stripe", "corner_stripe", "coordinates"]]
+        else:
+            normalized_pileups = normalized_pileups[["orientation", "data", "n"]]
         return normalized_pileups
