@@ -15,6 +15,7 @@ import random
 import logging
 import warnings
 import natsort
+import copy
 
 def auto_rows_cols(n):
     """Automatically determines number of rows and cols for n pileups
@@ -143,7 +144,7 @@ def make_heatmap_grid(
     **kwargs,
 ):
     pupsdf = pupsdf.copy()
-
+        
     if norm_corners:
         if not stripe:
             pupsdf["data"] = pupsdf.apply(
@@ -224,6 +225,10 @@ def make_heatmap_grid(
         **kwargs,
     )
     norm = norm(vmin, vmax)
+    
+    if cmap == "coolwarm_black":
+        cmap = copy.copy(cm.get_cmap('coolwarm')) # copy the default cmap
+        cmap.set_bad((0,0,0))
     
     if stripe in ["left_stripe", "right_stripe", "corner_stripe"]:
         fg.map(add_stripe_heatmap, stripe, norm=norm, cmap=cmap)
