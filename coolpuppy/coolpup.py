@@ -140,7 +140,7 @@ def load_pileup_df_list(files, quaich=False, nice_metadata=True):
                 if pd.isnull(x)
                 else f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
             )
-    return pups.reset_index(drop=True)
+    return pups.reset_index(drop=False)
 
 
 def save_array_with_header(array, header, filename):
