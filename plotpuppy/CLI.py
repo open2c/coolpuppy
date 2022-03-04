@@ -187,6 +187,13 @@ def parse_args_plotpuppy():
     #                    required=False,
     #                    help="""How many rows to use for plotting the data""")
     parser.add_argument(
+        "--height",
+        type=int,
+        required=False,
+        default=2,
+        help="""Height of the plot""",
+    )
+    parser.add_argument(
         "--output",
         "-o",
         type=str,
@@ -221,7 +228,6 @@ def main():
         sys.excepthook = _excepthook
     mpl.rcParams["svg.fonttype"] = "none"
     mpl.rcParams["pdf.fonttype"] = 42
-
     pups = load_pileup_df_list(args.input_pups, quaich=args.quaich, nice_metadata=True)
     if args.query is not None:
         for q in args.query:
@@ -237,7 +243,7 @@ def main():
         score = "score"
     else:
         score = False
-
+        
     if args.cols:
         if args.col_order:
             col_order = args.col_order
@@ -247,7 +253,7 @@ def main():
             col_order = pups[args.cols].unique()
     else:
         col_order = None
-
+        
     if args.rows:
         if args.row_order:
             row_order = args.row_order
@@ -273,6 +279,7 @@ def main():
         stripe=args.stripe,
         stripe_sort=args.no_stripe_sort,
         out_sorted_bedpe=args.out_sorted_bedpe,
+        height=args.height,
     )
     
     plt.savefig(args.output, bbox_inches="tight", dpi=args.dpi)

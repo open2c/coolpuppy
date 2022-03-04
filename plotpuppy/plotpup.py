@@ -230,6 +230,10 @@ def make_heatmap_grid(
         cmap = copy.copy(cm.get_cmap('coolwarm')) # copy the default cmap
         cmap.set_bad((0,0,0))
     
+    if cmap == "coolwarm_grey":
+        cmap = copy.copy(cm.get_cmap('coolwarm')) # copy the default cmap
+        cmap.set_bad((0.95,0.95,0.95))
+    
     if stripe in ["left_stripe", "right_stripe", "corner_stripe"]:
         fg.map(add_stripe_heatmap, stripe, norm=norm, cmap=cmap)
     elif stripe == None:

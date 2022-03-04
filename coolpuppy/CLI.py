@@ -117,7 +117,7 @@ def parse_args_coolpuppy():
         type=int,
         required=False,
         help="""Minimal distance of interactions to use, bp.
-                If "auto", uses 2*flank+2 (in bins) as mindist to avoid first two
+                If not provided, uses 2*flank+2 (in bins) as mindist to avoid first two
                 diagonals""",
     )
     parser.add_argument(
@@ -424,7 +424,7 @@ def main():
             )
 
     if args.mindist is None:
-        mindist = 0
+        mindist = 'auto'
     else:
         mindist = args.mindist
 
