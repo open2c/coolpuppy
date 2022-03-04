@@ -10,7 +10,7 @@ import logging
 from natsort import natsorted
 from scipy import sparse
 from cooltools import numutils
-from cooltools.lib import common
+from cooltools.lib import common, checks
 from cooltools.api import snipping
 import yaml
 import io
@@ -1474,8 +1474,8 @@ class PileUpper:
         if self.expected is not False:
             if self.trans:
                 try:
-                    _ = common.is_compatible_expected(
-                        self.expected,
+                    _ = checks.is_valid_expected(
+                        expected,
                         "trans",
                         self.view_df,
                         verify_cooler=clr,
@@ -1498,8 +1498,8 @@ class PileUpper:
                     self.expected["region1"] == self.expected["region2"]
                 ]
                 try:
-                    _ = common.is_compatible_expected(
-                        self.expected,
+                    _ = checks.is_valid_expected(
+                        expected,
                         "cis",
                         self.view_df,
                         verify_cooler=clr,
@@ -1617,9 +1617,7 @@ class PileUpper:
                                        (self.expected_df["region2"] == region2), "balanced.avg"].item()
         return exp_value
 
-    def make_outmap(
-        self,
-    ):
+    def make_outmap(self,):
         """Generate zero-filled array of the right shape
 
         Returns
@@ -1693,8 +1691,6 @@ class PileUpper:
         cov_start = np.zeros(mymap.shape[0])
         cov_end = np.zeros(mymap.shape[1])
 
-        
-
         if self.trans:
             try:
                 row1 = next(intervals)
@@ -1713,6 +1709,21 @@ class PileUpper:
             min_left1, max_right1 = self.view_df_extents[region1]
             min_left2, max_right2 = self.view_df_extents[region2]
             
+            if self.clr_weight_name:
+                isnan1 = np.isnan(
+                    self.clr.bins()[min_left1:max_right1][self.clr_weight_name].values
+                )
+                isnan2 = np.isnan(
+                    self.clr.bins()[min_left2:max_right2][self.clr_weight_name].values
+                )
+            else:
+                isnan1 = np.zeros_like(
+                    self.clr.bins()[min_left1:max_right1][self.clr_weight_name].values
+                ).astype(bool)
+                isnan2 = np.zeros_like(
+                    self.clr.bins()[min_left2:max_right2][self.clr_weight_name].values
+                ).astype(bool)
+            
         else:
             region = region1
             try:
@@ -1730,6 +1741,16 @@ class PileUpper:
                 region
             )  # self.CoolSnipper.select(self.regions[chrom], self.regions[chrom])
             min_left, max_right = self.view_df_extents[region]
+            
+            if self.clr_weight_name:
+                isnan = np.isnan(
+                    self.clr.bins()[min_left:max_right][self.clr_weight_name].values
+                )
+            else:
+                isnan = np.zeros_like(
+                    self.clr.bins()[min_left:max_right][self.clr_weight_name].values
+                ).astype(bool)
+                
             if self.coverage_norm:
                 coverage = self.get_coverage(bigdata)
 
@@ -1757,6 +1778,13 @@ class PileUpper:
                 .astype(float)
             )
             
+            if self.trans:
+                data[isnan1[snip["stBin1"] : snip["endBin1"]], :] = np.nan
+                data[:, isnan2[snip["stBin2"] : snip["endBin2"]]] = np.nan
+            else:
+                data[isnan[snip["stBin1"] : snip["endBin1"]], :] = np.nan
+                data[:, isnan[snip["stBin2"] : snip["endBin2"]]] = np.nan
+
             if self.expected:
                 if self.trans:
                     exp_data = self.get_expected_trans(region1, region2)
@@ -2176,8 +2204,7 @@ class PileUpper:
         return normalized_roi
 
     def pileupsByWindowWithControl(
-        self,
-        nproc=1,
+        self, nproc=1,
     ):
         """Perform by-window pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl
@@ -2306,8 +2333,7 @@ class PileUpper:
             Each distance band is a row, annotated in columns `separation`
         """
         normalized_pileups = self.pileupsWithControl(
-            nproc=nproc,
-            groupby=["strand1", "strand2"],
+            nproc=nproc, groupby=["strand1", "strand2"],
         )
         normalized_pileups = normalized_pileups.drop(index=("all", "all")).reset_index()
         normalized_pileups["orientation"] = (

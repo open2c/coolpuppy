@@ -3,7 +3,7 @@ from coolpuppy.coolpup import CoordCreator, PileUpper, save_pileup_df
 
 # from coolpuppy import *
 from coolpuppy._version import __version__
-from cooltools.lib import common
+from cooltools.lib import common, io
 from .util import validate_csv
 import cooler
 import pandas as pd
@@ -275,6 +275,8 @@ def parse_args_coolpuppy():
         default="weight",
         type=str,
         required=False,
+        nargs="?",
+        const=None,
         help="""Name of the norm to use for getting balanced data.
                 Provide empty argument to calculate pileups on raw data
                 (no masking bad pixels).""",
@@ -390,7 +392,7 @@ def main():
         view_df = common.make_cooler_view(clr)
     else:
         # Read view_df dataframe, and verify against cooler
-        view_df = common.read_viewframe(args.view, clr, check_sorting=True)
+        view_df = io.read_viewframe_from_file(args.view, clr, check_sorting=True)
 
     if args.nshifts > 0:
         control = True
@@ -407,7 +409,7 @@ def main():
             expected_value_col,
         ]
         if args.trans:
-            expected = common.read_expected(
+            expected = io.read_expected_from_file(
                 expected_path,
                 contact_type="trans",
                 expected_value_cols=expected_value_cols,
@@ -415,7 +417,7 @@ def main():
                 verify_cooler=clr,
             )
         else:
-            expected = common.read_expected(
+            expected = io.read_expected_from_file(
                 expected_path,
                 contact_type="cis",
                 expected_value_cols=expected_value_cols,
