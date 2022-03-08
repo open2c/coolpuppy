@@ -139,7 +139,7 @@ def make_heatmap_grid(
     scale="log",
     height=1,
     stripe=None,
-    stripe_sort=True,
+    stripe_sort="sum",
     out_sorted_bedpe=None,
     **kwargs,
 ):
@@ -187,7 +187,7 @@ def make_heatmap_grid(
     right = ncols / (ncols + 0.25)
     
     if stripe in ["left_stripe", "right_stripe", "corner_stripe"]:
-        if stripe_sort:
+        if not stripe_sort == None:
             pupsdf = pupsdf.reset_index()
             different = False
             for i in range(len(pupsdf)):
@@ -199,7 +199,12 @@ def make_heatmap_grid(
                     different = True
                     warnings.warn("Cannot sort, samples have different regions. Plot one by one if you want to sort")
             if not different:
-                ind_sum = np.argsort(-np.nansum(pupsdf[stripe][0], axis=1))
+                if stripe_sort == "sum":
+                    ind_sum = np.argsort(-np.nansum(pupsdf[stripe][0], axis=1))
+                elif stripe_sort == "center_pixel":
+                    ind_sum = np.argsort(-pupsdf[stripe][0][:,int(np.floor(pupsdf[stripe][0].shape[1]/2))])
+                else:
+                    raise ValueError("stripe_sort can only be None, sum, or center_pixel")
                 for i in range(len(pupsdf)):
                         pupsdf.loc[i,["coordinates", "right_stripe", "left_stripe", "corner_stripe"]] = pupsdf.iloc[i][["coordinates", "right_stripe", "left_stripe", "corner_stripe"]].apply(lambda x: x[ind_sum])
                 if isinstance(out_sorted_bedpe, str):

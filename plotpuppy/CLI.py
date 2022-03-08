@@ -74,9 +74,9 @@ def parse_args_plotpuppy():
         help="""For plotting stripe stackups"""
     )
     parser.add_argument(
-        "--no_stripe_sort", 
-        action='store_false',
-        default=True,
+        "--stripe_sort", 
+        type=str,
+        default="sum",
         required=False, 
         help="""Whether or not to sort stripe stackups by total signal"""
     )
@@ -277,7 +277,7 @@ def main():
         cmap=args.cmap,
         scale=args.scale,
         stripe=args.stripe,
-        stripe_sort=args.no_stripe_sort,
+        stripe_sort=args.stripe_sort,
         out_sorted_bedpe=args.out_sorted_bedpe,
         height=args.height,
     )
