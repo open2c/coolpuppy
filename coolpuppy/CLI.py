@@ -103,12 +103,13 @@ def parse_args_coolpuppy():
                 If None, don't use expected and use randomly shifted controls""",
     )
     parser.add_argument(
-        "--ooe",
-        default=False,
-        action="store_true",
-        help="""If expected is provided, normalize each snipper individually. If False,
-                will accumulate all expected snippets just like forrandomly shifted
-                controls""",
+        "--not_ooe",
+        target="ooe",
+        default=True,
+        action="store_false",
+        help="""If expected is provided, will accumulate all expected snippets just like 
+                for randomly shifted controls, instead of normalizing each snippet 
+                individually""",
     )
     # Filtering
     parser.add_argument(
