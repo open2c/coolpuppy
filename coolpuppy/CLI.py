@@ -104,9 +104,8 @@ def parse_args_coolpuppy():
     )
     parser.add_argument(
         "--ooe",
-        default=True,
-        type=bool,
-        required=False,
+        default=False,
+        action="store_true",
         help="""If expected is provided, normalize each snipper individually. If False,
                 will accumulate all expected snippets just like forrandomly shifted
                 controls""",
