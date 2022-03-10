@@ -104,7 +104,7 @@ def parse_args_coolpuppy():
     )
     parser.add_argument(
         "--not_ooe",
-        target="ooe",
+        dest="ooe",
         default=True,
         action="store_false",
         help="""If expected is provided, will accumulate all expected snippets just like 
