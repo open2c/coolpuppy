@@ -105,7 +105,13 @@ def add_stripe_heatmap(data, color=None, cmap="inferno", norm=LogNorm(0.5, 2)):
     elif len(data) == 0:
         return
     ax = plt.gca()
-    ax.imshow(data.values[0], cmap=cmap, norm=norm, aspect='auto', interpolation='none')    
+    ax.imshow(data.values[0], cmap=cmap, norm=norm, aspect='auto', interpolation='none')  
+
+    resolution = 5000
+    flank = 100000
+    ticks_pixels = np.linspace(0, flank*2//resolution,5)
+    ticks_kbp = ((ticks_pixels-ticks_pixels[-1]/2)*resolution//1000).astype(int)
+    plt.xticks(ticks_pixels, ticks_kbp)
 
 def add_score(score, color=None):
     """
@@ -250,25 +256,38 @@ def make_heatmap_grid(
             pass
         else:
             fg.map(add_score, "score")
-    fg.map(lambda color: plt.gca().set_xticks([]))
-    fg.map(lambda color: plt.gca().set_yticks([]))
-    fg.set_titles(col_template="", row_template="")
+    if stripe in ["left_stripe", "right_stripe", "corner_stripe"]:
+        fg.set_titles(col_template=stripe, row_template="")
+    else:
+        fg.map(lambda color: plt.gca().set_xticks([]))
+        fg.map(lambda color: plt.gca().set_yticks([]))
+        fg.set_titles(col_template="", row_template="")
 
     if nrows > 1 and ncols > 1:
         for (row_val, col_val), ax in fg.axes_dict.items():
             if row_val == row_order[-1]:
-                ax.set_xlabel(col_val)
+                if stripe in ["left_stripe", "right_stripe", "corner_stripe"]:
+                    ax.set_xlabel("relative position, kbp")
+                else:
+                    ax.set_xlabel(col_val)
             if col_val == col_order[0]:
                 ax.set_ylabel(row_val, rotation=0, ha="right")
     else:
         if nrows == 1 and ncols > 1:
             for col_val, ax in fg.axes_dict.items():
-                ax.set_xlabel(col_val)
+                if stripe in ["left_stripe", "right_stripe", "corner_stripe"]:
+                    ax.set_xlabel("relative position, kbp")
+                else:
+                    ax.set_xlabel(col_val)
         elif nrows > 1 and ncols == 1:
             for row_val, ax in fg.axes_dict.items():
                 ax.set_ylabel(row_val, rotation=0, ha="right")
         else:
-            pass
+            if stripe in ["left_stripe", "right_stripe", "corner_stripe"]:
+                plt.title(stripe)
+                plt.xlabel("relative position, kbp")
+            
+            
     plt.draw()
     ax_bottom = fg.axes[-1, -1]
     bottom = ax_bottom.get_position().y0
