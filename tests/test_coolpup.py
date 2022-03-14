@@ -56,6 +56,12 @@ def test_bystrand_pileups_with_expected(request):
     pu = PileUpper(clr, cc, expected=False, ooe=False)
     pup = pu.pileupsByStrandWithControl()
     assert np.all(pup.sort_values("orientation")["n"] == [1, 3, 1, 1])
+    # Unbalanced
+    pu = PileUpper(
+        clr, cc, expected=False, ooe=False, clr_weight_name=None, coverage_norm=True
+    )
+    pup = pu.pileupsByStrandWithControl()
+    assert np.all(pup.sort_values("orientation")["n"] == [1, 3, 1, 1])
 
 
 def test_bystrand_pileups_with_controls(request):
