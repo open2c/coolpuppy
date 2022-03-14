@@ -1480,9 +1480,7 @@ class PileUpper:
                 self.clr.bins()[min_left:max_right][self.clr_weight_name].values
             )
         else:
-            isnan = np.zeros_like(
-                self.clr.bins()[min_left:max_right][self.clr_weight_name].values
-            ).astype(bool)
+            isnan = np.zeros(max_right - min_left).astype(bool)
         if self.coverage_norm:
             coverage = self.get_coverage(bigdata)
 
