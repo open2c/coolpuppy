@@ -41,6 +41,7 @@ def parse_args_coolpuppy():
     ##### Extra arguments
     parser.add_argument(
         "--features_format",
+        "--features-format",
         "--basetype",
         type=str,
         choices=["bed", "bedpe", "auto"],
@@ -104,6 +105,7 @@ def parse_args_coolpuppy():
     )
     parser.add_argument(
         "--not_ooe",
+        "--not-ooe",
         dest="ooe",
         default=True,
         action="store_false",
@@ -128,6 +130,7 @@ def parse_args_coolpuppy():
     )
     parser.add_argument(
         "--ignore_diags",
+        "--ignore-diags",
         type=int,
         default=2,
         required=False,
@@ -135,6 +138,7 @@ def parse_args_coolpuppy():
     )
     parser.add_argument(
         "--excl_chrs",
+        "--excl-chrs",
         default="chrY,chrM",
         type=str,
         required=False,
@@ -142,6 +146,7 @@ def parse_args_coolpuppy():
     )
     parser.add_argument(
         "--incl_chrs",
+        "--incl-chrs",
         default="all",
         type=str,
         required=False,
@@ -169,6 +174,7 @@ def parse_args_coolpuppy():
     )
     parser.add_argument(
         "--by_window",
+        "--by-window",
         action="store_true",
         default=False,
         required=False,
@@ -181,6 +187,7 @@ def parse_args_coolpuppy():
     )
     parser.add_argument(
         "--by_strand",
+        "--by-strand",
         action="store_true",
         default=False,
         required=False,
@@ -189,6 +196,7 @@ def parse_args_coolpuppy():
     )
     parser.add_argument(
         "--by_distance",
+        "--by-distance",
         action="store_true",
         default=False,
         required=False,
@@ -198,6 +206,7 @@ def parse_args_coolpuppy():
     )
     parser.add_argument(
         "--flip_negative_strand",
+        "--flip-negative-strand",
         action="store_true",
         default=False,
         required=False,
@@ -214,6 +223,7 @@ def parse_args_coolpuppy():
     )
     parser.add_argument(
         "--coverage_norm",
+        "--coverage-norm",
         action="store_true",
         required=False,
         help="""
@@ -232,6 +242,8 @@ def parse_args_coolpuppy():
     parser.add_argument(
         "--rescale_flank",
         "--rescale_pad",
+        "--rescale-flank",
+        "--rescale-pad",
         default=1.0,
         required=False,
         type=float,
@@ -239,6 +251,7 @@ def parse_args_coolpuppy():
     )
     parser.add_argument(
         "--rescale_size",
+        "--rescale-size",
         type=int,
         default=99,
         required=False,
@@ -250,6 +263,8 @@ def parse_args_coolpuppy():
     parser.add_argument(
         "--clr_weight_name",
         "--weight_name",
+        "--clr-weight-name",
+        "--weight-name",
         default="weight",
         type=str,
         required=False,
@@ -263,6 +278,7 @@ def parse_args_coolpuppy():
         "-p",
         "--nproc",
         "--n_proc",
+        "--n-proc",
         default=1,
         type=int,
         required=False,
@@ -302,6 +318,7 @@ def parse_args_coolpuppy():
     )
     parser.add_argument(
         "--post_mortem",
+        "--post-mortem",
         action="store_true",
         default=False,
         required=False,
