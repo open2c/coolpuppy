@@ -238,7 +238,7 @@ def parse_args_coolpuppy():
         action="store_true",
         default=False,
         required=False,
-        help="""Store left, right, and corner stripes in pileup output""",
+        help="""Store horizontal, vertical, and corner stripes in pileup output""",
     )
     
     # Rescaling

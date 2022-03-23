@@ -192,14 +192,14 @@ def make_heatmap_grid(
 
     right = ncols / (ncols + 0.25)
     
-    if stripe in ["left_stripe", "right_stripe", "corner_stripe"]:
-        if not stripe_sort == None:
+    if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
+        if not stripe_sort is None:
             pupsdf = pupsdf.reset_index()
             different = False
             for i in range(len(pupsdf)):
                 pupsdf["coordinates"][i] = np.array(pupsdf["coordinates"][i], dtype=object)
                 ind_regions = natsort.index_natsorted(pupsdf["coordinates"][i])
-                pupsdf.loc[i,["coordinates", "right_stripe", "left_stripe", "corner_stripe"]] = pupsdf.iloc[i][["coordinates", "right_stripe", "left_stripe", "corner_stripe"]].apply(lambda x: x[ind_regions])
+                pupsdf.loc[i,["coordinates", "vertical_stripe", "horizontal_stripe", "corner_stripe"]] = pupsdf.iloc[i][["coordinates", "vertical_stripe", "horizontal_stripe", "corner_stripe"]].apply(lambda x: x[ind_regions])
             for i in range(len(pupsdf)):
                 if not (np.all(pupsdf["coordinates"][0] == pupsdf["coordinates"][i])):
                     different = True
@@ -212,7 +212,7 @@ def make_heatmap_grid(
                 else:
                     raise ValueError("stripe_sort can only be None, sum, or center_pixel")
                 for i in range(len(pupsdf)):
-                        pupsdf.loc[i,["coordinates", "right_stripe", "left_stripe", "corner_stripe"]] = pupsdf.iloc[i][["coordinates", "right_stripe", "left_stripe", "corner_stripe"]].apply(lambda x: x[ind_sum])
+                        pupsdf.loc[i,["coordinates", "vertical_stripe", "horizontal_stripe", "corner_stripe"]] = pupsdf.iloc[i][["coordinates", "vertical_stripe", "horizontal_stripe", "corner_stripe"]].apply(lambda x: x[ind_sum])
                 if isinstance(out_sorted_bedpe, str):
                     pd.DataFrame(pupsdf.loc[0, "coordinates"]).to_csv(out_sorted_bedpe, sep="\t", header=None, index=False)
         
@@ -245,18 +245,18 @@ def make_heatmap_grid(
         cmap = copy.copy(cm.get_cmap('coolwarm')) # copy the default cmap
         cmap.set_bad((0.95,0.95,0.95))
     
-    if stripe in ["left_stripe", "right_stripe", "corner_stripe"]:
+    if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
         fg.map(add_stripe_heatmap, stripe, norm=norm, cmap=cmap)
-    elif stripe == None:
+    elif stripe is None:
         fg.map(add_heatmap, "data", norm=norm, cmap=cmap)
     else:
-        raise ValueError("stripe can only be 'right_stripe', 'left_stripe', 'corner_stripe' or None")
+        raise ValueError("stripe can only be 'vertical_stripe', 'horizontal_stripe', 'corner_stripe' or None")
     if score:
         if stripe:
             pass
         else:
             fg.map(add_score, "score")
-    if stripe in ["left_stripe", "right_stripe", "corner_stripe"]:
+    if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
         fg.set_titles(col_template=stripe, row_template="")
     else:
         fg.map(lambda color: plt.gca().set_xticks([]))
@@ -266,7 +266,7 @@ def make_heatmap_grid(
     if nrows > 1 and ncols > 1:
         for (row_val, col_val), ax in fg.axes_dict.items():
             if row_val == row_order[-1]:
-                if stripe in ["left_stripe", "right_stripe", "corner_stripe"]:
+                if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
                     ax.set_xlabel("relative position, kbp")
                 else:
                     ax.set_xlabel(col_val)
@@ -275,7 +275,7 @@ def make_heatmap_grid(
     else:
         if nrows == 1 and ncols > 1:
             for col_val, ax in fg.axes_dict.items():
-                if stripe in ["left_stripe", "right_stripe", "corner_stripe"]:
+                if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
                     ax.set_xlabel("relative position, kbp")
                 else:
                     ax.set_xlabel(col_val)
@@ -283,7 +283,7 @@ def make_heatmap_grid(
             for row_val, ax in fg.axes_dict.items():
                 ax.set_ylabel(row_val, rotation=0, ha="right")
         else:
-            if stripe in ["left_stripe", "right_stripe", "corner_stripe"]:
+            if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
                 plt.title(stripe)
                 plt.xlabel("relative position, kbp")
             
