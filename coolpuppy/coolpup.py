@@ -49,6 +49,7 @@ def save_pileup_df(filename, df, metadata=None, mode="w"):
     if metadata is None:
         metadata = {}
     df[df.columns[df.columns != "data"]].to_hdf(filename, "annotation", mode=mode)
+    #df[df.columns[~df.columns.isin(['data', 'coordinates', 'horizontal_stripe', 'vertical_stripe', 'corner_stripe'])]].to_hdf(filename, "annotation", mode=mode)
     with h5py.File(filename, "a") as f:
         width = df["data"].iloc[0].shape[0]
         height = width * df["data"].shape[0]
@@ -57,6 +58,14 @@ def save_pileup_df(filename, df, metadata=None, mode="w"):
         )
         for i, arr in df["data"].reset_index(drop=True).items():
             ds[i * width : (i + 1) * width, :] = arr
+        
+#         for column, _ in df[["coordinates", "horizontal_stripe", "vertical_stripe", "corner_stripe"]].items(): 
+#             ds = f.create_dataset(
+#                 column, compression="lzf", maxshape = (None, width), dtype=list
+#             )
+#             for i, arr in df[column].reset_index(drop=True).items():
+#                 ds[i * width : (i + 1) * width, :] = arr
+                
         group = f.create_group("attrs")
         if metadata is not None:
             for key, val in metadata.items():
@@ -1832,6 +1841,18 @@ class PileUpper:
         else:
             n = normalized_roi.loc["all", "n"]
         logging.info(f"Total number of piled up windows: {n}")
+        
+        #Store attributes
+        exclude_attributes = ["CC", "intervals", "features_format", "kind",
+                              "basechroms", "final_chroms", "pos_stream",
+                              "view_df", "ExpSnipper", "expected_selections",
+                              "view_df_extents", "regions", "empty_outmap", "empty_pup"]
+        for name, attr in self.__dict__.items():
+            if name not in exclude_attributes:
+                if type(attr) == list:
+                    attr = str(attr)
+                normalized_roi[name] = attr
+
         return normalized_roi
 
     def pileupsByWindowWithControl(
