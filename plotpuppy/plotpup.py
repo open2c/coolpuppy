@@ -14,6 +14,7 @@ from cooltools.lib import plotting
 import random
 import logging
 import warnings
+pd.options.mode.chained_assignment = None
 import natsort
 import copy
 
@@ -94,7 +95,7 @@ def add_heatmap(data, color=None, cmap="coolwarm", norm=LogNorm(0.5, 2)):
 #     sns.heatmap(data.values[0], cmap=cmap, norm=norm, ax=ax, square=True, cbar=False,
 #                xticklabels=False, yticklabels=False)
 
-def add_stripe_heatmap(data, color=None, cmap="inferno", norm=LogNorm(0.5, 2)):
+def add_stripe_heatmap(data, resolution, flank, color=None, cmap="coolwarm", norm=LogNorm(0.5, 2)):
     """
     Adds the array contained in data.values[0] to the current axes as a heatmap of stripes
     """
@@ -106,12 +107,13 @@ def add_stripe_heatmap(data, color=None, cmap="inferno", norm=LogNorm(0.5, 2)):
         return
     ax = plt.gca()
     ax.imshow(data.values[0], cmap=cmap, norm=norm, aspect='auto', interpolation='none')  
-
-    resolution = 5000
-    flank = 100000
+    
+    resolution = int(resolution)
+    flank = int(flank)
+    
     ticks_pixels = np.linspace(0, flank*2//resolution,5)
     ticks_kbp = ((ticks_pixels-ticks_pixels[-1]/2)*resolution//1000).astype(int)
-    plt.xticks(ticks_pixels, ticks_kbp)
+    plt.xticks(ticks_pixels.tolist(), ticks_kbp.tolist())
 
 def add_score(score, color=None):
     """
@@ -125,7 +127,7 @@ def add_score(score, color=None):
             x=0.05,
             ha="left",
             va="top",
-            size="x-small",
+            size="medium",
             transform=ax.transAxes,
         )
         
@@ -133,11 +135,169 @@ def sort_separation(sep_string_series, sep="Mb"):
     return sorted(set(sep_string_series.dropna()), key=lambda x: float(x.split(sep)[0]))
 
 
+def make_heatmap_stripes(
+    pupsdf,
+    cols=None,
+    rows=None,
+    col_order=None,
+    row_order=None,
+    vmin=None,
+    vmax=None,
+    sym=True,
+    cmap="coolwarm",
+    cmap_emptypixel=(0.90,0.9,0.9),
+    scale="log",
+    height=2,
+    stripe="corner_stripe",
+    stripe_sort="center_pixel",
+    out_sorted_bedpe=None,
+    **kwargs,
+):
+    pupsdf = pupsdf.copy()
+        
+    if cols == "separation":
+        col_order = sort_separation(pupsdf["separation"])
+        ncols = len(col_order)
+    elif cols is not None and col_order is None:
+        col_order = list(set(pupsdf[cols].dropna()))
+        ncols = len(col_order)
+    elif col_order is not None:
+        ncols = len(col_order)
+    else:
+        ncols = 1
+        
+    if rows == "separation":
+        row_order = sort_separation(pupsdf["separation"])
+        nrows = len(row_order)
+    elif rows is not None and row_order is None:
+        row_order = list(set(pupsdf[rows].dropna()))
+        nrows = len(row_order)
+    elif row_order is not None:
+        nrows = len(row_order)
+    else:
+        nrows = 1
+
+    if cols is None and rows is None:
+        nrows, ncols = auto_rows_cols(pupsdf.shape[0])
+
+    if scale == "log":
+        norm = LogNorm
+    elif scale == "linear":
+        norm = Normalize
+    else:
+        raise ValueError(
+            f"Unknown scale value, only log or linear implemented, but got {scale}"
+        )
+
+    vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym)
+
+    right = ncols / (ncols + 0.25)    
+    
+    #Sorting stripes
+    if not stripe_sort == None:
+        pupsdf = pupsdf.reset_index()
+        different = False
+        for i in range(len(pupsdf)):
+            pupsdf["coordinates"][i] = np.array(pupsdf["coordinates"][i], dtype=object)
+            pupsdf["corner_stripe"][i] = np.array(pupsdf["corner_stripe"][i])
+            pupsdf["vertical_stripe"][i] = np.array(pupsdf["vertical_stripe"][i])
+            pupsdf["horizontal_stripe"][i] = np.array(pupsdf["horizontal_stripe"][i])
+            ind_regions = natsort.index_natsorted(pupsdf["coordinates"][i])
+            pupsdf.loc[i,["coordinates", "corner_stripe", "vertical_stripe", "horizontal_stripe"]] = pupsdf.loc[i,["coordinates", "corner_stripe", "vertical_stripe", "horizontal_stripe"]].apply(lambda x: x[ind_regions])
+        for i in range(len(pupsdf)):
+            #if not np.all(pupsdf["coordinates"][0] == pupsdf["coordinates"][i]):
+            if not np.array_equal(pupsdf["coordinates"][0], pupsdf["coordinates"][i]):
+                different = True
+                warnings.warn("Cannot sort, samples have different regions. Plot one by one if you want to sort")
+        if not different:
+            if stripe_sort == "sum":
+                ind_sort = np.argsort(-np.nansum(pupsdf[stripe][0], axis=1))
+            elif stripe_sort == "center_pixel":
+                cntr = int(np.floor(pupsdf[stripe][0].shape[1]/2))
+                ind_sort = np.argsort(-pupsdf[stripe][0][:,cntr])
+            else:
+                raise ValueError("stripe_sort can only be None, sum, or center_pixel")
+            for i in range(len(pupsdf)):
+                pupsdf.loc[i,["coordinates", "corner_stripe", "vertical_stripe", "horizontal_stripe"]] = pupsdf.loc[i,["coordinates", "corner_stripe", "vertical_stripe", "horizontal_stripe"]].apply(lambda x: x[ind_sort])
+            if isinstance(out_sorted_bedpe, str):
+                pd.DataFrame(pupsdf.loc[0, "coordinates"]).to_csv(out_sorted_bedpe, sep="\t", header=None, index=False)
+    
+    fg = sns.FacetGrid(
+        pupsdf,
+        col=cols,
+        row=rows,
+        row_order=row_order,
+        col_order=col_order,
+        margin_titles=True,
+        gridspec_kws={
+            "right": right,
+            #"hspace": 0.05,
+            "wspace": 0.2,
+            #'top':0.95,
+            #'bottom':0.05
+        },
+        height=height,
+        **kwargs,
+    )
+    
+    norm = norm(vmin, vmax)
+    
+    cmap = copy.copy(cm.get_cmap(cmap))
+    cmap.set_bad(cmap_emptypixel)   
+    
+    if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
+        fg.map(add_stripe_heatmap, stripe, "resolution", "flank", norm=norm, cmap=cmap)
+    else:
+        raise ValueError("stripe can only be 'vertical_stripe', 'horizontal_stripe' or 'corner_stripe'")
+
+    fg.set_titles(col_template=stripe, row_template="")
+    
+    if nrows > 1 and ncols > 1:
+        for (row_val, col_val), ax in fg.axes_dict.items():
+            if row_val == row_order[-1]:
+                ax.set_xlabel("relative position, kbp")
+            if col_val == col_order[0]:
+                ax.set_ylabel(row_val, rotation=0, ha="right")
+    else:
+        if nrows == 1 and ncols > 1:
+            for col_val, ax in fg.axes_dict.items():
+                ax.set_xlabel("relative position, kbp")
+        elif nrows > 1 and ncols == 1:
+            for row_val, ax in fg.axes_dict.items():
+                ax.set_ylabel(row_val, rotation=0, ha="right")
+        else:
+            plt.title(stripe)
+            plt.xlabel("relative position, kbp")
+            
+            
+    plt.draw()
+    ax_bottom = fg.axes[-1, -1]
+    bottom = ax_bottom.get_position().y0
+    ax_top = fg.axes[0, -1]
+    top = ax_top.get_position().y1
+    height = top - bottom
+    right = ax_top.get_position().x1
+    cax = fg.fig.add_axes([right + 0.01, bottom, (1 - right - 0.01) / 5, height])  
+    if sym:
+        ticks = [vmin, 1, vmax]
+    else:
+        ticks = [vmin, vmax]
+    cb = plt.colorbar(
+        cm.ScalarMappable(norm, cmap),
+        ticks=ticks,
+        cax=cax,
+        format=ticker.FuncFormatter(lambda x, pos: f"{x:.2g}"),
+        )
+    cax.minorticks_off()
+    return fg
+                    
 def make_heatmap_grid(
     pupsdf,
     cols=None,
     rows=None,
     score="score",
+    center=3,
+    ignore_central=3,
     col_order=None,
     row_order=None,
     vmin=None,
@@ -147,18 +307,14 @@ def make_heatmap_grid(
     cmap="coolwarm",
     scale="log",
     height=1,
-    stripe=None,
-    stripe_sort="sum",
-    out_sorted_bedpe=None,
     **kwargs,
 ):
     pupsdf = pupsdf.copy()
         
     if norm_corners:
-        if not stripe:
-            pupsdf["data"] = pupsdf.apply(
-                lambda x: coolpup.norm_cis(x["data"], norm_corners), axis=1
-            )
+        pupsdf["data"] = pupsdf.apply(
+            lambda x: coolpup.norm_cis(x["data"], norm_corners), axis=1
+        )
     if cols == "separation":
         col_order = sort_separation(pupsdf["separation"])
         ncols = len(col_order)
@@ -200,31 +356,7 @@ def make_heatmap_grid(
     vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym)
 
     right = ncols / (ncols + 0.25)
-    
-    if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
-        if not stripe_sort is None:
-            pupsdf = pupsdf.reset_index()
-            different = False
-            for i in range(len(pupsdf)):
-                pupsdf["coordinates"][i] = np.array(pupsdf["coordinates"][i], dtype=object)
-                ind_regions = natsort.index_natsorted(pupsdf["coordinates"][i])
-                pupsdf.loc[i,["coordinates", "vertical_stripe", "horizontal_stripe", "corner_stripe"]] = pupsdf.iloc[i][["coordinates", "vertical_stripe", "horizontal_stripe", "corner_stripe"]].apply(lambda x: x[ind_regions])
-            for i in range(len(pupsdf)):
-                if not (np.all(pupsdf["coordinates"][0] == pupsdf["coordinates"][i])):
-                    different = True
-                    warnings.warn("Cannot sort, samples have different regions. Plot one by one if you want to sort")
-            if not different:
-                if stripe_sort == "sum":
-                    ind_sum = np.argsort(-np.nansum(pupsdf[stripe][0], axis=1))
-                elif stripe_sort == "center_pixel":
-                    ind_sum = np.argsort(-pupsdf[stripe][0][:,int(np.floor(pupsdf[stripe][0].shape[1]/2))])
-                else:
-                    raise ValueError("stripe_sort can only be None, sum, or center_pixel")
-                for i in range(len(pupsdf)):
-                        pupsdf.loc[i,["coordinates", "vertical_stripe", "horizontal_stripe", "corner_stripe"]] = pupsdf.iloc[i][["coordinates", "vertical_stripe", "horizontal_stripe", "corner_stripe"]].apply(lambda x: x[ind_sum])
-                if isinstance(out_sorted_bedpe, str):
-                    pd.DataFrame(pupsdf.loc[0, "coordinates"]).to_csv(out_sorted_bedpe, sep="\t", header=None, index=False)
-        
+           
     # sns.set(font_scale=5)
     fg = sns.FacetGrid(
         pupsdf,
@@ -246,56 +378,33 @@ def make_heatmap_grid(
     )
     norm = norm(vmin, vmax)
     
-    if cmap == "coolwarm_black":
-        cmap = copy.copy(cm.get_cmap('coolwarm')) # copy the default cmap
-        cmap.set_bad((0,0,0))
-    
-    if cmap == "coolwarm_grey":
-        cmap = copy.copy(cm.get_cmap('coolwarm')) # copy the default cmap
-        cmap.set_bad((0.95,0.95,0.95))
-    
-    if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
-        fg.map(add_stripe_heatmap, stripe, norm=norm, cmap=cmap)
-    elif stripe is None:
-        fg.map(add_heatmap, "data", norm=norm, cmap=cmap)
-    else:
-        raise ValueError("stripe can only be 'vertical_stripe', 'horizontal_stripe', 'corner_stripe' or None")
+    fg.map(add_heatmap, "data", norm=norm, cmap=cmap)
+
     if score:
-        if stripe:
-            pass
-        else:
-            fg.map(add_score, "score")
-    if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
-        fg.set_titles(col_template=stripe, row_template="")
-    else:
-        fg.map(lambda color: plt.gca().set_xticks([]))
-        fg.map(lambda color: plt.gca().set_yticks([]))
-        fg.set_titles(col_template="", row_template="")
+        pupsdf["score"] = pupsdf.apply(
+            coolpup.get_score, center=center, ignore_central=ignore_central, axis=1
+        )
+        fg.map(add_score, "score")
+    
+    fg.map(lambda color: plt.gca().set_xticks([]))
+    fg.map(lambda color: plt.gca().set_yticks([]))
+    fg.set_titles(col_template="", row_template="")
 
     if nrows > 1 and ncols > 1:
         for (row_val, col_val), ax in fg.axes_dict.items():
             if row_val == row_order[-1]:
-                if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
-                    ax.set_xlabel("relative position, kbp")
-                else:
-                    ax.set_xlabel(col_val)
+                ax.set_xlabel(col_val)
             if col_val == col_order[0]:
                 ax.set_ylabel(row_val, rotation=0, ha="right")
     else:
         if nrows == 1 and ncols > 1:
             for col_val, ax in fg.axes_dict.items():
-                if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
-                    ax.set_xlabel("relative position, kbp")
-                else:
-                    ax.set_xlabel(col_val)
+                ax.set_xlabel(col_val)
         elif nrows > 1 and ncols == 1:
             for row_val, ax in fg.axes_dict.items():
                 ax.set_ylabel(row_val, rotation=0, ha="right")
         else:
-            if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
-                plt.title(stripe)
-                plt.xlabel("relative position, kbp")
-            
+            pass
             
     plt.draw()
     ax_bottom = fg.axes[-1, -1]
@@ -304,10 +413,7 @@ def make_heatmap_grid(
     top = ax_top.get_position().y1
     height = top - bottom
     right = ax_top.get_position().x1
-    if not stripe:
-        cax = fg.fig.add_axes([right + 0.005, bottom, (1 - right - 0.005) / 5, height])
-    else:
-        cax = fg.fig.add_axes([right + 0.01, bottom, (1 - right - 0.01) / 5, height])    
+    cax = fg.fig.add_axes([right + 0.005, bottom, (1 - right - 0.005) / 5, height])
     if sym:
         ticks = [vmin, 1, vmax]
     else:
