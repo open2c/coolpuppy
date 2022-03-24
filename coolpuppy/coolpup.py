@@ -584,7 +584,6 @@ class CoordCreator:
         resolution,
         *,
         features_format="auto",
-        anchor=False,
         flank=100000,
         fraction_flank=None,
         chroms="all",
@@ -612,10 +611,6 @@ class CoordCreator:
                 bed: chrom, start, end
                 bedpe: chrom1, start1, end1, chrom2, start2, end2
                 auto (default): determined from the columns in the DataFrame
-        anchor : tuple of (str, int, int), optional
-            Coordinates (chr, start, end) of an anchor region used to create
-            interactions with features (in bp). Anchor is on the left of the final pileup.
-            The default is False.
         flank : int, optional
             Padding around the central bin, in bp. For example, with 5000 bp resolution
             and 100000 flank, final pileup is 205000×205000 bp.
@@ -670,7 +665,6 @@ class CoordCreator:
         # self.stdin = self.intervals == sys.stdin
         self.resolution = resolution
         self.features_format = features_format
-        self.anchor = anchor
         self.flank = flank
         # self.pad_bins = flank // self.resolution
         self.fraction_flank = fraction_flank
@@ -727,16 +721,6 @@ class CoordCreator:
         
         if self.subset > 0:
             self.intervals = self._subset(self.intervals)
-            
-        if self.anchor:
-            assert self.kind == "bed"
-            self.intervals = pd.DataFrame(
-                {
-                    "chrom": self.anchor[0],
-                    "start": self.anchor[1],
-                    "end": self.anchor[2],
-                }
-            )
 
         if self.kind == "bed":
             assert all(
@@ -779,9 +763,7 @@ class CoordCreator:
             basechroms = set(self.intervals["chrom"])
 
         else:
-            if self.anchor:
-                raise ValueError("Can't use anchor with both sides of loops defined")
-            elif self.local:
+            if self.local:
                 raise ValueError("Can't make local with both sides of loops defined")
             basechroms = set(self.intervals["chrom1"]).intersection(
                 set(self.intervals["chrom2"])
@@ -796,7 +778,7 @@ class CoordCreator:
         if len(self.final_chroms) == 0:
             raise ValueError(
                 """No chromosomes are in common between the coordinate
-                   file/anchor and the cooler file. Are they in the same
+                   file and the cooler file. Are they in the same
                    format, e.g. starting with "chr"?
                    """
             )
@@ -1674,9 +1656,6 @@ class PileUpper:
             
         region1_coords = self.view_df.loc[region1]
         region2_coords = self.view_df.loc[region2]
-        
-        if self.anchor:
-            raise ValueError("Cannot do anchor with interchromosomal contacts (not implemented)")
             
         filter_func1 = self.CC.filter_func_region(region=region1_coords)
         filter_func2 = self.CC.filter_func_region(region=region2_coords)
