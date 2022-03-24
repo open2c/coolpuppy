@@ -430,7 +430,6 @@ def group_by_region(snip):
     snip2["group"] = tuple(snip2[["chrom2", "start2", "end2"]])
     yield from (snip1, snip2)
 
-
 def assign_groups(intervals, groupby=[]):
     """
 
@@ -513,8 +512,12 @@ def combine_rows(row1, row2, normalize_order=True):
 
 def _add_snip(outdict, key, snip):
     if key not in outdict:
-        outdict[key] = snip[["data", "horizontal_stripe", "vertical_stripe", "corner_stripe", "cov_start", "cov_end"]]
+        #outdict[key] = snip[["data", "horizontal_stripe", "vertical_stripe", "corner_stripe", "cov_start", "cov_end"]]
+        outdict[key] = snip[["data", "cov_start", "cov_end"]]
         outdict[key]["coordinates"] = [snip["coordinates"]]
+        outdict[key]["horizontal_stripe"] = [snip["horizontal_stripe"]]
+        outdict[key]["vertical_stripe"] = [snip["vertical_stripe"]]
+        outdict[key]["corner_stripe"] = [snip["corner_stripe"]]
         outdict[key]["num"] = np.isfinite(snip["data"]).astype(int)
         outdict[key]["n"] = 1
     else:
@@ -527,9 +530,12 @@ def _add_snip(outdict, key, snip):
             [outdict[key]["cov_end"], snip["cov_end"]], axis=0
         )
         outdict[key]["n"] += 1
-        outdict[key]["horizontal_stripe"] = np.vstack((outdict[key]["horizontal_stripe"], snip["horizontal_stripe"]))
-        outdict[key]["vertical_stripe"] = np.vstack((outdict[key]["vertical_stripe"], snip["vertical_stripe"]))
-        outdict[key]["corner_stripe"] = np.vstack((outdict[key]["corner_stripe"], snip["corner_stripe"]))
+        outdict[key]["horizontal_stripe"] = outdict[key]["horizontal_stripe"] + [snip["horizontal_stripe"]]
+        outdict[key]["vertical_stripe"] = outdict[key]["vertical_stripe"] + [snip["vertical_stripe"]]
+        outdict[key]["corner_stripe"] = outdict[key]["corner_stripe"] + [snip["corner_stripe"]]
+        #outdict[key]["horizontal_stripe"] = np.vstack((outdict[key]["horizontal_stripe"], snip["horizontal_stripe"]))
+        #outdict[key]["vertical_stripe"] = np.vstack((outdict[key]["vertical_stripe"], snip["vertical_stripe"]))
+        #outdict[key]["corner_stripe"] = np.vstack((outdict[key]["corner_stripe"], snip["corner_stripe"]))
         outdict[key]["coordinates"] = outdict[key]["coordinates"] + [snip["coordinates"]]
 
 def sum_pups(pup1, pup2):
@@ -545,9 +551,12 @@ def sum_pups(pup1, pup2):
         "n": pup1.get("n", 1) + pup2.get("n", 1),
         "num": pup1.get("num", np.isfinite(pup1["data"]).astype(int))
         + pup2.get("num", np.isfinite(pup2["data"]).astype(int)),
-        "horizontal_stripe": np.vstack((pup1["horizontal_stripe"], pup2["horizontal_stripe"])),
-        "vertical_stripe": np.vstack((pup1["vertical_stripe"], pup2["vertical_stripe"])),
-        "corner_stripe": np.vstack((pup1["corner_stripe"], pup2["corner_stripe"])),
+        #"horizontal_stripe": np.vstack((pup1["horizontal_stripe"], pup2["horizontal_stripe"])),
+        #"vertical_stripe": np.vstack((pup1["vertical_stripe"], pup2["vertical_stripe"])),
+        #"corner_stripe": np.vstack((pup1["corner_stripe"], pup2["corner_stripe"])),
+        "horizontal_stripe": pup1["horizontal_stripe"] + pup2["horizontal_stripe"],
+        "vertical_stripe": pup1["vertical_stripe"] + pup2["vertical_stripe"],
+        "corner_stripe": pup1["corner_stripe"] + pup2["corner_stripe"],
         "coordinates": pup1["coordinates"] + pup2["coordinates"]
     }
     return pd.Series(pup)
@@ -787,7 +796,10 @@ class CoordCreator:
                 
         if self.kind == "bed":
             if self.trans:
-                self.pos_stream = self.get_combinations_trans
+                if self.local:
+                    raise ValueError("Cannot do local with trans=True")
+                else:
+                    self.pos_stream = self.get_combinations_trans
             else:
                 self.pos_stream = self.get_combinations
         else:
@@ -1014,8 +1026,8 @@ class CoordCreator:
             yield None
 
         if self.local:
-            if self.store_stripes:
-                raise ValueError("Cannot do stripe stackups with local=True") 
+            #if self.store_stripes:
+                #raise ValueError("Cannot do stripe stackups with local=True") 
             merged = pd.merge(
                 intervals,
                 intervals,
@@ -1023,12 +1035,17 @@ class CoordCreator:
                 right_index=True,
                 suffixes=["1", "2"],
             )
+            if self.store_stripes:
+                merged["coordinates"] = merged.apply(lambda x: '.'.join(x[['chrom1', 'start1', 'end1', 'chrom2', 'start2', 'end2']].astype(str)),axis=1)
+            else:
+                merged["coordinates"] = ""
             merged = self._control_regions(merged, self.nshifts * control)
             if modify_2Dintervals_func is not None:
                 merged = modify_2Dintervals_func(merged)
             merged = assign_groups(merged, groupby=groupby)
             merged = merged.reindex(
-                columns=list(merged.columns) + ["data", "cov_start", "cov_end"]
+                columns=list(merged.columns) + ["data", "cov_start", "cov_end",
+                                                "horizontal_stripe", "vertical_stripe", "corner_stripe"]
             )
             for _, row in merged.iterrows():
                 yield row
@@ -1105,6 +1122,8 @@ class CoordCreator:
             if self.store_stripes:
                 if not combinations.empty:
                     combinations["coordinates"] = combinations.apply(lambda x: '.'.join(x[['chrom1', 'start1', 'end1', 'chrom2', 'start2', 'end2']].astype(str)),axis=1)
+            else:
+                combinations["coordinates"] = ""
             if modify_2Dintervals_func is not None:
                 combinations = modify_2Dintervals_func(combinations)
             combinations = assign_groups(combinations, groupby=groupby)
@@ -1313,14 +1332,14 @@ class PileUpper:
         self.empty_pup = pd.Series(
             {
                 "data": self.empty_outmap,
-                "horizontal_stripe": np.empty((1, 2 * self.pad_bins + 1)),
-                "vertical_stripe": np.empty((1, 2 * self.pad_bins + 1)),
-                "corner_stripe": np.empty((1, 2 * self.pad_bins + 1)),
+                "horizontal_stripe": [],#np.empty((1, 2 * self.pad_bins + 1)),
+                "vertical_stripe": [],#np.empty((1, 2 * self.pad_bins + 1)),
+                "corner_stripe": [],#np.empty((1, 2 * self.pad_bins + 1)),
                 "n": 0,
                 "num": self.empty_outmap,
                 "cov_start": np.zeros((self.empty_outmap.shape[0])),
                 "cov_end": np.zeros((self.empty_outmap.shape[1])),
-                "coordinates": [""],
+                "coordinates": [],
                 }
             )
     
@@ -1835,6 +1854,9 @@ class PileUpper:
             combined (the regions of interest, not control regions). Each window is a
             row, plus an additional row `all` is created with all data.
         """
+        if self.local:
+            raise ValueError("Cannot do by-window pileups for local")
+            
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc, postprocess_func=group_by_region
         )
@@ -1868,11 +1890,16 @@ class PileUpper:
         """
         if self.trans:
             raise ValueError("Cannot do by-distance pileups for trans")
+        elif self.local:
+            raise ValueError("Cannot do by-distance pileups for local")
         bin_func = partial(bin_distance_intervals, band_edges=distance_edges)
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc, modify_2Dintervals_func=bin_func, groupby=["distance_band"]
         )
         normalized_pileups = normalized_pileups.drop(index="all").reset_index()
+        
+        normalized_pileups['separation'] = normalized_pileups['distance_band'].apply(lambda x: f'{x[0]/1000000}Mb-\n{x[1]/1000000}Mb')
+        
         return normalized_pileups
 
     def pileupsByStrandByDistanceWithControl(self, nproc=1, distance_edges="default"):
@@ -1899,8 +1926,8 @@ class PileUpper:
         """
         if self.trans:
             raise ValueError("Cannot do by-distance pileups for trans")
-        #if self.store_stripes:
-            #raise ValueError("Cannot do by-strand and by-distance with stripes in the current implementation, do either")
+        elif self.local:
+            raise ValueError("Cannot do by-distance pileups for local")
             
         bin_func = partial(bin_distance_intervals, band_edges=distance_edges)
         normalized_pileups = self.pileupsWithControl(
@@ -1912,9 +1939,11 @@ class PileUpper:
         normalized_pileups["orientation"] = (
             normalized_pileups["strand1"] + normalized_pileups["strand2"]
         )
-        normalized_pileups = normalized_pileups[
-            ["orientation", "distance_band", "data", "n"]
-        ]
+        #normalized_pileups = normalized_pileups[
+        #    ["orientation", "distance_band", "data", "n"]
+        #]
+        
+        normalized_pileups['separation'] = normalized_pileups['distance_band'].apply(lambda x: f'{x[0]/1000000}Mb-\n{x[1]/1000000}Mb')
         
         return normalized_pileups
 
@@ -1940,6 +1969,9 @@ class PileUpper:
             combined (the regions of interest, not control regions).
             Each distance band is a row, annotated in columns `separation`
         """
+        if self.local:
+            raise ValueError("Cannot do by-strand pileups for local")
+            
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc, groupby=["strand1", "strand2"],
         )
@@ -1947,6 +1979,4 @@ class PileUpper:
         normalized_pileups["orientation"] = (
             normalized_pileups["strand1"] + normalized_pileups["strand2"]
         )
-        normalized_pileups = normalized_pileups[["orientation", "data", "n", 
-                                                     "horizontal_stripe", "vertical_stripe", "corner_stripe", "coordinates"]]
         return normalized_pileups

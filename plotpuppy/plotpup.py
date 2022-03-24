@@ -128,6 +128,9 @@ def add_score(score, color=None):
             size="x-small",
             transform=ax.transAxes,
         )
+        
+def sort_separation(sep_string_series, sep="Mb"):
+    return sorted(set(sep_string_series.dropna()), key=lambda x: float(x.split(sep)[0]))
 
 
 def make_heatmap_grid(
@@ -156,8 +159,10 @@ def make_heatmap_grid(
             pupsdf["data"] = pupsdf.apply(
                 lambda x: coolpup.norm_cis(x["data"], norm_corners), axis=1
             )
-
-    if cols is not None and col_order is None:
+    if cols == "separation":
+        col_order = sort_separation(pupsdf["separation"])
+        ncols = len(col_order)
+    elif cols is not None and col_order is None:
         col_order = list(set(pupsdf[cols].dropna()))
         #     pupsdf = pupsdf[pupsdf[cols].isin(col_order + ["data"])]
         ncols = len(col_order)
@@ -166,7 +171,11 @@ def make_heatmap_grid(
     else:
         ncols = 1
         # colvals = ['']
-    if rows is not None and row_order is None:
+        
+    if rows == "separation":
+        row_order = sort_separation(pupsdf["separation"])
+        nrows = len(row_order)
+    elif rows is not None and row_order is None:
         row_order = list(set(pupsdf[rows].dropna()))
         # else:
         #     pupsdf = pupsdf[pupsdf[rows].isin(row_order)]
