@@ -1176,6 +1176,7 @@ class PileUpper:
         rescale=False,
         rescale_size=99,
         flip_negative_strand=False,
+        ignore_diags=2,
     ):
         """Creates pileups
 
@@ -1219,6 +1220,9 @@ class PileUpper:
             Flip snippets so the positive strand always points to bottom-right.
             Requires strands to be annotated for each feature (or two strands for
             bedpe format features)
+        ignore_diags : int, optional
+            How many diagonals to ignore to avoid short-distance artefacts.
+            The default is 2.
 
         Returns
         -------
@@ -1240,6 +1244,7 @@ class PileUpper:
         self.rescale = rescale
         self.rescale_size = rescale_size
         self.flip_negative_strand = flip_negative_strand
+        self.ignore_diags = ignore_diags
         
         if view_df is None:
             # Generate viewframe from clr.chromsizes:
@@ -1452,7 +1457,10 @@ class PileUpper:
             isnan2 = np.zeros_like(
                 self.clr.bins()[min_left2:max_right2][self.clr_weight_name].values
             ).astype(bool)
-
+        
+        ar = np.arange(max_right1 - min_left1, dtype=np.int32)
+        diag_indicator = numutils.LazyToeplitz(-ar, ar)
+        
         for snip in intervals:
             snip[["stBin1", "endBin1"]] -= min_left1
             snip[["stBin2", "endBin2"]] -= min_left2 
@@ -1497,7 +1505,16 @@ class PileUpper:
                         exp_snip["horizontal_stripe"] = np.empty((1, 2 * self.pad_bins + 1))
                         exp_snip["vertical_stripe"] = np.empty((1, 2 * self.pad_bins + 1))
                         exp_snip["corner_stripe"] = np.empty((1, 2 * self.pad_bins + 1))
-                    
+            
+            if not self.trans:
+                D = (
+                    diag_indicator[
+                        snip["stBin1"] : snip["endBin1"], snip["stBin2"] : snip["endBin2"]
+                    ]
+                    < self.ignore_diags
+                )
+                data[D] = np.nan
+                
             if self.coverage_norm:
                 cov_start = coverage[snip["stBin1"] : snip["endBin1"]]
                 cov_end = coverage[snip["stBin2"] : snip["endBin2"]]
@@ -1978,9 +1995,7 @@ class PileUpper:
             combined (the regions of interest, not control regions).
             Each distance band is a row, annotated in columns `separation`
         """
-        if self.local:
-            raise ValueError("Cannot do by-strand pileups for local")
-            
+
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc, groupby=["strand1", "strand2"],
         )
