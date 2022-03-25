@@ -250,24 +250,30 @@ def make_heatmap_stripes(
     else:
         raise ValueError("stripe can only be 'vertical_stripe', 'horizontal_stripe' or 'corner_stripe'")
 
-    fg.set_titles(col_template=stripe, row_template="")
+    fg.set_titles(row_template="", col_template="")
     
     if nrows > 1 and ncols > 1:
         for (row_val, col_val), ax in fg.axes_dict.items():
+            if row_val == row_order[0]:
+                ax.set_title(col_val)
             if row_val == row_order[-1]:
-                ax.set_xlabel("relative position, kbp")
+                ax.set_xlabel("relative position, kbp\n"+stripe)
             if col_val == col_order[0]:
-                ax.set_ylabel(row_val, rotation=0, ha="right")
+                ax.set_ylabel(row_val)
     else:
         if nrows == 1 and ncols > 1:
             for col_val, ax in fg.axes_dict.items():
-                ax.set_xlabel("relative position, kbp")
+                ax.set_xlabel("relative position, kbp\n"+stripe)
+                ax.set_ylabel("")
+                ax.set_title(col_val)
         elif nrows > 1 and ncols == 1:
             for row_val, ax in fg.axes_dict.items():
                 ax.set_ylabel(row_val, rotation=0, ha="right")
+                ax.set_xlabel("relative position, kbp\n"+stripe)
         else:
-            plt.title(stripe)
-            plt.xlabel("relative position, kbp")
+            plt.title("")
+            plt.xlabel("relative position, kbp\n"+stripe)
+            plt.ylabel("")
             
             
     plt.draw()
