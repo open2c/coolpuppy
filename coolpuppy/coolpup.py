@@ -49,7 +49,7 @@ def save_pileup_df(filename, df, metadata=None, mode="w"):
     if metadata is None:
         metadata = {}
     df[df.columns[df.columns != "data"]].to_hdf(filename, "annotation", mode=mode)
-    #df[df.columns[~df.columns.isin(['data', 'coordinates', 'horizontal_stripe', 'vertical_stripe', 'corner_stripe'])]].to_hdf(filename, "annotation", mode=mode)
+
     with h5py.File(filename, "a") as f:
         width = df["data"].iloc[0].shape[0]
         height = width * df["data"].shape[0]
@@ -59,13 +59,6 @@ def save_pileup_df(filename, df, metadata=None, mode="w"):
         for i, arr in df["data"].reset_index(drop=True).items():
             ds[i * width : (i + 1) * width, :] = arr
         
-#         for column, _ in df[["coordinates", "horizontal_stripe", "vertical_stripe", "corner_stripe"]].items(): 
-#             ds = f.create_dataset(
-#                 column, compression="lzf", maxshape = (None, width), dtype=list
-#             )
-#             for i, arr in df[column].reset_index(drop=True).items():
-#                 ds[i * width : (i + 1) * width, :] = arr
-                
         group = f.create_group("attrs")
         if metadata is not None:
             for key, val in metadata.items():
@@ -521,7 +514,6 @@ def combine_rows(row1, row2, normalize_order=True):
 
 def _add_snip(outdict, key, snip):
     if key not in outdict:
-        #outdict[key] = snip[["data", "horizontal_stripe", "vertical_stripe", "corner_stripe", "cov_start", "cov_end"]]
         outdict[key] = snip[["data", "cov_start", "cov_end"]]
         outdict[key]["coordinates"] = [snip["coordinates"]]
         outdict[key]["horizontal_stripe"] = [snip["horizontal_stripe"]]
@@ -542,9 +534,6 @@ def _add_snip(outdict, key, snip):
         outdict[key]["horizontal_stripe"] = outdict[key]["horizontal_stripe"] + [snip["horizontal_stripe"]]
         outdict[key]["vertical_stripe"] = outdict[key]["vertical_stripe"] + [snip["vertical_stripe"]]
         outdict[key]["corner_stripe"] = outdict[key]["corner_stripe"] + [snip["corner_stripe"]]
-        #outdict[key]["horizontal_stripe"] = np.vstack((outdict[key]["horizontal_stripe"], snip["horizontal_stripe"]))
-        #outdict[key]["vertical_stripe"] = np.vstack((outdict[key]["vertical_stripe"], snip["vertical_stripe"]))
-        #outdict[key]["corner_stripe"] = np.vstack((outdict[key]["corner_stripe"], snip["corner_stripe"]))
         outdict[key]["coordinates"] = outdict[key]["coordinates"] + [snip["coordinates"]]
 
 def sum_pups(pup1, pup2):
@@ -560,9 +549,6 @@ def sum_pups(pup1, pup2):
         "n": pup1.get("n", 1) + pup2.get("n", 1),
         "num": pup1.get("num", np.isfinite(pup1["data"]).astype(int))
         + pup2.get("num", np.isfinite(pup2["data"]).astype(int)),
-        #"horizontal_stripe": np.vstack((pup1["horizontal_stripe"], pup2["horizontal_stripe"])),
-        #"vertical_stripe": np.vstack((pup1["vertical_stripe"], pup2["vertical_stripe"])),
-        #"corner_stripe": np.vstack((pup1["corner_stripe"], pup2["corner_stripe"])),
         "horizontal_stripe": pup1["horizontal_stripe"] + pup2["horizontal_stripe"],
         "vertical_stripe": pup1["vertical_stripe"] + pup2["vertical_stripe"],
         "corner_stripe": pup1["corner_stripe"] + pup2["corner_stripe"],
@@ -680,11 +666,9 @@ class CoordCreator:
 
         """
         self.intervals = features
-        # self.stdin = self.intervals == sys.stdin
         self.resolution = resolution
         self.features_format = features_format
         self.flank = flank
-        # self.pad_bins = flank // self.resolution
         self.fraction_flank = fraction_flank
         self.chroms = chroms
         self.minshift = minshift
@@ -773,19 +757,21 @@ class CoordCreator:
             self.intervals = expand2D(
                 self.intervals, self.flank, self.resolution, self.fraction_flank
             )
-
+        
         if self.nshifts > 0 and self.kind == "bedpe":
             self.intervals = self._control_regions(self.intervals)
-
+        
         if self.kind == "bed":
             basechroms = set(self.intervals["chrom"])
-
         else:
             if self.local:
                 raise ValueError("Can't make local with both sides of loops defined")
-            basechroms = set(self.intervals["chrom1"]).intersection(
-                set(self.intervals["chrom2"])
-            )
+            if self.trans:
+                basechroms = set(self.intervals["chrom1"].unique().tolist() + self.intervals["chrom2"].unique().tolist())
+            else:
+                basechroms = set(self.intervals["chrom1"]).intersection(
+                    set(self.intervals["chrom2"])
+                )
         self.basechroms = natsorted(list(basechroms))
         if self.chroms == "all":
             self.final_chroms = natsorted(list(basechroms))
@@ -808,7 +794,7 @@ class CoordCreator:
                 if self.local:
                     raise ValueError("Cannot do local with trans=True")
                 else:
-                    self.pos_stream = self.get_combinations_trans
+                    self.pos_stream = self.get_combinations
             else:
                 self.pos_stream = self.get_combinations
         else:
@@ -1001,7 +987,7 @@ class CoordCreator:
             & (intervals["start"] >= start)
             & (intervals["end"] < end)
         ].reset_index(drop=True)
-
+    
     def _filter_func_pairs_region(self, intervals, region):
         chrom, start, end = region
         return intervals[
@@ -1012,7 +998,22 @@ class CoordCreator:
             & (intervals["start2"] >= start)
             & (intervals["end2"] < end)
         ].reset_index(drop=True)
-
+    
+    def _filter_func_trans_pairs(self, intervals, region1, region2):
+        chrom1, start1, end1 = region1
+        chrom2, start2, end2 = region2
+        return intervals[
+            (intervals["chrom1"] == chrom1)
+            & (intervals["chrom2"] == chrom2)
+            & (intervals["start1"] >= start1)
+            & (intervals["end1"] < end1)
+            & (intervals["start2"] >= start2)
+            & (intervals["end2"] < end2)
+        ].reset_index(drop=True)
+    
+    def filter_func_trans_pairs(self, region1, region2):
+        return partial(self._filter_func_trans_pairs, region1=region1, region2=region2)
+    
     def filter_func_region(self, region):
         if self.kind == "bed":
             return partial(self._filter_func_region, region=region)
@@ -1021,7 +1022,8 @@ class CoordCreator:
 
     def get_combinations(
         self,
-        filter_func,
+        filter_func1,
+        filter_func2,
         intervals=None,
         control=False,
         groupby=[],
@@ -1029,17 +1031,17 @@ class CoordCreator:
     ):
         if intervals is None:
             intervals = self.intervals
-        intervals = filter_func(self.intervals)
         if not len(intervals) >= 1:
             logging.debug("Empty selection")
             yield None
-
+                          
+        intervals_left = filter_func1(intervals)
+        intervals_right = filter_func2(intervals)
+        
         if self.local:
-            #if self.store_stripes:
-                #raise ValueError("Cannot do stripe stackups with local=True") 
             merged = pd.merge(
-                intervals,
-                intervals,
+                intervals_left,
+                intervals_left,
                 left_index=True,
                 right_index=True,
                 suffixes=["1", "2"],
@@ -1058,111 +1060,95 @@ class CoordCreator:
             )
             for _, row in merged.iterrows():
                 yield row
-        else:  # all combinations
-            intervals_left = intervals.rename(columns=lambda x: x + "1")
-            intervals_right = intervals.rename(columns=lambda x: x + "2")
-                
-            for i in range(1, intervals.shape[0]):
-                combinations = pd.concat(
-                    [
-                        intervals_left.iloc[:-i].reset_index(drop=True),
-                        intervals_right.iloc[i:].reset_index(drop=True),
-                    ],
-                    axis=1,
-                )
-                combinations["distance"] = (
-                    combinations["center2"] - combinations["center1"]
-                )
-                combinations = combinations[
-                    (self.mindist <= combinations["distance"].abs())
-                    & (combinations["distance"].abs() <= self.maxdist)
-                ]
-                combinations = self._control_regions(
-                    combinations, self.nshifts * control
-                )
-                if self.store_stripes:
-                    if not combinations.empty:
-                        combinations["coordinates"] = combinations.apply(lambda x: '.'.join(x[['chrom1', 'start1', 'end1', 'chrom2', 'start2', 'end2']].astype(str)),axis=1)
-                else:
+        else:
+            intervals_left = intervals_left.rename(columns=lambda x: x + "1").reset_index(drop=True)
+            intervals_right = intervals_right.rename(columns=lambda x: x + "2").reset_index(drop=True)
+
+            if self.trans:
+                for x,y in itertools.product(intervals_left.index, intervals_right.index):
+                    combinations = pd.concat(
+                        [
+                            intervals_left.iloc[[x]].reset_index(drop=True),
+                            intervals_right.iloc[[y]].reset_index(drop=True),
+                        ],
+                        axis=1,
+                    )
+                    combinations = self._control_regions(
+                        combinations, self.nshifts * control
+                    )
+                    if self.store_stripes:
+                        if not combinations.empty:
+                            combinations["coordinates"] = combinations.apply(lambda x: '.'.join(x[['chrom1', 'start1', 'end1', 'chrom2', 'start2', 'end2']].astype(str)),axis=1)
+                    else:
                         combinations["coordinates"] = ""
-                if modify_2Dintervals_func is not None:
-                    combinations = modify_2Dintervals_func(combinations)
-                combinations = assign_groups(combinations, groupby=groupby)
-                combinations = combinations.reindex(
-                    columns=list(combinations.columns)
-                    + ["data", "horizontal_stripe", "vertical_stripe", "corner_stripe", "cov_start", "cov_end"]
-                )
-                for _, row in combinations.iterrows():
-                    yield row
-
-    def get_combinations_trans(
-        self,
-        filter_func1,
-        filter_func2,
-        intervals=None,
-        control=False,
-        groupby=[],
-        modify_2Dintervals_func=None,
-    ):
-        if intervals is None:
-            intervals = self.intervals
-        if not len(intervals) >= 1:
-            logging.debug("Empty selection")
-            yield None
-                          
-        intervals_left = filter_func1(intervals)
-        intervals_right = filter_func2(intervals)
-        
-        intervals_left = intervals_left.rename(columns=lambda x: x + "1").reset_index(drop=True)
-        intervals_right = intervals_right.rename(columns=lambda x: x + "2").reset_index(drop=True)
-        
-        for x,y in itertools.product(intervals_left.index, intervals_right.index):
-            combinations = pd.concat(
-                [
-                    intervals_left.iloc[[x]].reset_index(drop=True),
-                    intervals_right.iloc[[y]].reset_index(drop=True),
-                ],
-                axis=1,
-            )
-
-            combinations = self._control_regions(
-                combinations, self.nshifts * control
-            )
-            if self.store_stripes:
-                if not combinations.empty:
-                    combinations["coordinates"] = combinations.apply(lambda x: '.'.join(x[['chrom1', 'start1', 'end1', 'chrom2', 'start2', 'end2']].astype(str)),axis=1)
+                    if modify_2Dintervals_func is not None:
+                        combinations = modify_2Dintervals_func(combinations)
+                    combinations = assign_groups(combinations, groupby=groupby)
+                    combinations = combinations.reindex(
+                            columns=list(combinations.columns)
+                            + ["data", "horizontal_stripe", "vertical_stripe", "corner_stripe", "cov_start", "cov_end"]
+                        )
+                    for _, row in combinations.iterrows():
+                        yield row
             else:
-                combinations["coordinates"] = ""
-            if modify_2Dintervals_func is not None:
-                combinations = modify_2Dintervals_func(combinations)
-            combinations = assign_groups(combinations, groupby=groupby)
-            combinations = combinations.reindex(
-                    columns=list(combinations.columns)
-                    + ["data", "horizontal_stripe", "vertical_stripe", "corner_stripe", "cov_start", "cov_end"]
-                )
-            for _, row in combinations.iterrows():
-                    yield row
+                for i in range(1, intervals.shape[0]):
+                    combinations = pd.concat(
+                        [
+                            intervals_left.iloc[:-i].reset_index(drop=True),
+                            intervals_right.iloc[i:].reset_index(drop=True),
+                        ],
+                        axis=1,
+                    )
+                    combinations["distance"] = (
+                        combinations["center2"] - combinations["center1"]
+                    )
+                    combinations = combinations[
+                        (self.mindist <= combinations["distance"].abs())
+                        & (combinations["distance"].abs() <= self.maxdist)
+                    ]
+                    combinations = self._control_regions(
+                        combinations, self.nshifts * control
+                    )
+                    if self.store_stripes:
+                        if not combinations.empty:
+                            combinations["coordinates"] = combinations.apply(lambda x: '.'.join(x[['chrom1', 'start1', 'end1', 'chrom2', 'start2', 'end2']].astype(str)),axis=1)
+                    else:
+                            combinations["coordinates"] = ""
+                    if modify_2Dintervals_func is not None:
+                        combinations = modify_2Dintervals_func(combinations)
+                    combinations = assign_groups(combinations, groupby=groupby)
+                    combinations = combinations.reindex(
+                        columns=list(combinations.columns)
+                        + ["data", "horizontal_stripe", "vertical_stripe", "corner_stripe", "cov_start", "cov_end"]
+                    )
+                    for _, row in combinations.iterrows():
+                        yield row
 
     def get_intervals_stream(
         self,
-        filter_func,
+        filter_func1,
+        filter_func2=None,
         intervals=None,
         control=False,
         groupby=[],
         modify_2Dintervals_func=None,
     ):
         if intervals is None:
-            intervals = self.intervals
-        intervals = filter_func(intervals)
-        
+            intervals = self.intervals  
+        intervals = filter_func1(intervals)
         intervals = self._control_regions(intervals, self.nshifts * control)
+        
+        if self.store_stripes:
+            intervals["coordinates"] = intervals.apply(lambda x: '.'.join(x[['chrom1', 'start1', 'end1', 'chrom2', 'start2', 'end2']].astype(str)),axis=1)
+        else:
+            intervals["coordinates"] = ""
         if modify_2Dintervals_func is not None:
             intervals = modify_2Dintervals_func(intervals)
         intervals = assign_groups(intervals, groupby)
         intervals = intervals.reindex(
             columns=list(intervals.columns) + ["data", "cov_start", "cov_end", 
                                                "horizontal_stripe", "vertical_stripe", 
-                                               "corner_stripe", "coordinates"]
+                                               "corner_stripe"]
         )
         if not len(intervals) >= 1:
             logging.debug("Empty selection")
@@ -1341,9 +1327,9 @@ class PileUpper:
         self.empty_pup = pd.Series(
             {
                 "data": self.empty_outmap,
-                "horizontal_stripe": [],#np.empty((1, 2 * self.pad_bins + 1)),
-                "vertical_stripe": [],#np.empty((1, 2 * self.pad_bins + 1)),
-                "corner_stripe": [],#np.empty((1, 2 * self.pad_bins + 1)),
+                "horizontal_stripe": [],
+                "vertical_stripe": [],
+                "corner_stripe": [],
                 "n": 0,
                 "num": self.empty_outmap,
                 "cov_start": np.zeros((self.empty_outmap.shape[0])),
@@ -1684,9 +1670,14 @@ class PileUpper:
             
         region1_coords = self.view_df.loc[region1]
         region2_coords = self.view_df.loc[region2]
+        
+        if (self.kind == "bedpe") and (self.trans):
+            filter_func1 = self.CC.filter_func_trans_pairs(region1=region1_coords, region2=region2_coords)
+            filter_func2 = None
+        else:
             
-        filter_func1 = self.CC.filter_func_region(region=region1_coords)
-        filter_func2 = self.CC.filter_func_region(region=region2_coords)
+            filter_func1 = self.CC.filter_func_region(region=region1_coords)
+            filter_func2 = self.CC.filter_func_region(region=region2_coords)
         
         intervals = self.CC.pos_stream(
             filter_func1,
@@ -1960,9 +1951,6 @@ class PileUpper:
         normalized_pileups["orientation"] = (
             normalized_pileups["strand1"] + normalized_pileups["strand2"]
         )
-        #normalized_pileups = normalized_pileups[
-        #    ["orientation", "distance_band", "data", "n"]
-        #]
         
         normalized_pileups['separation'] = normalized_pileups['distance_band'].apply(lambda x: f'{x[0]/1000000}Mb-\n{x[1]/1000000}Mb')
         
