@@ -18,7 +18,6 @@ from more_itertools import collapse
 import h5py
 import os
 import re
-from math import comb
 
 
 def save_pileup_df(filename, df, metadata=None, mode="w"):
@@ -514,7 +513,7 @@ def combine_rows(row1, row2, normalize_order=True):
 
 def _add_snip(outdict, key, snip):
     if key not in outdict:
-        outdict[key] = snip[["data", "cov_start", "cov_end"]]
+        outdict[key] = dict(snip[["data", "cov_start", "cov_end"]])
         outdict[key]["coordinates"] = [snip["coordinates"]]
         outdict[key]["horizontal_stripe"] = [snip["horizontal_stripe"]]
         outdict[key]["vertical_stripe"] = [snip["vertical_stripe"]]
@@ -1383,12 +1382,16 @@ class PileUpper:
 
         """
         logging.debug("Loading data")
-        if region2 is None:
-            region2 = region1
-        assert (isinstance(region1, str)) & (isinstance(region2, str))
+        
+        assert isinstance(region1, str)
         
         region1 = self.view_df.loc[region1]
-        region2 = self.view_df.loc[region2]
+        
+        if region2 is None:
+            region2 = region1
+        else:
+            region2 = self.view_df.loc[region2]
+            
         data = self.clr.matrix(sparse=True, balance=self.clr_weight_name).fetch(region1, region2)
         #data = sparse.triu(data)
         return data.tocsr()
@@ -1433,15 +1436,17 @@ class PileUpper:
         
         intervals = itertools.chain([row1], intervals)
         
+        min_left1, max_right1 = self.view_df_extents[region1]
+        
         if region2 is None:
             region2 = region1
+            min_left2, max_right2 = min_left1, max_right1
+        else:
+            min_left2, max_right2 = self.view_df_extents[region2]
         
         bigdata = self.get_data(
             region1=region1, region2=region2
         )  
-        
-        min_left1, max_right1 = self.view_df_extents[region1]
-        min_left2, max_right2 = self.view_df_extents[region2]
         
         if self.clr_weight_name:
             isnan1 = np.isnan(
@@ -1462,12 +1467,12 @@ class PileUpper:
         diag_indicator = numutils.LazyToeplitz(-ar, ar)
         
         for snip in intervals:
-            snip[["stBin1", "endBin1"]] -= min_left1
-            snip[["stBin2", "endBin2"]] -= min_left2 
-            snip[["stBin1", "endBin1", "stBin2", "endBin2"]] = snip[["stBin1", 
-                                                                     "endBin1", 
-                                                                     "stBin2",
-                                                                     "endBin2"]].dropna().astype(int)
+            if region2 != region1:
+                snip[["stBin1", "endBin1"]] -= min_left1
+                snip[["stBin2", "endBin2"]] -= min_left2 
+            else:
+                snip[["stBin1", "endBin1", "stBin2", "endBin2"]] -= min_left1
+                
             if (snip["stBin1"] < 0 or snip["endBin1"] > 
                 (max_right1 - min_left1)) | (snip["stBin2"] < 0 or snip["endBin2"] > 
                                              (max_right2 - min_left2)):
@@ -1682,17 +1687,18 @@ class PileUpper:
             accumulated snips as a dict
         """
         
+        region1_coords = self.view_df.loc[region1]
+        
         if region2 is None:
             region2 = region1
-            
-        region1_coords = self.view_df.loc[region1]
-        region2_coords = self.view_df.loc[region2]
+            region2_coords = region1_coords
+        else:
+            region2_coords = self.view_df.loc[region2]
         
         if (self.kind == "bedpe") and (self.trans):
             filter_func1 = self.CC.filter_func_trans_pairs(region1=region1_coords, region2=region2_coords)
             filter_func2 = None
         else:
-            
             filter_func1 = self.CC.filter_func_region(region=region1_coords)
             filter_func2 = self.CC.filter_func_region(region=region2_coords)
         
@@ -1750,19 +1756,6 @@ class PileUpper:
         """
         if len(self.chroms) == 0:
             return self.make_outmap(), 0
-
-        if nproc > 1:
-            p = Pool(nproc)
-            mymap = p.map
-        else:
-            mymap = map
-
-        f = partial(
-            self.pileup_region,
-            groupby=groupby,
-            modify_2Dintervals_func=modify_2Dintervals_func,
-            postprocess_func=postprocess_func,
-        )
         
         #Generate all combinations of chromosomes
         listchr1 = []
@@ -1774,7 +1767,19 @@ class PileUpper:
         else:
             listchr1 = self.view_df.index
             listchr2 = listchr1
-        pileups = list(mymap(f, listchr1, listchr2))
+            
+        f = partial(
+            self.pileup_region,
+            groupby=groupby,
+            modify_2Dintervals_func=modify_2Dintervals_func,
+            postprocess_func=postprocess_func,
+        )
+        
+        if nproc > 1:
+            p = Pool(nproc)    
+            pileups = list(p.starmap(f, zip(listchr1, listchr2)))
+        else:
+            pileups = list(map(f, listchr1))
 
         roi = (
             pd.DataFrame([pileup["ROI"] for pileup in pileups])
@@ -1955,8 +1960,6 @@ class PileUpper:
         """
         if self.trans:
             raise ValueError("Cannot do by-distance pileups for trans")
-        elif self.local:
-            raise ValueError("Cannot do by-distance pileups for local")
             
         bin_func = partial(bin_distance_intervals, band_edges=distance_edges)
         normalized_pileups = self.pileupsWithControl(
