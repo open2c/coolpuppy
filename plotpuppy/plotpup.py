@@ -229,13 +229,6 @@ def make_heatmap_stripes(
         row_order=row_order,
         col_order=col_order,
         margin_titles=True,
-        gridspec_kws={
-            "right": right,
-            #"hspace": 0.05,
-            "wspace": 0.2,
-            #'top':0.95,
-            #'bottom':0.05
-        },
         height=height,
         **kwargs,
     )
@@ -249,7 +242,9 @@ def make_heatmap_stripes(
         fg.map(add_stripe_heatmap, stripe, "resolution", "flank", norm=norm, cmap=cmap)
     else:
         raise ValueError("stripe can only be 'vertical_stripe', 'horizontal_stripe' or 'corner_stripe'")
-
+        
+    fg.fig.subplots_adjust(wspace=0.2, right = right)
+    
     fg.set_titles(row_template="", col_template="")
     
     if nrows > 1 and ncols > 1:
@@ -372,13 +367,6 @@ def make_heatmap_grid(
         col_order=col_order,
         aspect=1,
         margin_titles=True,
-        gridspec_kws={
-            "right": right,
-            "hspace": 0.05,
-            "wspace": 0.05,
-            #'top':0.95,
-            #'bottom':0.05
-        },
         height=height,
         **kwargs,
     )
@@ -395,6 +383,7 @@ def make_heatmap_grid(
     fg.map(lambda color: plt.gca().set_xticks([]))
     fg.map(lambda color: plt.gca().set_yticks([]))
     fg.set_titles(col_template="", row_template="")
+    fg.fig.subplots_adjust(hspace=0.05, wspace=0.05, right = right)
 
     if nrows > 1 and ncols > 1:
         for (row_val, col_val), ax in fg.axes_dict.items():
