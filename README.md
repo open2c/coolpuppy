@@ -46,11 +46,11 @@ to get the latest version from GitHub. This will make `coolpup.py` callable in y
 
 ## Usage
 
-Some examples to get you started are available here: [Examples](https://coolpuppy.readthedocs.io/en/latest/Examples/snHi-C_Examples.html)
-
 A guide walkthrough to pile-up analysis is available here (WIP): [Walkthrough](https://coolpuppy.readthedocs.io/en/latest/walkthrough.html)
 
 Docs for the command line interface are available here: [CLI docs](https://coolpuppy.readthedocs.io/en/latest/coolpup_py_cli.html)
+
+Some examples to get you started with CLI interface are available [here](https://coolpuppy.readthedocs.io/en/latest/Examples/Walkthrough_CLI.html) and for the python API examples see [here](https://coolpuppy.readthedocs.io/en/latest/Examples/Walkthrough_API.html).
 
 Currently, `coolpup.py` doesn't support inter-chromosomal pileups, but this is an addition that is planned for the future.
 
