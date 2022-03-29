@@ -514,7 +514,11 @@ def combine_rows(row1, row2, normalize_order=True):
 
 def _add_snip(outdict, key, snip):
     if key not in outdict:
-        outdict[key] = snip[["data", "cov_start", "cov_end"]]
+        outdict[key] = {
+            key: value
+            for key, value in snip.items()
+            if key in ["data", "cov_start", "cov_end"]
+        }
         outdict[key]["num"] = np.isfinite(snip["data"]).astype(int)
         outdict[key]["n"] = 1
     else:
@@ -1122,7 +1126,7 @@ class CoordCreator:
             merged = merged.reindex(
                 columns=list(merged.columns) + ["data", "cov_start", "cov_end"]
             )
-            for _, row in merged.iterrows():
+            for row in merged.to_dict(orient="records"):
                 yield row
         else:  # all combinations
             intervals_left = intervals.rename(columns=lambda x: x + "1")
@@ -1152,7 +1156,7 @@ class CoordCreator:
                     columns=list(combinations.columns)
                     + ["data", "cov_start", "cov_end"]
                 )
-                for _, row in combinations.iterrows():
+                for row in combinations.to_dict(orient="records"):
                     yield row
 
     def get_combinations(
@@ -1195,7 +1199,7 @@ class CoordCreator:
         if not len(intervals) >= 1:
             logging.debug("Empty selection")
             yield None
-        for i, interval in intervals.iterrows():
+        for interval in intervals.to_dict(orient="records"):
             yield interval
 
     def empty_stream(self, *args, **kwargs):
@@ -1488,7 +1492,12 @@ class PileUpper:
         diag_indicator = numutils.LazyToeplitz(-ar, ar)
 
         for snip in intervals:
-            snip[["stBin1", "endBin1", "stBin2", "endBin2"]] -= min_left
+            snip["stBin1"], snip["endBin1"], snip["stBin2"], snip["endBin2"] = (
+                snip["stBin1"] - 1,
+                snip["endBin1"] - 1,
+                snip["stBin2"] - 1,
+                snip["endBin2"] - 1,
+            )
             if snip["stBin1"] < 0 or snip["endBin2"] > (max_right - min_left):
                 continue
             data = (
@@ -1533,8 +1542,8 @@ class PileUpper:
 
             if (
                 self.flip_negative_strand
-                and "strand1" in snip.index
-                and "strand2" in snip.index
+                and "strand1" in snip
+                and "strand2" in snip
             ):
                 if snip["strand1"] == "-" and snip["strand2"] == "-":
                     axes = (0, 1)
@@ -1613,7 +1622,7 @@ class PileUpper:
         if postprocess_func is not None:
             snip_stream = map(postprocess_func, snip_stream)
         outdict = {"ROI": {}, "control": {}}
-        for snip in collapse(snip_stream, base_type=pd.Series):
+        for snip in collapse(snip_stream, base_type=dict):
             kind = snip["kind"]
             key = snip["group"]
             if isinstance(key, str):
