@@ -514,6 +514,7 @@ def combine_rows(row1, row2, normalize_order=True):
 def _add_snip(outdict, key, snip):
     if key not in outdict:
         outdict[key] = dict(snip[["data", "cov_start", "cov_end"]])
+        #outdict[key] = snip[["data", "cov_start", "cov_end"]]
         outdict[key]["coordinates"] = [snip["coordinates"]]
         outdict[key]["horizontal_stripe"] = [snip["horizontal_stripe"]]
         outdict[key]["vertical_stripe"] = [snip["vertical_stripe"]]
@@ -787,15 +788,12 @@ class CoordCreator:
             )
 
         self.intervals = self._binnify(self.intervals)
-                
+        
+        if self.trans & self.local:
+            raise ValueError("Cannot do local with trans=True")
+                    
         if self.kind == "bed":
-            if self.trans:
-                if self.local:
-                    raise ValueError("Cannot do local with trans=True")
-                else:
-                    self.pos_stream = self.get_combinations
-            else:
-                self.pos_stream = self.get_combinations
+            self.pos_stream = self.get_combinations
         else:
             self.pos_stream = self.get_intervals_stream
 
@@ -1022,7 +1020,7 @@ class CoordCreator:
     def get_combinations(
         self,
         filter_func1,
-        filter_func2,
+        filter_func2=None,
         intervals=None,
         control=False,
         groupby=[],
@@ -1033,9 +1031,12 @@ class CoordCreator:
         if not len(intervals) >= 1:
             logging.debug("Empty selection")
             yield None
-                          
+        
         intervals_left = filter_func1(intervals)
-        intervals_right = filter_func2(intervals)
+        if filter_func2 is None:
+            intervals_right = intervals_left
+        else:
+            intervals_right = filter_func2(intervals)
         
         if self.local:
             merged = pd.merge(
@@ -1526,7 +1527,8 @@ class PileUpper:
                 snip["cov_start"] = cov_start
                 snip["cov_end"] = cov_end
             if self.expected and self.ooe:
-                data = data / exp_data
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    data = data / exp_data
             snip["data"] = data
             
             if self.store_stripes:
@@ -1697,10 +1699,12 @@ class PileUpper:
         
         if (self.kind == "bedpe") and (self.trans):
             filter_func1 = self.CC.filter_func_trans_pairs(region1=region1_coords, region2=region2_coords)
-            filter_func2 = None
         else:
             filter_func1 = self.CC.filter_func_region(region=region1_coords)
-            filter_func2 = self.CC.filter_func_region(region=region2_coords)
+            if region2 == region1:
+                filter_func2 = None
+            else:
+                filter_func2 = self.CC.filter_func_region(region=region2_coords)
         
         intervals = self.CC.pos_stream(
             filter_func1,
@@ -1838,7 +1842,7 @@ class PileUpper:
             normalized_roi["data"] = normalized_roi["data"].apply(
                 lambda x: np.nanmean(np.dstack((x, x.T)), 2)
             )
-        
+               
         if groupby:
             normalized_roi = normalized_roi.reset_index()
             normalized_roi[groupby] = pd.DataFrame(
@@ -1850,6 +1854,7 @@ class PileUpper:
             )
             normalized_roi = normalized_roi.drop(columns="index")
             normalized_roi = normalized_roi.set_index(groupby)
+            normalized_roi = normalized_roi.sort_index()
             n = normalized_roi.loc["all", "n"]
         else:
             n = normalized_roi.loc["all", "n"]
