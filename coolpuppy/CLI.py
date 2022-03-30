@@ -119,7 +119,7 @@ def parse_args_coolpuppy():
         type=int,
         required=False,
         help="""Minimal distance of interactions to use, bp.
-                If "auto", uses 2*flank+2 (in bins) as mindist to avoid first two
+                If not provided, uses 2*flank+2 (in bins) as mindist to avoid first two
                 diagonals""",
     )
     parser.add_argument(
@@ -229,6 +229,28 @@ def parse_args_coolpuppy():
         help="""
         If empty `clr_weight_name`, add coverage normalization using chromosome marginals""",
     )
+    parser.add_argument(
+        "--trans",
+        action="store_true",
+        default=False,
+        required=False,
+        help="""Perform inter-chromosomal (trans) pileups""",
+    )
+    parser.add_argument(
+        "--by_chroms",
+        action="store_true",
+        default=False,
+        required=False,
+        help="""Perform by-chromosome pileups for trans interactions""",
+    )
+    parser.add_argument(
+        "--stripes",
+        action="store_true",
+        default=False,
+        required=False,
+        help="""Store horizontal, vertical, and corner stripes in pileup output""",
+    )
+    
     # Rescaling
     parser.add_argument(
         "--rescale",
@@ -403,16 +425,25 @@ def main():
         expected_value_cols = [
             expected_value_col,
         ]
-        expected = common.read_expected(
-            expected_path,
-            contact_type="cis",
-            expected_value_cols=expected_value_cols,
-            verify_view=view_df,
-            verify_cooler=clr,
-        )
+        if args.trans:
+            expected = io.read_expected_from_file(
+                expected_path,
+                contact_type="trans",
+                expected_value_cols=expected_value_cols,
+                verify_view=view_df,
+                verify_cooler=clr,
+            )
+        else:
+            expected = io.read_expected_from_file(
+                expected_path,
+                contact_type="cis",
+                expected_value_cols=expected_value_cols,
+                verify_view=view_df,
+                verify_cooler=clr,
+            )
 
     if args.mindist is None:
-        mindist = 0
+        mindist = 'auto'
     else:
         mindist = args.mindist
 
@@ -478,6 +509,8 @@ def main():
         local=args.local,
         subset=args.subset,
         seed=args.seed,
+        trans=args.trans,
+        store_stripes=args.stripes,
     )
 
     PU = PileUpper(
@@ -519,6 +552,10 @@ def main():
             outname += "_by-window"
         if args.by_strand:
             outname += "_by-strand"
+        if args.trans:
+            outname += "_trans"
+        if args.by_chroms:
+            outname += "_by-chroms"
         outname += ".clpy"
     else:
         outname = args.outname
@@ -531,6 +568,8 @@ def main():
         pups = PU.pileupsByStrandWithControl(nproc=nproc)
     elif args.by_distance:
         pups = PU.pileupsByDistanceWithControl(nproc=nproc)
+    elif args.by_chroms:
+        pups = PU.pileupsWithControl(nproc=nproc, groupby=["chrom1", "chrom2"])
     else:
         pups = PU.pileupsWithControl(nproc)
     headerdict = vars(args)

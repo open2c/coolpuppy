@@ -65,6 +65,28 @@ def parse_args_plotpuppy():
         choices={"linear", "log"},
         help="""Whether to use linear or log scaling for mapping colours""",
     )
+    parser.add_argument(
+        "--stripe", 
+        type=str, 
+        default=None,
+        required=False, 
+        help="""For plotting stripe stackups"""
+    )
+    parser.add_argument(
+        "--stripe_sort", 
+        type=str,
+        default="sum",
+        required=False, 
+        help="""Whether or not to sort stripe stackups by total signal"""
+    )
+    parser.add_argument(
+        "--out_sorted_bedpe", 
+        type=str, 
+        default=None,
+        required=False, 
+        help="""Output bedpe of sorted stripe regions"""
+    )
+    
     # parser.add_argument(
     #     "--cbar_mode",
     #     type=str,
@@ -117,13 +139,11 @@ def parse_args_plotpuppy():
                 squares whose values are averaged""",
     )
     parser.add_argument(
-        "--score",
-        dest="score",
+        "--no_score",
+        action='store_true',
+        required=False,
         default=False,
-        action="store_true",
-        help="""Calculate score and add it to the top right corner of each pileup.
-                Will use the 'coolpup.get_score' function with 'center' and
-                'ignore_central' arguments.""",
+        help="""If central pixel score should not be shown in top left corner""",
     )
     parser.add_argument(
         "--center",
@@ -160,6 +180,13 @@ def parse_args_plotpuppy():
     #                    required=False,
     #                    help="""How many rows to use for plotting the data""")
     parser.add_argument(
+        "--height",
+        type=int,
+        required=False,
+        default=2,
+        help="""Height of the plot""",
+    )
+    parser.add_argument(
         "--output",
         "-o",
         type=str,
@@ -194,7 +221,6 @@ def main():
         sys.excepthook = _excepthook
     mpl.rcParams["svg.fonttype"] = "none"
     mpl.rcParams["pdf.fonttype"] = 42
-
     pups = load_pileup_df_list(args.input_pups, quaich=args.quaich, nice_metadata=True)
     if args.query is not None:
         for q in args.query:
@@ -203,31 +229,31 @@ def main():
     if args.norm_corners > 0:
         pups["data"] = pups["data"].apply(norm_cis, i=int(args.norm_corners))
 
-    if args.score:
+    if not args.no_score:
         pups["score"] = pups.apply(
             get_score, center=args.center, ignore_central=args.ignore_central, axis=1
         )
         score = "score"
     else:
         score = False
-
+        
     if args.cols:
         if args.col_order:
             col_order = args.col_order
         elif args.cols == "separation":
             col_order = sort_separation(pups["separation"])
         else:
-            col_order = natsorted(pups[args.cols].unique())
+            col_order = pups[args.cols].unique()
     else:
         col_order = None
-
+        
     if args.rows:
         if args.row_order:
             row_order = args.row_order
         elif args.rows == "separation":
             row_order = sort_separation(pups["separation"])
         else:
-            row_order = natsorted(pups[args.rows].unique())
+            row_order = pups[args.rows].unique()
     else:
         row_order = None
 
@@ -243,6 +269,10 @@ def main():
         sym=args.symmetric,
         cmap=args.cmap,
         scale=args.scale,
+        stripe=args.stripe,
+        stripe_sort=args.stripe_sort,
+        out_sorted_bedpe=args.out_sorted_bedpe,
+        height=args.height,
     )
-
+    
     plt.savefig(args.output, bbox_inches="tight", dpi=args.dpi)
