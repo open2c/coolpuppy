@@ -1892,9 +1892,10 @@ class PileUpper:
                 ctrl["data"] / ctrl["num"], columns=["data"]
             )
             normalized_roi = normalized_roi / normalized_control
+            normalized_roi["control_n"] = ctrl["n"]
+            normalized_roi["control_num"] = ctrl["num"]
         normalized_roi["n"] = roi["n"]
         normalized_roi["num"] = roi["num"]
-
         if self.store_stripes:
             normalized_roi["coordinates"] = roi["coordinates"]
             normalized_roi["coordinates"] = [
@@ -1942,7 +1943,6 @@ class PileUpper:
                 normalized_roi["corner_stripe"]["all"] = (
                     normalized_roi["corner_stripe"]["all"] / control_cornerstripe
                 )
-
         # pileup[~np.isfinite(pileup)] = 0
         if self.local:
             normalized_roi["data"] = normalized_roi["data"].apply(
