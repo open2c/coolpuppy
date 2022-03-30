@@ -47,9 +47,8 @@ def parse_args_plotpuppy():
     )
     parser.add_argument(
         "--symmetric",
-        type=bool,
-        required=False,
-        default=True,
+        default=False,
+        action="store_true",
         help="""Whether to make colormap symmetric around 1, if log scale""",
     )
     parser.add_argument(
@@ -106,16 +105,10 @@ def parse_args_plotpuppy():
     #             If 0, automatically make the figure as square as possible""",
     # )
     parser.add_argument(
-        "--cols",
-        type=str,
-        required=False,
-        help="""Which value to map as columns""",
+        "--cols", type=str, required=False, help="""Which value to map as columns""",
     )
     parser.add_argument(
-        "--rows",
-        type=str,
-        required=False,
-        help="""Which value to map as rows""",
+        "--rows", type=str, required=False, help="""Which value to map as rows""",
     )
     parser.add_argument(
         "--col_order",

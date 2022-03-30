@@ -56,7 +56,7 @@ One can easily observe that these regions on average indeed have some insulating
 
 Average insulation can be quantiifed by dividing signal in two red squares (top left and bottom right corners) by the signal in the more blue squares (top right and bottom left corners), and here it is shown in the top left corner.
 
-This analysis is very easily performed using coolpup.py: simply run `coolpup.py coolpup.py my_hic_data.cool my_insulating_regions.bed --local` (with optional `--expected my_hic_data_expected.tsv`  for normalization to the background level of interactions; note that for local analyses in my experience random shift controls work better).
+This analysis is very easily performed using coolpup.py: simply run `coolpup.py my_hic_data.cool my_insulating_regions.bed --local` (with optional `--expected my_hic_data_expected.tsv`  for normalization to the background level of interactions; note that for local analyses in my experience random shift controls work better).
 
 ### Rescaled pileups
 
