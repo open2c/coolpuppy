@@ -517,7 +517,6 @@ def combine_rows(row1, row2, normalize_order=True):
 def _add_snip(outdict, key, snip):
     if key not in outdict:
         outdict[key] = {key: snip[key] for key in ["data", "cov_start", "cov_end"]}
-        # outdict[key] = snip[["data", "cov_start", "cov_end"]]
         outdict[key]["coordinates"] = [snip["coordinates"]]
         outdict[key]["horizontal_stripe"] = [snip["horizontal_stripe"]]
         outdict[key]["vertical_stripe"] = [snip["vertical_stripe"]]
@@ -547,12 +546,11 @@ def _add_snip(outdict, key, snip):
             snip["coordinates"]
         ]
 
-
 def sum_pups(pup1, pup2):
     """
     Preserves data, stripes, cov_start, cov_end, n, num and coordinates
     Assumes n=1 if not present, and calculates num if not present
-    If stripes are not stored, stripes and coordinates will be empty
+    If store_stripes is set to False, stripes and coordinates will be empty
     """
     pup = {
         "data": pup1["data"] + pup2["data"],
@@ -612,7 +610,6 @@ class CoordCreator:
         local=False,
         subset=0,
         trans=False,
-        store_stripes=False,
         seed=None,
     ):
         """Generator of coordinate pairs for pileups.
@@ -666,9 +663,6 @@ class CoordCreator:
         seed : int, optional
             Seed for np.random to make it reproducible.
             The default is None.
-        store_stripes: bool, optional
-            Whether to store horizontal, vertical, corner_stripes, and coordinates in the output
-            The default is False
         trans : bool, optional
             Whether to generate inter-chromosomal (trans) pileups.
             The default is False
@@ -693,16 +687,15 @@ class CoordCreator:
         else:
             self.mindist = mindist
             if self.trans:
-                warnings.warn("Ignoring mindist when using trans")
+                warnings.warn("Ignoring mindist when using trans", stacklevel = 2)
         if maxdist is None:
             self.maxdist = np.inf
         else:
             self.maxdist = maxdist
             if self.trans:
-                warnings.warn("Ignoring maxdist when using trans")
+                warnings.warn("Ignoring maxdist when using trans", stacklevel = 2)
         self.local = local
         self.subset = subset
-        self.store_stripes = store_stripes
         self.seed = seed
         self.process()
 
@@ -729,7 +722,7 @@ class CoordCreator:
             self.kind = self.features_format
 
         if self.intervals.shape[0] == 0:
-            warnings.warn("No regions in features, returning empty output")
+            warnings.warn("No regions in features, returning empty output", stacklevel = 2)
             self.pos_stream = self.empty_stream
             self.final_chroms = []
             return
@@ -1040,17 +1033,14 @@ class CoordCreator:
                 right_index=True,
                 suffixes=["1", "2"],
             )
-            if self.store_stripes:
-                merged["coordinates"] = merged.apply(
-                    lambda x: ".".join(
-                        x[
-                            ["chrom1", "start1", "end1", "chrom2", "start2", "end2"]
-                        ].astype(str)
-                    ),
-                    axis=1,
-                )
-            else:
-                merged["coordinates"] = ""
+            merged["coordinates"] = merged.apply(
+                lambda x: ".".join(
+                    x[
+                        ["chrom1", "start1", "end1", "chrom2", "start2", "end2"]
+                    ].astype(str)
+                ),
+                axis=1,
+            )
             merged = self._control_regions(merged, self.nshifts * control)
             if modify_2Dintervals_func is not None:
                 merged = modify_2Dintervals_func(merged)
@@ -1091,25 +1081,22 @@ class CoordCreator:
                     combinations = self._control_regions(
                         combinations, self.nshifts * control
                     )
-                    if self.store_stripes:
-                        if not combinations.empty:
-                            combinations["coordinates"] = combinations.apply(
-                                lambda x: ".".join(
-                                    x[
-                                        [
-                                            "chrom1",
-                                            "start1",
-                                            "end1",
-                                            "chrom2",
-                                            "start2",
-                                            "end2",
-                                        ]
-                                    ].astype(str)
-                                ),
-                                axis=1,
-                            )
-                    else:
-                        combinations["coordinates"] = ""
+                    if not combinations.empty:
+                        combinations["coordinates"] = combinations.apply(
+                            lambda x: ".".join(
+                                x[
+                                    [
+                                        "chrom1",
+                                        "start1",
+                                        "end1",
+                                        "chrom2",
+                                        "start2",
+                                        "end2",
+                                    ]
+                                ].astype(str)
+                            ),
+                            axis=1,
+                        )
                     if modify_2Dintervals_func is not None:
                         combinations = modify_2Dintervals_func(combinations)
                     combinations = assign_groups(combinations, groupby=groupby)
@@ -1145,25 +1132,22 @@ class CoordCreator:
                     combinations = self._control_regions(
                         combinations, self.nshifts * control
                     )
-                    if self.store_stripes:
-                        if not combinations.empty:
-                            combinations["coordinates"] = combinations.apply(
-                                lambda x: ".".join(
-                                    x[
-                                        [
-                                            "chrom1",
-                                            "start1",
-                                            "end1",
-                                            "chrom2",
-                                            "start2",
-                                            "end2",
-                                        ]
-                                    ].astype(str)
-                                ),
-                                axis=1,
-                            )
-                    else:
-                        combinations["coordinates"] = ""
+                    if not combinations.empty:
+                        combinations["coordinates"] = combinations.apply(
+                            lambda x: ".".join(
+                                x[
+                                    [
+                                        "chrom1",
+                                        "start1",
+                                        "end1",
+                                        "chrom2",
+                                        "start2",
+                                        "end2",
+                                    ]
+                                ].astype(str)
+                            ),
+                            axis=1,
+                        )
                     if modify_2Dintervals_func is not None:
                         combinations = modify_2Dintervals_func(combinations)
                     combinations = assign_groups(combinations, groupby=groupby)
@@ -1195,17 +1179,14 @@ class CoordCreator:
         intervals = filter_func1(intervals)
         intervals = self._control_regions(intervals, self.nshifts * control)
 
-        if self.store_stripes:
-            intervals["coordinates"] = intervals.apply(
-                lambda x: ".".join(
-                    x[["chrom1", "start1", "end1", "chrom2", "start2", "end2"]].astype(
-                        str
-                    )
-                ),
-                axis=1,
-            )
-        else:
-            intervals["coordinates"] = ""
+        intervals["coordinates"] = intervals.apply(
+            lambda x: ".".join(
+                x[["chrom1", "start1", "end1", "chrom2", "start2", "end2"]].astype(
+                    str
+                )
+            ),
+            axis=1,
+        )
         if modify_2Dintervals_func is not None:
             intervals = modify_2Dintervals_func(intervals)
         intervals = assign_groups(intervals, groupby)
@@ -1247,6 +1228,7 @@ class PileUpper:
         rescale_size=99,
         flip_negative_strand=False,
         ignore_diags=2,
+        store_stripes=False,
     ):
         """Creates pileups
 
@@ -1293,6 +1275,9 @@ class PileUpper:
         ignore_diags : int, optional
             How many diagonals to ignore to avoid short-distance artefacts.
             The default is 2.
+        store_stripes: bool, optional
+            Whether to store horizontal, vertical, corner_stripes, and coordinates in the output
+            The default is False
 
         Returns
         -------
@@ -1315,6 +1300,7 @@ class PileUpper:
         self.rescale_size = rescale_size
         self.flip_negative_strand = flip_negative_strand
         self.ignore_diags = ignore_diags
+        self.store_stripes = store_stripes
 
         if view_df is None:
             # Generate viewframe from clr.chromsizes:
@@ -1342,7 +1328,7 @@ class PileUpper:
                     raise ValueError("provided expected is not valid") from e
                 if self.control:
                     warnings.warn(
-                        "Can't do both expected and control shifts; defaulting to expected"
+                        "Can't do both expected and control shifts; defaulting to expected", stacklevel = 2
                     )
                     self.control = False
                 self.expected_df = self.expected
@@ -1364,7 +1350,7 @@ class PileUpper:
                     raise ValueError("provided expected is not valid") from e
                 if self.control:
                     warnings.warn(
-                        "Can't do both expected and control shifts; defaulting to expected"
+                        "Can't do both expected and control shifts; defaulting to expected", stacklevel = 2
                     )
                     self.control = False
                 self.ExpSnipper = snipping.ExpectedSnipper(
@@ -1585,13 +1571,9 @@ class PileUpper:
                             )
                         )
                     else:
-                        exp_snip["horizontal_stripe"] = np.empty(
-                            (1, 2 * self.pad_bins + 1)
-                        )
-                        exp_snip["vertical_stripe"] = np.empty(
-                            (1, 2 * self.pad_bins + 1)
-                        )
-                        exp_snip["corner_stripe"] = np.empty((1, 2 * self.pad_bins + 1))
+                        exp_snip["horizontal_stripe"] = []
+                        exp_snip["vertical_stripe"] = []
+                        exp_snip["corner_stripe"] = []
 
             if not self.trans:
                 D = (
@@ -1626,9 +1608,10 @@ class PileUpper:
                     )
                 )
             else:
-                snip["horizontal_stripe"] = np.empty((1, 2 * self.pad_bins + 1))
-                snip["vertical_stripe"] = np.empty((1, 2 * self.pad_bins + 1))
-                snip["corner_stripe"] = np.empty((1, 2 * self.pad_bins + 1))
+                snip["horizontal_stripe"] = []
+                snip["vertical_stripe"] = []
+                snip["corner_stripe"] = []
+                snip["coordinates"] = []
 
             if self.rescale:
                 snip = self._rescale_snip(snip)
@@ -1686,15 +1669,12 @@ class PileUpper:
             )
             snip["cov_end"] = numutils.zoom_array(snip["cov_end"], (self.rescale_size,))
         if self.store_stripes:
-            snip["horizontal_stripe"] = [
-                numutils.zoom_array(snip["horizontal_stripe"], (self.rescale_size,))
-            ]
-            snip["vertical_stripe"] = [
-                numutils.zoom_array(snip["vertical_stripe"], (self.rescale_size,))
-            ]
-            snip["corner_stripe"] = [
-                numutils.zoom_array(snip["corner_stripe"], (self.rescale_size,))
-            ]
+            snip["horizontal_stripe"] = numutils.zoom_array(snip["horizontal_stripe"], 
+                                                            (self.rescale_size,))
+            snip["vertical_stripe"] = numutils.zoom_array(snip["vertical_stripe"], 
+                                                          (self.rescale_size,))
+            snip["corner_stripe"] = numutils.zoom_array(snip["corner_stripe"], 
+                                                        (self.rescale_size,))
         return snip
 
     def accumulate_stream(self, snip_stream, postprocess_func=None):
@@ -1785,6 +1765,7 @@ class PileUpper:
             filter_func1 = self.CC.filter_func_trans_pairs(
                 region1=region1_coords, region2=region2_coords
             )
+            filter_func2 = None
         else:
             filter_func1 = self.CC.filter_func_region(region=region1_coords)
             if region2 == region1:
@@ -1852,39 +1833,38 @@ class PileUpper:
         else:
             listchr1 = self.view_df.index
             listchr2 = listchr1
-
+        
         f = partial(
             self.pileup_region,
             groupby=groupby,
             modify_2Dintervals_func=modify_2Dintervals_func,
             postprocess_func=postprocess_func,
         )
-
         if nproc > 1:
             p = Pool(nproc)
             pileups = list(p.starmap(f, zip(listchr1, listchr2)))
             p.close()
         else:
-            pileups = list(map(f, listchr1))
-
+            pileups = list(map(f, listchr1, listchr2))
         roi = (
-            pd.DataFrame([pileup["ROI"] for pileup in pileups])
+            pd.DataFrame([{k: pd.Series(v) for k, v in pileup["ROI"].items()} for pileup in pileups])
             .apply(lambda x: reduce(sum_pups, x.dropna()))
             .T
         )
         if self.control or (self.expected and not self.ooe):
             ctrl = (
-                pd.DataFrame([pileup["control"] for pileup in pileups])
+                pd.DataFrame([{k: pd.Series(v) for k, v in pileup["control"].items()} for pileup in pileups])
                 .apply(lambda x: reduce(sum_pups, x.dropna()))
                 .T
             )
-
+        
+            
         if self.coverage_norm:
             roi = roi.apply(norm_coverage, axis=1)
             if self.control:
                 ctrl = ctrl.apply(norm_coverage, axis=1)
             elif self.expected:
-                warnings.warn("Expected can not be normalized to coverage")
+                warnings.warn("Expected can not be normalized to coverage", stacklevel = 2)
         normalized_roi = pd.DataFrame(roi["data"] / roi["num"], columns=["data"])
 
         if self.control or (self.expected and not self.ooe):
@@ -1945,10 +1925,12 @@ class PileUpper:
                 )
         # pileup[~np.isfinite(pileup)] = 0
         if self.local:
-            normalized_roi["data"] = normalized_roi["data"].apply(
-                lambda x: np.nanmean(np.dstack((x, x.T)), 2)
-            )
-
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                normalized_roi["data"] = normalized_roi["data"].apply(
+                    lambda x: np.nanmean(np.dstack((x, x.T)), 2)
+                )
+               
         if groupby:
             normalized_roi = normalized_roi.reset_index()
             normalized_roi[groupby] = pd.DataFrame(
@@ -1960,11 +1942,11 @@ class PileUpper:
             )
             normalized_roi = normalized_roi.drop(columns="index")
             normalized_roi = normalized_roi.set_index(groupby)
-            normalized_roi = normalized_roi.sort_index()
             n = normalized_roi.loc["all", "n"]
         else:
             n = normalized_roi.loc["all", "n"]
-        logging.info(f"Total number of piled up windows: {n}")
+
+        logging.info(f"Total number of piled up windows: {int(n)}")
 
         # Store attributes
         exclude_attributes = [
@@ -1983,6 +1965,7 @@ class PileUpper:
             "empty_outmap",
             "empty_pup",
         ]
+
         for name, attr in self.__dict__.items():
             if name not in exclude_attributes:
                 if type(attr) == list:

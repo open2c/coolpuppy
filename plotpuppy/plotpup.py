@@ -127,7 +127,7 @@ def add_score(score, color=None):
             x=0.05,
             ha="left",
             va="top",
-            size="medium",
+            size="x-small",
             transform=ax.transAxes,
         )
         
