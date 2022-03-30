@@ -517,7 +517,6 @@ def combine_rows(row1, row2, normalize_order=True):
 def _add_snip(outdict, key, snip):
     if key not in outdict:
         outdict[key] = {key: snip[key] for key in ["data", "cov_start", "cov_end"]}
-        # outdict[key] = snip[["data", "cov_start", "cov_end"]]
         outdict[key]["coordinates"] = [snip["coordinates"]]
         outdict[key]["horizontal_stripe"] = [snip["horizontal_stripe"]]
         outdict[key]["vertical_stripe"] = [snip["vertical_stripe"]]
@@ -547,12 +546,11 @@ def _add_snip(outdict, key, snip):
             snip["coordinates"]
         ]
 
-
 def sum_pups(pup1, pup2):
     """
     Preserves data, stripes, cov_start, cov_end, n, num and coordinates
     Assumes n=1 if not present, and calculates num if not present
-    If stripes are not stored, stripes and coordinates will be empty
+    If store_stripes is set to False, stripes and coordinates will be empty
     """
     pup = {
         "data": pup1["data"] + pup2["data"],
@@ -1585,13 +1583,9 @@ class PileUpper:
                             )
                         )
                     else:
-                        exp_snip["horizontal_stripe"] = np.empty(
-                            (1, 2 * self.pad_bins + 1)
-                        )
-                        exp_snip["vertical_stripe"] = np.empty(
-                            (1, 2 * self.pad_bins + 1)
-                        )
-                        exp_snip["corner_stripe"] = np.empty((1, 2 * self.pad_bins + 1))
+                        exp_snip["horizontal_stripe"] = []
+                        exp_snip["vertical_stripe"] = []
+                        exp_snip["corner_stripe"] = []
 
             if not self.trans:
                 D = (
@@ -1626,9 +1620,9 @@ class PileUpper:
                     )
                 )
             else:
-                snip["horizontal_stripe"] = np.empty((1, 2 * self.pad_bins + 1))
-                snip["vertical_stripe"] = np.empty((1, 2 * self.pad_bins + 1))
-                snip["corner_stripe"] = np.empty((1, 2 * self.pad_bins + 1))
+                snip["horizontal_stripe"] = []
+                snip["vertical_stripe"] = []
+                snip["corner_stripe"] = []
 
             if self.rescale:
                 snip = self._rescale_snip(snip)
@@ -1865,19 +1859,19 @@ class PileUpper:
             pileups = list(p.starmap(f, zip(listchr1, listchr2)))
         else:
             pileups = list(map(f, listchr1))
-
         roi = (
-            pd.DataFrame([pileup["ROI"] for pileup in pileups])
+            pd.DataFrame([{k: pd.Series(v) for k, v in pileup["ROI"].items()} for pileup in pileups])
             .apply(lambda x: reduce(sum_pups, x.dropna()))
             .T
         )
         if self.control or (self.expected and not self.ooe):
             ctrl = (
-                pd.DataFrame([pileup["control"] for pileup in pileups])
+                pd.DataFrame([{k: pd.Series(v) for k, v in pileup["control"].items()} for pileup in pileups])
                 .apply(lambda x: reduce(sum_pups, x.dropna()))
                 .T
             )
-
+        
+            
         if self.coverage_norm:
             roi = roi.apply(norm_coverage, axis=1)
             if self.control:
@@ -1945,10 +1939,12 @@ class PileUpper:
             p.close()
         # pileup[~np.isfinite(pileup)] = 0
         if self.local:
-            normalized_roi["data"] = normalized_roi["data"].apply(
-                lambda x: np.nanmean(np.dstack((x, x.T)), 2)
-            )
-
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                normalized_roi["data"] = normalized_roi["data"].apply(
+                    lambda x: np.nanmean(np.dstack((x, x.T)), 2)
+                )
+               
         if groupby:
             normalized_roi = normalized_roi.reset_index()
             normalized_roi[groupby] = pd.DataFrame(
@@ -1964,7 +1960,8 @@ class PileUpper:
             n = normalized_roi.loc["all", "n"]
         else:
             n = normalized_roi.loc["all", "n"]
-        logging.info(f"Total number of piled up windows: {n}")
+
+        logging.info(f"Total number of piled up windows: {int(n)}")
 
         # Store attributes
         exclude_attributes = [
@@ -1983,6 +1980,7 @@ class PileUpper:
             "empty_outmap",
             "empty_pup",
         ]
+
         for name, attr in self.__dict__.items():
             if name not in exclude_attributes:
                 if type(attr) == list:
