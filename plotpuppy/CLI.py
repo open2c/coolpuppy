@@ -256,23 +256,39 @@ def main():
             row_order = pups[args.rows].unique()
     else:
         row_order = None
-
-    fg = make_heatmap_grid(
-        pups,
-        cols=args.cols,
-        rows=args.rows,
-        score=score,
-        col_order=col_order,
-        row_order=row_order,
-        vmin=args.vmin,
-        vmax=args.vmax,
-        sym=args.symmetric,
-        cmap=args.cmap,
-        scale=args.scale,
-        stripe=args.stripe,
-        stripe_sort=args.stripe_sort,
-        out_sorted_bedpe=args.out_sorted_bedpe,
-        height=args.height,
-    )
+    
+    if args.stripe:
+        fg = make_heatmap_stripes(
+            pups,
+            cols=args.cols,
+            rows=args.rows,
+            score=score,
+            col_order=col_order,
+            row_order=row_order,
+            vmin=args.vmin,
+            vmax=args.vmax,
+            sym=args.symmetric,
+            cmap=args.cmap,
+            scale=args.scale,
+            height=args.height,
+            stripe=args.stripe,
+            stripe_sort=args.stripe_sort,
+            out_sorted_bedpe=args.out_sorted_bedpe,
+        )
+    else:
+        fg = make_heatmap_grid(
+            pups,
+            cols=args.cols,
+            rows=args.rows,
+            score=score,
+            col_order=col_order,
+            row_order=row_order,
+            vmin=args.vmin,
+            vmax=args.vmax,
+            sym=args.symmetric,
+            cmap=args.cmap,
+            scale=args.scale,
+            height=args.height,
+        )
     
     plt.savefig(args.output, bbox_inches="tight", dpi=args.dpi)

@@ -164,15 +164,6 @@ def parse_args_coolpuppy():
     )
     # Modes of action
     parser.add_argument(
-        "--anchor",
-        default=None,
-        type=str,
-        required=False,
-        help="""A UCSC-style coordinate.
-                Use as an anchor to create intersections with coordinates in the
-                features""",
-    )
-    parser.add_argument(
         "--by_window",
         "--by-window",
         action="store_true",
@@ -464,40 +455,22 @@ def main():
     else:
         rescale_flank = args.rescale_flank
 
-    if args.anchor is not None:
-        if "_" in args.anchor:
-            anchor, anchor_name = args.anchor.split("_")
-            anchor = cooler.util.parse_region_string(anchor)
-        else:
-            anchor = cooler.util.parse_region_string(args.anchor)
-            anchor_name = args.anchor
-    else:
-        anchor = None
-
-    if anchor:
-        fchroms = [anchor[0]]
-    else:
-        chroms = np.array(clr.chromnames).astype(str)
-        fchroms = []
-        for chrom in chroms:
-            if chrom not in args.excl_chrs.split(",") and chrom in incl_chrs:
-                fchroms.append(chrom)
-    if args.anchor is not None:
-        anchor = cooler.util.parse_region_string(args.anchor)
+    chroms = np.array(clr.chromnames).astype(str)
+    fchroms = []
+    for chrom in chroms:
+        if chrom not in args.excl_chrs.split(",") and chrom in incl_chrs:
+            fchroms.append(chrom)
 
     if args.by_window:
         if schema != "bed12":
             raise ValueError("Can't make by-window pileups without making combinations")
         if args.local:
             raise ValueError("Can't make local by-window pileups")
-        if anchor:
-            raise ValueError("Can't make by-window combinations with an anchor")
 
     CC = CoordCreator(
         features=features,
         resolution=clr.binsize,
         features_format=args.features_format,
-        anchor=anchor,
         flank=args.flank,
         fraction_flank=rescale_flank,
         chroms=fchroms,
@@ -510,7 +483,6 @@ def main():
         subset=args.subset,
         seed=args.seed,
         trans=args.trans,
-        store_stripes=args.stripes,
     )
 
     PU = PileUpper(
@@ -526,6 +498,7 @@ def main():
         rescale_size=args.rescale_size,
         flip_negative_strand=args.flip_negative_strand,
         ignore_diags=args.ignore_diags,
+        store_stripes=args.stripes,
     )
 
     if args.outname == "auto":
@@ -536,8 +509,6 @@ def main():
             outname += "_expected"
         if args.nshifts <= 0 and args.expected is None:
             outname += "_noNorm"
-        if anchor:
-            outname += f"_from_{anchor_name}"
         if args.local:
             outname += "_local"
         elif args.mindist is not None or args.maxdist is not None:

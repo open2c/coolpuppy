@@ -1376,7 +1376,6 @@ class PileUpper:
         self.regions = {
             chrom: (chrom, 0, self.clr.chromsizes[chrom]) for chrom in self.chroms
         }
-
         if self.trans:
             if self.view_df["chrom"].unique().shape[0] < 2:
                 raise ValueError("Trying to do trans with fewer than two chromosomes")
@@ -1833,7 +1832,6 @@ class PileUpper:
         else:
             listchr1 = self.view_df.index
             listchr2 = listchr1
-        
         f = partial(
             self.pileup_region,
             groupby=groupby,
