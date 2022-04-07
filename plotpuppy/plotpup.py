@@ -95,7 +95,7 @@ def add_heatmap(data, color=None, cmap="coolwarm", norm=LogNorm(0.5, 2)):
 #     sns.heatmap(data.values[0], cmap=cmap, norm=norm, ax=ax, square=True, cbar=False,
 #                xticklabels=False, yticklabels=False)
 
-def add_stripe_heatmap(data, resolution, flank, rescale, fraction_flank, color=None, cmap="coolwarm", norm=LogNorm(0.5, 2)):
+def add_stripe_heatmap(data, resolution, flank, rescale, rescale_flank, color=None, cmap="coolwarm", norm=LogNorm(0.5, 2)):
     """
     Adds the array contained in data.values[0] to the current axes as a heatmap of stripes
     """
@@ -109,16 +109,15 @@ def add_stripe_heatmap(data, resolution, flank, rescale, fraction_flank, color=N
     ax.imshow(data.values[0], cmap=cmap, norm=norm, aspect='auto', interpolation='none')  
     
     resolution = int(resolution)
-    flank = int(flank)
-    rescale = bool(rescale)
+    flank = int(flank) 
     
-    if not rescale:
+    if not rescale.any():
         ticks_pixels = np.linspace(0, flank*2//resolution,5)
         ticks_kbp = ((ticks_pixels-ticks_pixels[-1]/2)*resolution//1000).astype(int)
         plt.xticks(ticks_pixels.tolist(), ticks_kbp.tolist())
     else:
-        if fraction_flank is not None:
-            pass
+        if not rescale_flank.any():
+            plt.xticks([], [])
 
 def add_score(score, color=None):
     """
@@ -150,7 +149,7 @@ def make_heatmap_stripes(
     vmax=None,
     sym=True,
     cmap="coolwarm",
-    cmap_emptypixel=(0.90,0.9,0.9),
+    cmap_emptypixel=(0.98,0.98,0.98),
     scale="log",
     height=2,
     stripe="corner_stripe",
@@ -213,7 +212,7 @@ def make_heatmap_stripes(
             #if not np.all(pupsdf["coordinates"][0] == pupsdf["coordinates"][i]):
             if not np.array_equal(pupsdf["coordinates"][0], pupsdf["coordinates"][i]):
                 different = True
-                warnings.warn("Cannot sort, samples have different regions. Plot one by one if you want to sort")
+                warnings.warn("Cannot sort, samples have different regions. Plot one by one if you want to sort", stacklevel = 2)
         if not different:
             if stripe_sort == "sum":
                 ind_sort = np.argsort(-np.nansum(pupsdf[stripe][0], axis=1))
@@ -244,36 +243,48 @@ def make_heatmap_stripes(
     cmap.set_bad(cmap_emptypixel)   
     
     if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
-        fg.map(add_stripe_heatmap, stripe, "resolution", "flank", "rescale", "fraction_flank", norm=norm, cmap=cmap)
+        fg.map(add_stripe_heatmap, stripe, "resolution", "flank", "rescale", "rescale_flank", norm=norm, cmap=cmap)
     else:
         raise ValueError("stripe can only be 'vertical_stripe', 'horizontal_stripe' or 'corner_stripe'")
         
     fg.fig.subplots_adjust(wspace=0.2, right = right)
     
     fg.set_titles(row_template="", col_template="")
-    
     if nrows > 1 and ncols > 1:
         for (row_val, col_val), ax in fg.axes_dict.items():
             if row_val == row_order[0]:
                 ax.set_title(col_val)
             if row_val == row_order[-1]:
-                ax.set_xlabel("relative position, kbp\n"+stripe)
+                if pupsdf["rescale"].any():
+                    ax.set_xlabel("rescaled\n"+stripe)
+                else:
+                    ax.set_xlabel("relative position, kbp\n"+stripe)
             if col_val == col_order[0]:
                 ax.set_ylabel(row_val)
     else:
         if nrows == 1 and ncols > 1:
             for col_val, ax in fg.axes_dict.items():
-                ax.set_xlabel("relative position, kbp\n"+stripe)
+                if pupsdf["rescale"].any():
+                    ax.set_xlabel("rescaled\n"+stripe)
+                else:
+                    ax.set_xlabel("relative position, kbp\n"+stripe)
                 ax.set_ylabel("")
                 ax.set_title(col_val)
         elif nrows > 1 and ncols == 1:
             for row_val, ax in fg.axes_dict.items():
                 ax.set_ylabel(row_val, rotation=0, ha="right")
-                ax.set_xlabel("relative position, kbp\n"+stripe)
+                if pupsdf["rescale"].any():
+                    ax.set_xlabel("rescaled\n"+stripe)
+                else:
+                    ax.set_xlabel("relative position, kbp\n"+stripe)
         else:
             plt.title("")
-            plt.xlabel("relative position, kbp\n"+stripe)
             plt.ylabel("")
+            if pupsdf["rescale"].any():
+                plt.xlabel("rescaled\n"+stripe)
+            else:
+                plt.xlabel("relative position, kbp\n"+stripe)
+           
             
             
     plt.draw()
@@ -311,12 +322,16 @@ def make_heatmap_grid(
     sym=True,
     norm_corners=0,
     cmap="coolwarm",
+    cmap_emptypixel=(0.98,0.98,0.98),
     scale="log",
     height=1,
     **kwargs,
 ):
     pupsdf = pupsdf.copy()
-        
+    
+    cmap = copy.copy(cm.get_cmap(cmap))
+    cmap.set_bad(cmap_emptypixel) 
+    
     if norm_corners:
         pupsdf["data"] = pupsdf.apply(
             lambda x: coolpup.norm_cis(x["data"], norm_corners), axis=1
