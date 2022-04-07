@@ -1376,7 +1376,6 @@ class PileUpper:
         self.regions = {
             chrom: (chrom, 0, self.clr.chromsizes[chrom]) for chrom in self.chroms
         }
-
         if self.trans:
             if self.view_df["chrom"].unique().shape[0] < 2:
                 raise ValueError("Trying to do trans with fewer than two chromosomes")
@@ -1451,7 +1450,7 @@ class PileUpper:
         data = self.clr.matrix(sparse=True, balance=self.clr_weight_name).fetch(
             region1, region2
         )
-        # data = sparse.triu(data)
+        #data = sparse.triu(data)
         return data.tocsr()
 
     def get_coverage(self, data):
@@ -1492,7 +1491,6 @@ class PileUpper:
         min_left1, max_right1 = self.view_df_extents[region1]
 
         if region2 is None:
-            region2 = region1
             min_left2, max_right2 = min_left1, max_right1
         else:
             min_left2, max_right2 = self.view_df_extents[region2]
@@ -1833,7 +1831,6 @@ class PileUpper:
         else:
             listchr1 = self.view_df.index
             listchr2 = listchr1
-        
         f = partial(
             self.pileup_region,
             groupby=groupby,
@@ -1960,6 +1957,7 @@ class PileUpper:
             "view_df",
             "ExpSnipper",
             "expected_selections",
+            "expected_df",
             "view_df_extents",
             "regions",
             "empty_outmap",
