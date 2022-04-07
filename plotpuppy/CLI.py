@@ -11,7 +11,7 @@ from coolpuppy.coolpup import (
     load_pileup_df_list,
     get_score,
 )
-from plotpuppy.plotpup import make_heatmap_grid
+from plotpuppy.plotpup import make_heatmap_grid, make_heatmap_stripes
 from coolpuppy._version import __version__
 
 import matplotlib
@@ -77,7 +77,7 @@ def parse_args_plotpuppy():
         type=str,
         default="sum",
         required=False, 
-        help="""Whether or not to sort stripe stackups by total signal"""
+        help="""Whether to sort stripe stackups by total signal (sum, default), central pixel signal (center_pixel), or not at all (None)"""
     )
     parser.add_argument(
         "--out_sorted_bedpe", 
@@ -257,12 +257,14 @@ def main():
     else:
         row_order = None
     
+    if args.stripe_sort == "None":
+        args.stripe_sort = None
+    
     if args.stripe:
         fg = make_heatmap_stripes(
             pups,
             cols=args.cols,
             rows=args.rows,
-            score=score,
             col_order=col_order,
             row_order=row_order,
             vmin=args.vmin,

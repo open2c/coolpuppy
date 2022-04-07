@@ -235,7 +235,7 @@ def parse_args_coolpuppy():
         help="""Perform by-chromosome pileups for trans interactions""",
     )
     parser.add_argument(
-        "--stripes",
+        "--store_stripes",
         action="store_true",
         default=False,
         required=False,
@@ -498,7 +498,7 @@ def main():
         rescale_size=args.rescale_size,
         flip_negative_strand=args.flip_negative_strand,
         ignore_diags=args.ignore_diags,
-        store_stripes=args.stripes,
+        store_stripes=args.store_stripes,
     )
 
     if args.outname == "auto":

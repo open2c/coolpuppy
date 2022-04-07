@@ -95,7 +95,7 @@ def add_heatmap(data, color=None, cmap="coolwarm", norm=LogNorm(0.5, 2)):
 #     sns.heatmap(data.values[0], cmap=cmap, norm=norm, ax=ax, square=True, cbar=False,
 #                xticklabels=False, yticklabels=False)
 
-def add_stripe_heatmap(data, resolution, flank, color=None, cmap="coolwarm", norm=LogNorm(0.5, 2)):
+def add_stripe_heatmap(data, resolution, flank, rescale, fraction_flank, color=None, cmap="coolwarm", norm=LogNorm(0.5, 2)):
     """
     Adds the array contained in data.values[0] to the current axes as a heatmap of stripes
     """
@@ -110,10 +110,15 @@ def add_stripe_heatmap(data, resolution, flank, color=None, cmap="coolwarm", nor
     
     resolution = int(resolution)
     flank = int(flank)
+    rescale = bool(rescale)
     
-    ticks_pixels = np.linspace(0, flank*2//resolution,5)
-    ticks_kbp = ((ticks_pixels-ticks_pixels[-1]/2)*resolution//1000).astype(int)
-    plt.xticks(ticks_pixels.tolist(), ticks_kbp.tolist())
+    if not rescale:
+        ticks_pixels = np.linspace(0, flank*2//resolution,5)
+        ticks_kbp = ((ticks_pixels-ticks_pixels[-1]/2)*resolution//1000).astype(int)
+        plt.xticks(ticks_pixels.tolist(), ticks_kbp.tolist())
+    else:
+        if fraction_flank is not None:
+            pass
 
 def add_score(score, color=None):
     """
@@ -239,7 +244,7 @@ def make_heatmap_stripes(
     cmap.set_bad(cmap_emptypixel)   
     
     if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
-        fg.map(add_stripe_heatmap, stripe, "resolution", "flank", norm=norm, cmap=cmap)
+        fg.map(add_stripe_heatmap, stripe, "resolution", "flank", "rescale", "fraction_flank", norm=norm, cmap=cmap)
     else:
         raise ValueError("stripe can only be 'vertical_stripe', 'horizontal_stripe' or 'corner_stripe'")
         
