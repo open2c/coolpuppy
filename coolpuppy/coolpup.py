@@ -457,9 +457,9 @@ def assign_groups(intervals, groupby=[]):
     return intervals
 
 
-def expand(intervals, flank, resolution, fraction_flank=None):
+def expand(intervals, flank, resolution, rescale_flank=None):
     intervals = intervals.copy()
-    if fraction_flank is None:
+    if rescale_flank is None:
         intervals["exp_start"] = (
             np.floor(intervals["center"] / resolution) * resolution - flank
         )
@@ -468,13 +468,13 @@ def expand(intervals, flank, resolution, fraction_flank=None):
         )
     else:
         intervals[["exp_start", "exp_end"]] = bioframe.expand(
-            intervals, scale=2 * fraction_flank + 1
+            intervals, scale=2 * rescale_flank + 1
         )[["start", "end"]]
     return intervals
 
 
-def expand2D(intervals, flank, resolution, fraction_flank=None):
-    if fraction_flank is None:
+def expand2D(intervals, flank, resolution, rescale_flank=None):
+    if rescale_flank is None:
         intervals["exp_start1"] = (
             np.floor(intervals["center1"] // resolution) * resolution - flank
         )
@@ -489,10 +489,10 @@ def expand2D(intervals, flank, resolution, fraction_flank=None):
         )
     else:
         intervals[["exp_start1", "exp_end1"]] = bioframe.expand(
-            intervals, scale=2 * fraction_flank + 1, cols=["chrom1", "start1", "end1"]
+            intervals, scale=2 * rescale_flank + 1, cols=["chrom1", "start1", "end1"]
         )[["start1", "end1"]]
         intervals[["exp_start2", "exp_end2"]] = bioframe.expand(
-            intervals, scale=2 * fraction_flank + 1, cols=["chrom2", "start2", "end2"]
+            intervals, scale=2 * rescale_flank + 1, cols=["chrom2", "start2", "end2"]
         )[["start2", "end2"]]
     return intervals
 
@@ -600,7 +600,7 @@ class CoordCreator:
         *,
         features_format="auto",
         flank=100000,
-        fraction_flank=None,
+        rescale_flank=None,
         chroms="all",
         minshift=10 ** 5,
         maxshift=10 ** 6,
@@ -629,7 +629,7 @@ class CoordCreator:
             Padding around the central bin, in bp. For example, with 5000 bp resolution
             and 100000 flank, final pileup is 205000×205000 bp.
             The default is 100000.
-        fraction_flank : float, optional
+        rescale_flank : float, optional
             Fraction of ROI size added on each end when extracting snippets, if rescale.
             The default is None. If specified, overrides flank.
         chroms : str or list, optional
@@ -676,7 +676,7 @@ class CoordCreator:
         self.resolution = resolution
         self.features_format = features_format
         self.flank = flank
-        self.fraction_flank = fraction_flank
+        self.rescale_flank = rescale_flank
         self.chroms = chroms
         self.minshift = minshift
         self.maxshift = maxshift
@@ -720,7 +720,7 @@ class CoordCreator:
                 )
         else:
             self.kind = self.features_format
-
+        
         if self.intervals.shape[0] == 0:
             warnings.warn("No regions in features, returning empty output", stacklevel = 2)
             self.pos_stream = self.empty_stream
@@ -729,7 +729,11 @@ class CoordCreator:
 
         if self.subset > 0:
             self.intervals = self._subset(self.intervals)
-
+        
+        if self.rescale_flank is not None:
+            if self.rescale_flank % 2 == 0:
+                raise ValueError("Please provide an odd rescale_flank")
+        
         if self.kind == "bed":
             assert all(
                 [name in self.intervals.columns for name in ["chrom", "start", "end"]]
@@ -738,7 +742,7 @@ class CoordCreator:
                 self.intervals["start"] + self.intervals["end"]
             ) / 2
             self.intervals = expand(
-                self.intervals, self.flank, self.resolution, self.fraction_flank
+                self.intervals, self.flank, self.resolution, self.rescale_flank
             )
         else:
             assert all(
@@ -761,7 +765,7 @@ class CoordCreator:
                 & (self.intervals["distance"].abs() <= self.maxdist)
             ]
             self.intervals = expand2D(
-                self.intervals, self.flank, self.resolution, self.fraction_flank
+                self.intervals, self.flank, self.resolution, self.rescale_flank
             )
 
         if self.nshifts > 0 and self.kind == "bedpe":
@@ -1379,7 +1383,15 @@ class PileUpper:
         if self.trans:
             if self.view_df["chrom"].unique().shape[0] < 2:
                 raise ValueError("Trying to do trans with fewer than two chromosomes")
-
+                
+        if self.rescale:
+            logging.info("Rescaling to " + str(self.rescale_size) + "x" + str(self.rescale_size))
+            if self.rescale_flank is not None:
+                warnings.warn("Ignoring flank in favor of rescale_flank = " + str(self.rescale_flank), stacklevel = 2)               
+        else:
+            if self.rescale_flank is not None:
+                raise ValueError("Cannot set rescale_flank with rescale=False")
+            
         self.empty_outmap = self.make_outmap()
 
         self.empty_pup = {
@@ -1552,26 +1564,6 @@ class PileUpper:
                     exp_snip = snip.copy()
                     exp_snip["kind"] = "control"
                     exp_snip["data"] = exp_data
-                    if self.store_stripes:
-                        cntr = int(np.floor(exp_snip["data"].shape[0] / 2))
-                        exp_snip["horizontal_stripe"] = np.array(
-                            exp_snip["data"][cntr, :], dtype=float
-                        )
-                        exp_snip["vertical_stripe"] = np.array(
-                            exp_snip["data"][:, cntr][::-1], dtype=float
-                        )
-                        exp_snip["corner_stripe"] = np.concatenate(
-                            (
-                                exp_snip["horizontal_stripe"][
-                                    : int(np.floor(cntr + 1))
-                                ],
-                                exp_snip["vertical_stripe"][: int(np.floor(cntr))],
-                            )
-                        )
-                    else:
-                        exp_snip["horizontal_stripe"] = []
-                        exp_snip["vertical_stripe"] = []
-                        exp_snip["corner_stripe"] = []
 
             if not self.trans:
                 D = (
@@ -1593,24 +1585,6 @@ class PileUpper:
                     data = data / exp_data
             snip["data"] = data
 
-            if self.store_stripes:
-                cntr = int(np.floor(snip["data"].shape[0] / 2))
-                snip["horizontal_stripe"] = np.array(snip["data"][cntr, :], dtype=float)
-                snip["vertical_stripe"] = np.array(
-                    snip["data"][:, cntr][::-1], dtype=float
-                )
-                snip["corner_stripe"] = np.concatenate(
-                    (
-                        snip["horizontal_stripe"][: int(np.floor(cntr + 1))],
-                        snip["vertical_stripe"][: int(np.floor(cntr))],
-                    )
-                )
-            else:
-                snip["horizontal_stripe"] = []
-                snip["vertical_stripe"] = []
-                snip["corner_stripe"] = []
-                snip["coordinates"] = []
-
             if self.rescale:
                 snip = self._rescale_snip(snip)
                 if self.expected and not self.ooe:
@@ -1630,7 +1604,25 @@ class PileUpper:
                     snip["data"] = np.flip(snip["data"], axes)
                     if self.expected and not self.ooe:
                         exp_data = np.flip(exp_data, axes)
-
+                        
+            if self.store_stripes:
+                cntr = int(np.floor(snip["data"].shape[0] / 2))
+                snip["horizontal_stripe"] = np.array(snip["data"][cntr, :], dtype=float)
+                snip["vertical_stripe"] = np.array(
+                    snip["data"][:, cntr][::-1], dtype=float
+                )
+                snip["corner_stripe"] = np.concatenate(
+                    (
+                        snip["horizontal_stripe"][: int(np.floor(cntr + 1))],
+                        snip["vertical_stripe"][: int(np.floor(cntr))],
+                    )
+                )
+            else:
+                snip["horizontal_stripe"] = []
+                snip["vertical_stripe"] = []
+                snip["corner_stripe"] = []
+                snip["coordinates"] = []
+                
             yield snip
 
             if self.expected and not self.ooe:
@@ -1666,13 +1658,6 @@ class PileUpper:
                 snip["cov_start"], (self.rescale_size,)
             )
             snip["cov_end"] = numutils.zoom_array(snip["cov_end"], (self.rescale_size,))
-        if self.store_stripes:
-            snip["horizontal_stripe"] = numutils.zoom_array(snip["horizontal_stripe"], 
-                                                            (self.rescale_size,))
-            snip["vertical_stripe"] = numutils.zoom_array(snip["vertical_stripe"], 
-                                                          (self.rescale_size,))
-            snip["corner_stripe"] = numutils.zoom_array(snip["corner_stripe"], 
-                                                        (self.rescale_size,))
         return snip
 
     def accumulate_stream(self, snip_stream, postprocess_func=None):
@@ -1882,21 +1867,7 @@ class PileUpper:
             normalized_roi["vertical_stripe"] = roi["vertical_stripe"]
             normalized_roi["corner_stripe"] = roi["corner_stripe"]
 
-            if self.expected and not self.ooe:
-                normalized_roi["horizontal_stripe"]["all"] = (
-                    normalized_roi["horizontal_stripe"]["all"]
-                    / ctrl["horizontal_stripe"]["all"]
-                )
-                normalized_roi["vertical_stripe"]["all"] = (
-                    normalized_roi["vertical_stripe"]["all"]
-                    / ctrl["vertical_stripe"]["all"]
-                )
-                normalized_roi["corner_stripe"]["all"] = (
-                    normalized_roi["corner_stripe"]["all"]
-                    / ctrl["corner_stripe"]["all"]
-                )
-
-            elif self.control:
+            if self.control or (self.expected and not self.ooe):
                 # Generate stripes of normalized control arrays
                 cntr = int(np.floor(normalized_control["data"]["all"].shape[0] / 2))
                 control_leftstripe = np.array(

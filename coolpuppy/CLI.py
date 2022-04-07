@@ -472,7 +472,7 @@ def main():
         resolution=clr.binsize,
         features_format=args.features_format,
         flank=args.flank,
-        fraction_flank=rescale_flank,
+        rescale_flank=rescale_flank,
         chroms=fchroms,
         minshift=args.minshift,
         maxshift=args.maxshift,
