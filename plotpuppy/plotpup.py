@@ -65,6 +65,9 @@ def get_min_max(pups, vmin=None, vmax=None, sym=True):
         return vmin, vmax
     else:
         comb = np.concatenate([pup.ravel() for pup in pups.ravel()])
+        comb = comb[comb != -np.inf]
+        comb = comb[comb != np.inf]
+        comb = comb[comb != 0]
     if vmin is None and vmax is None:
         vmax = np.nanmax(comb)
         vmin = np.nanmin(comb)
@@ -183,17 +186,19 @@ def make_heatmap_stripes(
 
     if cols is None and rows is None:
         nrows, ncols = auto_rows_cols(pupsdf.shape[0])
-
+    
+    vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym)
+    
     if scale == "log":
         norm = LogNorm
+        if vmin == 0:
+            vmin = 1e-6
     elif scale == "linear":
         norm = Normalize
     else:
         raise ValueError(
             f"Unknown scale value, only log or linear implemented, but got {scale}"
         )
-
-    vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym)
 
     right = ncols / (ncols + 0.25)    
     
@@ -364,17 +369,19 @@ def make_heatmap_grid(
         # rowvals = ['']
     if cols is None and rows is None:
         nrows, ncols = auto_rows_cols(pupsdf.shape[0])
-
+    
+    vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym)
+    
     if scale == "log":
         norm = LogNorm
+        if vmin == 0:
+            vmin = 1e-6
     elif scale == "linear":
         norm = Normalize
     else:
         raise ValueError(
             f"Unknown scale value, only log or linear implemented, but got {scale}"
         )
-
-    vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym)
 
     right = ncols / (ncols + 0.25)
            

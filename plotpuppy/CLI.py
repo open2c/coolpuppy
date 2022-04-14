@@ -46,10 +46,10 @@ def parse_args_plotpuppy():
                 (see https://matplotlib.org/users/colormaps.html)""",
     )
     parser.add_argument(
-        "--symmetric",
+        "--not_symmetric",
         default=False,
         action="store_true",
-        help="""Whether to make colormap symmetric around 1, if log scale""",
+        help="""Whether to **not** make colormap symmetric around 1, if log scale""",
     )
     parser.add_argument(
         "--vmin", type=float, required=False, help="""Value for the lowest colour"""
@@ -77,7 +77,7 @@ def parse_args_plotpuppy():
         type=str,
         default="sum",
         required=False, 
-        help="""Whether to sort stripe stackups by total signal (sum, default), central pixel signal (center_pixel), or not at all (None)"""
+        help="""Whether to sort stripe stackups by total signal (sum), central pixel signal (center_pixel), or not at all (None)"""
     )
     parser.add_argument(
         "--out_sorted_bedpe", 
@@ -260,6 +260,11 @@ def main():
     if args.stripe_sort == "None":
         args.stripe_sort = None
     
+    if args.not_symmetric:
+        symmetric = False
+    else:
+        symmetric = True
+    
     if args.stripe:
         fg = make_heatmap_stripes(
             pups,
@@ -269,7 +274,7 @@ def main():
             row_order=row_order,
             vmin=args.vmin,
             vmax=args.vmax,
-            sym=args.symmetric,
+            sym=symmetric,
             cmap=args.cmap,
             scale=args.scale,
             height=args.height,
@@ -287,7 +292,7 @@ def main():
             row_order=row_order,
             vmin=args.vmin,
             vmax=args.vmax,
-            sym=args.symmetric,
+            sym=symmetric,
             cmap=args.cmap,
             scale=args.scale,
             height=args.height,
