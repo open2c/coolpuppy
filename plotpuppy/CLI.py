@@ -181,9 +181,8 @@ def parse_args_plotpuppy():
     #                    help="""How many rows to use for plotting the data""")
     parser.add_argument(
         "--height",
-        type=int,
+        type=float,
         required=False,
-        default=2,
         help="""Height of the plot""",
     )
     parser.add_argument(
@@ -264,6 +263,14 @@ def main():
         symmetric = False
     else:
         symmetric = True
+        
+    if args.height is None:
+        if args.stripe:
+            height = 2
+        else:
+            height = 1
+    else:
+        height = args.height
     
     if args.stripe:
         fg = make_heatmap_stripes(
@@ -277,7 +284,7 @@ def main():
             sym=symmetric,
             cmap=args.cmap,
             scale=args.scale,
-            height=args.height,
+            height=height,
             stripe=args.stripe,
             stripe_sort=args.stripe_sort,
             out_sorted_bedpe=args.out_sorted_bedpe,
@@ -295,7 +302,7 @@ def main():
             sym=symmetric,
             cmap=args.cmap,
             scale=args.scale,
-            height=args.height,
+            height=height,
         )
     
     plt.savefig(args.output, bbox_inches="tight", dpi=args.dpi)

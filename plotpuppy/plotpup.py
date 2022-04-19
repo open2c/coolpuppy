@@ -426,7 +426,7 @@ def make_heatmap_grid(
             for row_val, ax in fg.axes_dict.items():
                 ax.set_ylabel(row_val, rotation=0, ha="right")
         else:
-            pass
+            plt.xlabel("")
             
     plt.draw()
     ax_bottom = fg.axes[-1, -1]
