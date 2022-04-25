@@ -1451,9 +1451,8 @@ class PileUpper:
         logging.debug("Loading data")
 
         assert isinstance(region1, str)
-
         region1 = self.view_df.loc[region1]
-
+    
         if region2 is None:
             region2 = region1
         else:
@@ -1811,8 +1810,9 @@ class PileUpper:
         listchr2 = []
         if self.trans:
             for chr1, chr2 in itertools.combinations(self.view_df.index, 2):
-                listchr1.append(chr1)
-                listchr2.append(chr2)
+                if self.view_df.loc[chr1, "chrom"] != self.view_df.loc[chr2, "chrom"]:
+                    listchr1.append(chr1)
+                    listchr2.append(chr2)
         else:
             listchr1 = self.view_df.index
             listchr2 = listchr1
