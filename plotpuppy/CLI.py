@@ -66,27 +66,27 @@ def parse_args_plotpuppy():
         help="""Whether to use linear or log scaling for mapping colours""",
     )
     parser.add_argument(
-        "--stripe", 
-        type=str, 
+        "--stripe",
+        type=str,
         default=None,
-        required=False, 
-        help="""For plotting stripe stackups"""
+        required=False,
+        help="""For plotting stripe stackups""",
     )
     parser.add_argument(
-        "--stripe_sort", 
+        "--stripe_sort",
         type=str,
         default="sum",
-        required=False, 
-        help="""Whether to sort stripe stackups by total signal (sum), central pixel signal (center_pixel), or not at all (None)"""
+        required=False,
+        help="""Whether to sort stripe stackups by total signal (sum), central pixel signal (center_pixel), or not at all (None)""",
     )
     parser.add_argument(
-        "--out_sorted_bedpe", 
-        type=str, 
+        "--out_sorted_bedpe",
+        type=str,
         default=None,
-        required=False, 
-        help="""Output bedpe of sorted stripe regions"""
+        required=False,
+        help="""Output bedpe of sorted stripe regions""",
     )
-    
+
     # parser.add_argument(
     #     "--cbar_mode",
     #     type=str,
@@ -105,10 +105,16 @@ def parse_args_plotpuppy():
     #             If 0, automatically make the figure as square as possible""",
     # )
     parser.add_argument(
-        "--cols", type=str, required=False, help="""Which value to map as columns""",
+        "--cols",
+        type=str,
+        required=False,
+        help="""Which value to map as columns""",
     )
     parser.add_argument(
-        "--rows", type=str, required=False, help="""Which value to map as rows""",
+        "--rows",
+        type=str,
+        required=False,
+        help="""Which value to map as rows""",
     )
     parser.add_argument(
         "--col_order",
@@ -140,7 +146,7 @@ def parse_args_plotpuppy():
     )
     parser.add_argument(
         "--no_score",
-        action='store_true',
+        action="store_true",
         required=False,
         default=False,
         help="""If central pixel score should not be shown in top left corner""",
@@ -235,7 +241,7 @@ def main():
         score = "score"
     else:
         score = False
-        
+
     if args.cols:
         if args.col_order:
             col_order = args.col_order
@@ -245,7 +251,7 @@ def main():
             col_order = pups[args.cols].unique()
     else:
         col_order = None
-        
+
     if args.rows:
         if args.row_order:
             row_order = args.row_order
@@ -255,15 +261,15 @@ def main():
             row_order = pups[args.rows].unique()
     else:
         row_order = None
-    
+
     if args.stripe_sort == "None":
         args.stripe_sort = None
-    
+
     if args.not_symmetric:
         symmetric = False
     else:
         symmetric = True
-        
+
     if args.height is None:
         if args.stripe:
             height = 2
@@ -271,7 +277,7 @@ def main():
             height = 1
     else:
         height = args.height
-    
+
     if args.stripe:
         fg = make_heatmap_stripes(
             pups,
@@ -304,5 +310,5 @@ def main():
             scale=args.scale,
             height=height,
         )
-    
+
     plt.savefig(args.output, bbox_inches="tight", dpi=args.dpi)

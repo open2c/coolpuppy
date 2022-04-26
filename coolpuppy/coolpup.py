@@ -546,6 +546,7 @@ def _add_snip(outdict, key, snip):
             snip["coordinates"]
         ]
 
+
 def sum_pups(pup1, pup2):
     """
     Preserves data, stripes, cov_start, cov_end, n, num and coordinates
@@ -602,8 +603,8 @@ class CoordCreator:
         flank=100000,
         rescale_flank=None,
         chroms="all",
-        minshift=10 ** 5,
-        maxshift=10 ** 6,
+        minshift=10**5,
+        maxshift=10**6,
         nshifts=10,
         mindist="auto",
         maxdist=None,
@@ -687,13 +688,13 @@ class CoordCreator:
         else:
             self.mindist = mindist
             if self.trans:
-                warnings.warn("Ignoring mindist when using trans", stacklevel = 2)
+                warnings.warn("Ignoring mindist when using trans", stacklevel=2)
         if maxdist is None:
             self.maxdist = np.inf
         else:
             self.maxdist = maxdist
             if self.trans:
-                warnings.warn("Ignoring maxdist when using trans", stacklevel = 2)
+                warnings.warn("Ignoring maxdist when using trans", stacklevel=2)
         self.local = local
         self.subset = subset
         self.seed = seed
@@ -720,20 +721,22 @@ class CoordCreator:
                 )
         else:
             self.kind = self.features_format
-        
+
         if self.intervals.shape[0] == 0:
-            warnings.warn("No regions in features, returning empty output", stacklevel = 2)
+            warnings.warn(
+                "No regions in features, returning empty output", stacklevel=2
+            )
             self.pos_stream = self.empty_stream
             self.final_chroms = []
             return
 
         if self.subset > 0:
             self.intervals = self._subset(self.intervals)
-        
+
         if self.rescale_flank is not None:
             if self.rescale_flank % 2 == 0:
                 raise ValueError("Please provide an odd rescale_flank")
-        
+
         if self.kind == "bed":
             assert all(
                 [name in self.intervals.columns for name in ["chrom", "start", "end"]]
@@ -829,7 +832,13 @@ class CoordCreator:
                 sign2 = np.random.choice([-1, 1], control_intervals.shape[0])
                 shift2 = shift2 * sign2
                 control_intervals[["exp_start1", "exp_end1", "center1"]] = (
-                    control_intervals[["exp_start1", "exp_end1", "center1",]]
+                    control_intervals[
+                        [
+                            "exp_start1",
+                            "exp_end1",
+                            "center1",
+                        ]
+                    ]
                     + shift[:, np.newaxis]
                 )
                 control_intervals[["exp_start2", "exp_end2", "center2"]] = (
@@ -1039,9 +1048,9 @@ class CoordCreator:
             )
             merged["coordinates"] = merged.apply(
                 lambda x: ".".join(
-                    x[
-                        ["chrom1", "start1", "end1", "chrom2", "start2", "end2"]
-                    ].astype(str)
+                    x[["chrom1", "start1", "end1", "chrom2", "start2", "end2"]].astype(
+                        str
+                    )
                 ),
                 axis=1,
             )
@@ -1185,9 +1194,7 @@ class CoordCreator:
 
         intervals["coordinates"] = intervals.apply(
             lambda x: ".".join(
-                x[["chrom1", "start1", "end1", "chrom2", "start2", "end2"]].astype(
-                    str
-                )
+                x[["chrom1", "start1", "end1", "chrom2", "start2", "end2"]].astype(str)
             ),
             axis=1,
         )
@@ -1325,14 +1332,17 @@ class PileUpper:
                         "trans",
                         self.view_df,
                         verify_cooler=clr,
-                        expected_value_cols=[self.expected_value_col,],
+                        expected_value_cols=[
+                            self.expected_value_col,
+                        ],
                         raise_errors=True,
                     )
                 except Exception as e:
                     raise ValueError("provided expected is not valid") from e
                 if self.control:
                     warnings.warn(
-                        "Can't do both expected and control shifts; defaulting to expected", stacklevel = 2
+                        "Can't do both expected and control shifts; defaulting to expected",
+                        stacklevel=2,
                     )
                     self.control = False
                 self.expected_df = self.expected
@@ -1347,14 +1357,17 @@ class PileUpper:
                         "cis",
                         self.view_df,
                         verify_cooler=clr,
-                        expected_value_cols=[self.expected_value_col,],
+                        expected_value_cols=[
+                            self.expected_value_col,
+                        ],
                         raise_errors=True,
                     )
                 except Exception as e:
                     raise ValueError("provided expected is not valid") from e
                 if self.control:
                     warnings.warn(
-                        "Can't do both expected and control shifts; defaulting to expected", stacklevel = 2
+                        "Can't do both expected and control shifts; defaulting to expected",
+                        stacklevel=2,
                     )
                     self.control = False
                 self.ExpSnipper = snipping.ExpectedSnipper(
@@ -1383,17 +1396,25 @@ class PileUpper:
         if self.trans:
             if self.view_df["chrom"].unique().shape[0] < 2:
                 raise ValueError("Trying to do trans with fewer than two chromosomes")
-                
+
         if self.rescale:
             if self.rescale_flank is None:
                 raise ValueError("Cannot use rescale without setting rescale_flank")
             else:
-                logging.info("Rescaling with rescale_flank = " + str(self.rescale_flank) + " to " + str(self.rescale_size) + "x" + str(self.rescale_size) + " pixels")
-                           
+                logging.info(
+                    "Rescaling with rescale_flank = "
+                    + str(self.rescale_flank)
+                    + " to "
+                    + str(self.rescale_size)
+                    + "x"
+                    + str(self.rescale_size)
+                    + " pixels"
+                )
+
         else:
             if self.rescale_flank is not None:
                 raise ValueError("Cannot set rescale_flank with rescale=False")
-            
+
         self.empty_outmap = self.make_outmap()
 
         self.empty_pup = {
@@ -1416,7 +1437,9 @@ class PileUpper:
         ].item()
         return exp_value
 
-    def make_outmap(self,):
+    def make_outmap(
+        self,
+    ):
         """Generate zero-filled array of the right shape
 
         Returns
@@ -1454,7 +1477,7 @@ class PileUpper:
 
         assert isinstance(region1, str)
         region1 = self.view_df.loc[region1]
-    
+
         if region2 is None:
             region2 = region1
         else:
@@ -1463,7 +1486,7 @@ class PileUpper:
         data = self.clr.matrix(sparse=True, balance=self.clr_weight_name).fetch(
             region1, region2
         )
-        #data = sparse.triu(data)
+        # data = sparse.triu(data)
         return data.tocsr()
 
     def get_coverage(self, data):
@@ -1605,7 +1628,7 @@ class PileUpper:
                     snip["data"] = np.flip(snip["data"], axes)
                     if self.expected and not self.ooe:
                         exp_data = np.flip(exp_data, axes)
-                        
+
             if self.store_stripes:
                 cntr = int(np.floor(snip["data"].shape[0] / 2))
                 snip["horizontal_stripe"] = np.array(snip["data"][cntr, :], dtype=float)
@@ -1623,7 +1646,7 @@ class PileUpper:
                 snip["vertical_stripe"] = []
                 snip["corner_stripe"] = []
                 snip["coordinates"] = []
-                
+
             yield snip
 
             if self.expected and not self.ooe:
@@ -1830,24 +1853,35 @@ class PileUpper:
         else:
             pileups = list(map(f, listchr1, listchr2))
         roi = (
-            pd.DataFrame([{k: pd.Series(v) for k, v in pileup["ROI"].items()} for pileup in pileups])
+            pd.DataFrame(
+                [
+                    {k: pd.Series(v) for k, v in pileup["ROI"].items()}
+                    for pileup in pileups
+                ]
+            )
             .apply(lambda x: reduce(sum_pups, x.dropna()))
             .T
         )
         if self.control or (self.expected and not self.ooe):
             ctrl = (
-                pd.DataFrame([{k: pd.Series(v) for k, v in pileup["control"].items()} for pileup in pileups])
+                pd.DataFrame(
+                    [
+                        {k: pd.Series(v) for k, v in pileup["control"].items()}
+                        for pileup in pileups
+                    ]
+                )
                 .apply(lambda x: reduce(sum_pups, x.dropna()))
                 .T
             )
-        
-            
+
         if self.coverage_norm:
             roi = roi.apply(norm_coverage, axis=1)
             if self.control:
                 ctrl = ctrl.apply(norm_coverage, axis=1)
             elif self.expected:
-                warnings.warn("Expected can not be normalized to coverage", stacklevel = 2)
+                warnings.warn(
+                    "Expected can not be normalized to coverage", stacklevel=2
+                )
         normalized_roi = pd.DataFrame(roi["data"] / roi["num"], columns=["data"])
 
         if self.control or (self.expected and not self.ooe):
@@ -1881,12 +1915,22 @@ class PileUpper:
                         control_verticalstripe[: int(np.floor(cntr))],
                     )
                 )
-                normalized_roi["horizontal_stripe"] = normalized_roi.apply(lambda row : np.divide(row['horizontal_stripe'],
-                     control_horizontalstripe), axis = 1)
-                normalized_roi["vertical_stripe"] = normalized_roi.apply(lambda row : np.divide(row['vertical_stripe'],
-                     control_verticalstripe), axis = 1)
-                normalized_roi["corner_stripe"] = normalized_roi.apply(lambda row : np.divide(row['corner_stripe'],
-                     control_cornerstripe), axis = 1)
+                normalized_roi["horizontal_stripe"] = normalized_roi.apply(
+                    lambda row: np.divide(
+                        row["horizontal_stripe"], control_horizontalstripe
+                    ),
+                    axis=1,
+                )
+                normalized_roi["vertical_stripe"] = normalized_roi.apply(
+                    lambda row: np.divide(
+                        row["vertical_stripe"], control_verticalstripe
+                    ),
+                    axis=1,
+                )
+                normalized_roi["corner_stripe"] = normalized_roi.apply(
+                    lambda row: np.divide(row["corner_stripe"], control_cornerstripe),
+                    axis=1,
+                )
 
         if nproc > 1:
             p.close()
@@ -1897,7 +1941,7 @@ class PileUpper:
                 normalized_roi["data"] = normalized_roi["data"].apply(
                     lambda x: np.nanmean(np.dstack((x, x.T)), 2)
                 )
-               
+
         if groupby:
             normalized_roi = normalized_roi.reset_index()
             normalized_roi[groupby] = pd.DataFrame(
@@ -1943,7 +1987,8 @@ class PileUpper:
         return normalized_roi
 
     def pileupsByWindowWithControl(
-        self, nproc=1,
+        self,
+        nproc=1,
     ):
         """Perform by-window pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl
@@ -2078,7 +2123,8 @@ class PileUpper:
         """
 
         normalized_pileups = self.pileupsWithControl(
-            nproc=nproc, groupby=["strand1", "strand2"],
+            nproc=nproc,
+            groupby=["strand1", "strand2"],
         )
         normalized_pileups = normalized_pileups.drop(index=("all", "all")).reset_index()
         normalized_pileups["orientation"] = (
