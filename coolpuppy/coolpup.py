@@ -329,7 +329,7 @@ def get_score(pup, center=3, ignore_central=3):
     pup : pd.Series or dict
         Series or dict with pileup in 'data' and annotations in other keys.
         Will correctly calculate enrichment score with annotations in 'local' (book),
-        'rescale' (bool) and 'rescale_pad' (float)
+        'rescale' (bool) and 'rescale_flank' (float)
     enrichment : int, optional
         Passed to 'get_enrichment' to calculate the average strength of central pixels.
         The default is 3.
@@ -347,7 +347,7 @@ def get_score(pup, center=3, ignore_central=3):
         return get_enrichment(pup["data"], center)
     else:
         if pup["rescale"]:
-            return get_local_enrichment(pup["data"], pup["rescale_pad"])
+            return get_local_enrichment(pup["data"], pup["rescale_flank"])
         else:
             return get_insulation_strength(pup["data"], ignore_central)
 
@@ -1385,9 +1385,11 @@ class PileUpper:
                 raise ValueError("Trying to do trans with fewer than two chromosomes")
                 
         if self.rescale:
-            logging.info("Rescaling to " + str(self.rescale_size) + "x" + str(self.rescale_size))
-            if self.rescale_flank is not None:
-                warnings.warn("Ignoring flank in favor of rescale_flank = " + str(self.rescale_flank), stacklevel = 2)               
+            if self.rescale_flank is None:
+                raise ValueError("Cannot use rescale without setting rescale_flank")
+            else:
+                logging.info("Rescaling with rescale_flank = " + str(self.rescale_flank) + " to " + str(self.rescale_size) + "x" + str(self.rescale_size) + " pixels")
+                           
         else:
             if self.rescale_flank is not None:
                 raise ValueError("Cannot set rescale_flank with rescale=False")
@@ -1867,27 +1869,24 @@ class PileUpper:
             if self.control or (self.expected and not self.ooe):
                 # Generate stripes of normalized control arrays
                 cntr = int(np.floor(normalized_control["data"]["all"].shape[0] / 2))
-                control_leftstripe = np.array(
+                control_horizontalstripe = np.array(
                     normalized_control["data"]["all"][cntr, :], dtype=float
                 )
-                control_rightstripe = np.array(
+                control_verticalstripe = np.array(
                     normalized_control["data"]["all"][:, cntr][::-1], dtype=float
                 )
                 control_cornerstripe = np.concatenate(
                     (
-                        control_leftstripe[: int(np.floor(cntr + 1))],
-                        control_rightstripe[: int(np.floor(cntr))],
+                        control_horizontalstripe[: int(np.floor(cntr + 1))],
+                        control_verticalstripe[: int(np.floor(cntr))],
                     )
                 )
-                normalized_roi["horizontal_stripe"]["all"] = (
-                    normalized_roi["horizontal_stripe"]["all"] / control_leftstripe
-                )
-                normalized_roi["vertical_stripe"]["all"] = (
-                    normalized_roi["vertical_stripe"]["all"] / control_rightstripe
-                )
-                normalized_roi["corner_stripe"]["all"] = (
-                    normalized_roi["corner_stripe"]["all"] / control_cornerstripe
-                )
+                normalized_roi["horizontal_stripe"] = normalized_roi.apply(lambda row : np.divide(row['horizontal_stripe'],
+                     control_horizontalstripe), axis = 1)
+                normalized_roi["vertical_stripe"] = normalized_roi.apply(lambda row : np.divide(row['vertical_stripe'],
+                     control_verticalstripe), axis = 1)
+                normalized_roi["corner_stripe"] = normalized_roi.apply(lambda row : np.divide(row['corner_stripe'],
+                     control_cornerstripe), axis = 1)
 
         if nproc > 1:
             p.close()

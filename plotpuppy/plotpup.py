@@ -134,7 +134,7 @@ def add_score(score, color=None):
             x=0.05,
             ha="left",
             va="top",
-            size="small",
+            size="x-small",
             transform=ax.transAxes,
         )
         
@@ -394,6 +394,13 @@ def make_heatmap_grid(
         col_order=col_order,
         aspect=1,
         margin_titles=True,
+        gridspec_kws={
+            "right": right,
+            "hspace": 0.05,
+            "wspace": 0.05,
+            #'top':0.95,
+            #'bottom':0.05
+        },
         height=height,
         **kwargs,
     )
@@ -410,7 +417,6 @@ def make_heatmap_grid(
     fg.map(lambda color: plt.gca().set_xticks([]))
     fg.map(lambda color: plt.gca().set_yticks([]))
     fg.set_titles(col_template="", row_template="")
-    fg.fig.subplots_adjust(hspace=0.05, wspace=0.05, right = right)
 
     if nrows > 1 and ncols > 1:
         for (row_val, col_val), ax in fg.axes_dict.items():
