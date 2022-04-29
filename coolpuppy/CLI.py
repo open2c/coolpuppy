@@ -73,7 +73,7 @@ def parse_args_coolpuppy():
     ### Control of controls
     parser.add_argument(
         "--minshift",
-        default=10 ** 5,
+        default=10**5,
         type=int,
         required=False,
         help="""Shortest shift for random controls, bp
@@ -81,7 +81,7 @@ def parse_args_coolpuppy():
     )
     parser.add_argument(
         "--maxshift",
-        default=10 ** 6,
+        default=10**6,
         type=int,
         required=False,
         help="""Longest shift for random controls, bp
@@ -241,7 +241,7 @@ def parse_args_coolpuppy():
         required=False,
         help="""Store horizontal, vertical, and corner stripes in pileup output""",
     )
-    
+
     # Rescaling
     parser.add_argument(
         "--rescale",
@@ -434,7 +434,7 @@ def main():
             )
 
     if args.mindist is None:
-        mindist = 'auto'
+        mindist = "auto"
     else:
         mindist = args.mindist
 
