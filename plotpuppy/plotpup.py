@@ -14,7 +14,7 @@ from cooltools.lib import plotting
 import random
 import logging
 import warnings
-
+warnings.filterwarnings(action="ignore", message=".*tight_layout.*")
 pd.options.mode.chained_assignment = None
 import natsort
 import copy
