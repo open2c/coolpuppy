@@ -1638,7 +1638,7 @@ class PileUpper:
                 snip["corner_stripe"] = np.concatenate(
                     (
                         snip["horizontal_stripe"][: int(np.floor(cntr + 1))],
-                        snip["vertical_stripe"][: int(np.floor(cntr))],
+                        snip["vertical_stripe"][int(np.floor(cntr)) :],
                     )
                 )
             else:
@@ -1915,7 +1915,7 @@ class PileUpper:
                 control_cornerstripe = np.concatenate(
                     (
                         control_horizontalstripe[: int(np.floor(cntr + 1))],
-                        control_verticalstripe[: int(np.floor(cntr))],
+                        control_verticalstripe[int(np.floor(cntr)) :],
                     )
                 )
                 normalized_roi["horizontal_stripe"] = normalized_roi.apply(
