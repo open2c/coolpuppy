@@ -767,6 +767,7 @@ class CoordCreator:
                 (self.mindist <= self.intervals["distance"].abs())
                 & (self.intervals["distance"].abs() <= self.maxdist)
             ]
+            self.intervals = self.intervals.reset_index(drop=True)
             self.intervals = expand2D(
                 self.intervals, self.flank, self.resolution, self.rescale_flank
             )
@@ -1191,13 +1192,15 @@ class CoordCreator:
             intervals = self.intervals
         intervals = filter_func1(intervals)
         intervals = self._control_regions(intervals, self.nshifts * control)
-
-        intervals["coordinates"] = intervals.apply(
-            lambda x: ".".join(
-                x[["chrom1", "start1", "end1", "chrom2", "start2", "end2"]].astype(str)
-            ),
-            axis=1,
-        )
+        if not intervals.empty:
+            intervals["coordinates"] = intervals.apply(
+                lambda x: ".".join(
+                    x[["chrom1", "start1", "end1", "chrom2", "start2", "end2"]].astype(
+                        str
+                    )
+                ),
+                axis=1,
+            )
         if modify_2Dintervals_func is not None:
             intervals = modify_2Dintervals_func(intervals)
         intervals = assign_groups(intervals, groupby)
@@ -2050,7 +2053,9 @@ class PileUpper:
             nproc=nproc, modify_2Dintervals_func=bin_func, groupby=["distance_band"]
         )
         normalized_pileups = normalized_pileups.drop(index="all").reset_index()
-
+        normalized_pileups = normalized_pileups.loc[
+            normalized_pileups["distance_band"] != (), :
+        ].reset_index(drop=True)
         normalized_pileups["separation"] = normalized_pileups["distance_band"].apply(
             lambda x: f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
         )
@@ -2092,7 +2097,9 @@ class PileUpper:
         normalized_pileups["orientation"] = (
             normalized_pileups["strand1"] + normalized_pileups["strand2"]
         )
-
+        normalized_pileups = normalized_pileups.loc[
+            normalized_pileups["distance_band"] != (), :
+        ].reset_index(drop=True)
         normalized_pileups["separation"] = normalized_pileups["distance_band"].apply(
             lambda x: f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
         )
