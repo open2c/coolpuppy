@@ -140,8 +140,10 @@ def load_pileup_df_list(files, quaich=False, nice_metadata=True):
             pups["separation"] = pups["distance_band"].apply(
                 lambda x: np.nan
                 if pd.isnull(x)
-                #else f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
-                else f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb" if len(x)==2 else f"{x[0]/1000000}Mb+"
+                # else f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
+                else f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
+                if len(x) == 2
+                else f"{x[0]/1000000}Mb+"
             )
     return pups.reset_index(drop=False)
 
@@ -1892,8 +1894,10 @@ class PileUpper:
                 ctrl["data"] / ctrl["num"], columns=["data"]
             )
             normalized_roi = normalized_roi / normalized_control
-            
-        normalized_roi["data"] = normalized_roi["data"].apply(lambda x: np.where(x==np.inf,np.nan,x))
+
+        normalized_roi["data"] = normalized_roi["data"].apply(
+            lambda x: np.where(x == np.inf, np.nan, x)
+        )
         normalized_roi["n"] = roi["n"]
 
         if self.store_stripes:
@@ -2053,7 +2057,7 @@ class PileUpper:
                 raise ValueError("Distance edges must be integers")
             distance_edges = list(np.sort(distance_edges))
             for n in range(len(distance_edges)):
-                if (np.min(distance_edges) < self.mindist):
+                if np.min(distance_edges) < self.mindist:
                     distance_edges[np.argmin(distance_edges)] = self.mindist
                 else:
                     break
@@ -2066,7 +2070,9 @@ class PileUpper:
             normalized_pileups["distance_band"] != (), :
         ].reset_index(drop=True)
         normalized_pileups["separation"] = normalized_pileups["distance_band"].apply(
-            lambda x: f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb" if len(x)==2 else f"{x[0]/1000000}Mb+"
+            lambda x: f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
+            if len(x) == 2
+            else f"{x[0]/1000000}Mb+"
         )
 
         return normalized_pileups
@@ -2100,7 +2106,7 @@ class PileUpper:
                 raise ValueError("Distance edges must be integers")
             distance_edges = list(np.sort(distance_edges))
             for n in range(len(distance_edges)):
-                if (np.min(distance_edges) < self.mindist):
+                if np.min(distance_edges) < self.mindist:
                     distance_edges[np.argmin(distance_edges)] = self.mindist
                 else:
                     break
@@ -2118,7 +2124,9 @@ class PileUpper:
             normalized_pileups["distance_band"] != (), :
         ].reset_index(drop=True)
         normalized_pileups["separation"] = normalized_pileups["distance_band"].apply(
-            lambda x: f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb" if len(x)==2 else f"{x[0]/1000000}Mb+"
+            lambda x: f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
+            if len(x) == 2
+            else f"{x[0]/1000000}Mb+"
         )
 
         return normalized_pileups

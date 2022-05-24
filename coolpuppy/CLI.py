@@ -361,7 +361,9 @@ def main():
             try:
                 _ = [int(item) for item in args.by_distance.split(",")]
             except:
-                raise ValueError("Distance edges must be integers. Separate edges with commas and no spaces.")
+                raise ValueError(
+                    "Distance edges must be integers. Separate edges with commas and no spaces."
+                )
             distance_edges = [int(item) for item in args.by_distance.split(",")]
         else:
             distance_edges = "default"
