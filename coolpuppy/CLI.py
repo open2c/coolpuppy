@@ -358,6 +358,10 @@ def main():
     if args.by_distance is not None:
         if len(args.by_distance) > 0:
             args.by_distance = args.by_distance[0]
+            try:
+                _ = [int(item) for item in args.by_distance.split(",")]
+            except:
+                raise ValueError("Distance edges must be integers. Separate edges with commas and no spaces.")
             distance_edges = [int(item) for item in args.by_distance.split(",")]
         else:
             distance_edges = "default"

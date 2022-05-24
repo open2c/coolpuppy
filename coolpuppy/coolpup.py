@@ -140,7 +140,8 @@ def load_pileup_df_list(files, quaich=False, nice_metadata=True):
             pups["separation"] = pups["distance_band"].apply(
                 lambda x: np.nan
                 if pd.isnull(x)
-                else f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
+                #else f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
+                else f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb" if len(x)==2 else f"{x[0]/1000000}Mb+"
             )
     return pups.reset_index(drop=False)
 
@@ -1886,12 +1887,13 @@ class PileUpper:
                     "Expected can not be normalized to coverage", stacklevel=2
                 )
         normalized_roi = pd.DataFrame(roi["data"] / roi["num"], columns=["data"])
-
         if self.control or (self.expected and not self.ooe):
             normalized_control = pd.DataFrame(
                 ctrl["data"] / ctrl["num"], columns=["data"]
             )
             normalized_roi = normalized_roi / normalized_control
+            
+        normalized_roi["data"] = normalized_roi["data"].apply(lambda x: np.where(x==np.inf,np.nan,x))
         normalized_roi["n"] = roi["n"]
 
         if self.store_stripes:
@@ -1944,7 +1946,6 @@ class PileUpper:
                 normalized_roi["data"] = normalized_roi["data"].apply(
                     lambda x: np.nanmean(np.dstack((x, x.T)), 2)
                 )
-
         if groupby:
             normalized_roi = normalized_roi.reset_index()
             normalized_roi[groupby] = pd.DataFrame(
@@ -1959,7 +1960,6 @@ class PileUpper:
             n = normalized_roi.loc["all", "n"]
         else:
             n = normalized_roi.loc["all", "n"]
-
         logging.info(f"Total number of piled up windows: {int(n)}")
 
         # Store attributes
@@ -2048,6 +2048,15 @@ class PileUpper:
             raise ValueError("Cannot do by-distance pileups for trans")
         elif self.local:
             raise ValueError("Cannot do by-distance pileups for local")
+        if distance_edges != "default":
+            if not all(isinstance(n, int) for n in distance_edges):
+                raise ValueError("Distance edges must be integers")
+            distance_edges = list(np.sort(distance_edges))
+            for n in range(len(distance_edges)):
+                if (np.min(distance_edges) < self.mindist):
+                    distance_edges[np.argmin(distance_edges)] = self.mindist
+                else:
+                    break
         bin_func = partial(bin_distance_intervals, band_edges=distance_edges)
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc, modify_2Dintervals_func=bin_func, groupby=["distance_band"]
@@ -2057,7 +2066,7 @@ class PileUpper:
             normalized_pileups["distance_band"] != (), :
         ].reset_index(drop=True)
         normalized_pileups["separation"] = normalized_pileups["distance_band"].apply(
-            lambda x: f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
+            lambda x: f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb" if len(x)==2 else f"{x[0]/1000000}Mb+"
         )
 
         return normalized_pileups
@@ -2086,7 +2095,15 @@ class PileUpper:
         """
         if self.trans:
             raise ValueError("Cannot do by-distance pileups for trans")
-
+        if distance_edges != "default":
+            if not all(isinstance(n, int) for n in distance_edges):
+                raise ValueError("Distance edges must be integers")
+            distance_edges = list(np.sort(distance_edges))
+            for n in range(len(distance_edges)):
+                if (np.min(distance_edges) < self.mindist):
+                    distance_edges[np.argmin(distance_edges)] = self.mindist
+                else:
+                    break
         bin_func = partial(bin_distance_intervals, band_edges=distance_edges)
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc,
@@ -2101,7 +2118,7 @@ class PileUpper:
             normalized_pileups["distance_band"] != (), :
         ].reset_index(drop=True)
         normalized_pileups["separation"] = normalized_pileups["distance_band"].apply(
-            lambda x: f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
+            lambda x: f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb" if len(x)==2 else f"{x[0]/1000000}Mb+"
         )
 
         return normalized_pileups
@@ -2116,9 +2133,6 @@ class PileUpper:
         nproc : int, optional
             How many cores to use. Sends a whole chromosome per process.
             The default is 1.
-        distance_edges : list/array of int
-            How to group snips by distance (based on their centres).
-            Default uses separations [0, 50_000, 100_000, 200_000, ...]
 
         Returns
         -------
