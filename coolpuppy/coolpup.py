@@ -1856,6 +1856,7 @@ class PileUpper:
         if nproc > 1:
             p = Pool(nproc)
             pileups = list(p.starmap(f, zip(listchr1, listchr2)))
+            p.close()
         else:
             pileups = list(map(f, listchr1, listchr2))
         roi = (
@@ -1896,11 +1897,13 @@ class PileUpper:
             normalized_roi = normalized_roi / normalized_control
             normalized_roi["control_n"] = ctrl["n"]
             normalized_roi["control_num"] = ctrl["num"]
+
         normalized_roi["data"] = normalized_roi["data"].apply(
             lambda x: np.where(x == np.inf, np.nan, x)
         )
+        
         normalized_roi["n"] = roi["n"]
-
+        normalized_roi["num"] = roi["num"]
         if self.store_stripes:
             normalized_roi["coordinates"] = roi["coordinates"]
             normalized_roi["coordinates"] = [
@@ -1941,9 +1944,6 @@ class PileUpper:
                     lambda row: np.divide(row["corner_stripe"], control_cornerstripe),
                     axis=1,
                 )
-
-        if nproc > 1:
-            p.close()
         # pileup[~np.isfinite(pileup)] = 0
         if self.local:
             with warnings.catch_warnings():
