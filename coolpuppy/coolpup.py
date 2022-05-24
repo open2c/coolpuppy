@@ -1894,7 +1894,8 @@ class PileUpper:
                 ctrl["data"] / ctrl["num"], columns=["data"]
             )
             normalized_roi = normalized_roi / normalized_control
-
+            normalized_roi["control_n"] = ctrl["n"]
+            normalized_roi["control_num"] = ctrl["num"]
         normalized_roi["data"] = normalized_roi["data"].apply(
             lambda x: np.where(x == np.inf, np.nan, x)
         )
