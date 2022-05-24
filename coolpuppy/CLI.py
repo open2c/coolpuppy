@@ -188,12 +188,12 @@ def parse_args_coolpuppy():
     parser.add_argument(
         "--by_distance",
         "--by-distance",
-        action="store_true",
-        default=False,
+        nargs="*",
         required=False,
         help="""Perform by-distance pile-ups.
-                Create a separate pile-up for each distance band using 
-                [0, 50000, 100000, 200000, ...) as edges.""",
+                Create a separate pile-up for each distance band. If empty, will use default 
+                (0,50000,100000,200000,...) edges. Specify edges using comma-separated values, 
+                e.g. 1000000,10000000,100000000,1000000000""",
     )
     parser.add_argument(
         "--flip_negative_strand",
@@ -287,6 +287,7 @@ def parse_args_coolpuppy():
                 Provide empty argument to calculate pileups on raw data
                 (no masking bad pixels).""",
     )
+
     parser.add_argument(
         "-p",
         "--nproc",
@@ -353,6 +354,22 @@ def main():
             pdb.pm()
 
         sys.excepthook = _excepthook
+
+    if args.by_distance is not None:
+        if len(args.by_distance) > 0:
+            args.by_distance = args.by_distance[0]
+            try:
+                _ = [int(item) for item in args.by_distance.split(",")]
+            except:
+                raise ValueError(
+                    "Distance edges must be integers. Separate edges with commas and no spaces."
+                )
+            distance_edges = [int(item) for item in args.by_distance.split(",")]
+        else:
+            distance_edges = "default"
+            args.by_distance = True
+    else:
+        args.by_distance = False
 
     logging.basicConfig(format="%(message)s", level=getattr(logging, args.logLevel))
 
@@ -534,11 +551,15 @@ def main():
     if args.by_window:
         pups = PU.pileupsByWindowWithControl(nproc=nproc)
     elif args.by_strand and args.by_distance:
-        pups = PU.pileupsByStrandByDistanceWithControl(nproc=nproc)
+        pups = PU.pileupsByStrandByDistanceWithControl(
+            nproc=nproc, distance_edges=distance_edges
+        )
     elif args.by_strand:
         pups = PU.pileupsByStrandWithControl(nproc=nproc)
     elif args.by_distance:
-        pups = PU.pileupsByDistanceWithControl(nproc=nproc)
+        pups = PU.pileupsByDistanceWithControl(
+            nproc=nproc, distance_edges=distance_edges
+        )
     elif args.by_chroms:
         pups = PU.pileupsWithControl(nproc=nproc, groupby=["chrom1", "chrom2"])
     else:

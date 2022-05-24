@@ -87,6 +87,14 @@ def parse_args_plotpuppy():
         help="""Output bedpe of sorted stripe regions""",
     )
 
+    parser.add_argument(
+        "--font",
+        type=str,
+        default=False,
+        required=False,
+        help="""Font to use for plotting""",
+    )
+
     # parser.add_argument(
     #     "--cbar_mode",
     #     type=str,
@@ -294,6 +302,7 @@ def main():
             stripe=args.stripe,
             stripe_sort=args.stripe_sort,
             out_sorted_bedpe=args.out_sorted_bedpe,
+            font=args.font,
         )
     else:
         fg = make_heatmap_grid(
@@ -309,6 +318,7 @@ def main():
             cmap=args.cmap,
             scale=args.scale,
             height=height,
+            font=args.font,
         )
 
     plt.savefig(args.output, bbox_inches="tight", dpi=args.dpi)

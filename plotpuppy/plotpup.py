@@ -14,6 +14,7 @@ from cooltools.lib import plotting
 import random
 import logging
 import warnings
+
 warnings.filterwarnings(action="ignore", message=".*tight_layout.*")
 pd.options.mode.chained_assignment = None
 import natsort
@@ -70,6 +71,8 @@ def get_min_max(pups, vmin=None, vmax=None, sym=True):
         comb = comb[comb != -np.inf]
         comb = comb[comb != np.inf]
         comb = comb[comb != 0]
+        if np.isnan(comb).all():
+            raise ValueError("Data only contains NaNs or zeros")
     if vmin is None and vmax is None:
         vmax = np.nanmax(comb)
         vmin = np.nanmin(comb)
@@ -94,11 +97,7 @@ def add_heatmap(data, color=None, cmap="coolwarm", norm=LogNorm(0.5, 2)):
     elif len(data) == 0:
         return
     ax = plt.gca()
-    ax.imshow(data.values[0], cmap=cmap, norm=norm)  #
-
-
-#     sns.heatmap(data.values[0], cmap=cmap, norm=norm, ax=ax, square=True, cbar=False,
-#                xticklabels=False, yticklabels=False)
+    ax.imshow(data.values[0], cmap=cmap, norm=norm, interpolation="none")
 
 
 def add_stripe_heatmap(
@@ -174,6 +173,7 @@ def make_heatmap_stripes(
     stripe="corner_stripe",
     stripe_sort="center_pixel",
     out_sorted_bedpe=None,
+    font=False,
     **kwargs,
 ):
     pupsdf = pupsdf.copy()
@@ -287,6 +287,8 @@ def make_heatmap_stripes(
                 pd.DataFrame(pupsdf.loc[0, "coordinates"]).to_csv(
                     out_sorted_bedpe, sep="\t", header=None, index=False
                 )
+    if font:
+        sns.set(font=font, style="white")
 
     fg = sns.FacetGrid(
         pupsdf,
@@ -397,12 +399,16 @@ def make_heatmap_grid(
     cmap_emptypixel=(0.98, 0.98, 0.98),
     scale="log",
     height=1,
+    font=False,
     **kwargs,
 ):
     pupsdf = pupsdf.copy()
 
     cmap = copy.copy(cm.get_cmap(cmap))
     cmap.set_bad(cmap_emptypixel)
+
+    if font:
+        sns.set(font=font, style="white")
 
     if norm_corners:
         pupsdf["data"] = pupsdf.apply(
