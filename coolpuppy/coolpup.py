@@ -1330,6 +1330,12 @@ class PileUpper:
                 (self.expected["region1"].isin(self.view_df["name"]))
                 & (self.expected["region2"].isin(self.view_df["name"]))
             ].reset_index(drop=True)
+            if self.control:
+                warnings.warn(
+                    "Can't do both expected and control shifts; defaulting to expected",
+                    stacklevel=2,
+                )
+                self.control = False
             if self.trans:
                 try:
                     _ = checks.is_valid_expected(
@@ -1342,12 +1348,7 @@ class PileUpper:
                     )
                 except Exception as e:
                     raise ValueError("provided expected is not valid") from e
-                if self.control:
-                    warnings.warn(
-                        "Can't do both expected and control shifts; defaulting to expected",
-                        stacklevel=2,
-                    )
-                    self.control = False
+
                 self.expected_df = self.expected
                 self.expected = True
             else:
@@ -1365,12 +1366,6 @@ class PileUpper:
                     )
                 except Exception as e:
                     raise ValueError("provided expected is not valid") from e
-                if self.control:
-                    warnings.warn(
-                        "Can't do both expected and control shifts; defaulting to expected",
-                        stacklevel=2,
-                    )
-                    self.control = False
                 self.ExpSnipper = snipping.ExpectedSnipper(
                     self.clr, self.expected, view_df=self.view_df
                 )
@@ -1392,9 +1387,6 @@ class PileUpper:
             list(set(self.CC.final_chroms) & set(self.clr.chromnames))
         )
         self.view_df = self.view_df[self.view_df["chrom"].isin(self.chroms)]
-        self.regions = {
-            chrom: (chrom, 0, self.clr.chromsizes[chrom]) for chrom in self.chroms
-        }
         if self.trans:
             if self.view_df["chrom"].unique().shape[0] < 2:
                 raise ValueError("Trying to do trans with fewer than two chromosomes")
