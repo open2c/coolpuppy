@@ -676,7 +676,7 @@ class CoordCreator:
         Object that generates coordinates for pileups required for PileUpper.
 
         """
-        self.intervals = features
+        self.intervals = features.copy()
         self.resolution = resolution
         self.features_format = features_format
         self.flank = flank
@@ -725,14 +725,6 @@ class CoordCreator:
         else:
             self.kind = self.features_format
 
-        if self.intervals.shape[0] == 0:
-            warnings.warn(
-                "No regions in features, returning empty output", stacklevel=2
-            )
-            self.pos_stream = self.empty_stream
-            self.final_chroms = []
-            return
-
         if self.subset > 0:
             self.intervals = self._subset(self.intervals)
 
@@ -774,6 +766,16 @@ class CoordCreator:
             self.intervals = expand2D(
                 self.intervals, self.flank, self.resolution, self.rescale_flank
             )
+
+        if self.intervals.shape[0] == 0:
+            warnings.warn(
+                "No regions in features (maybe all below mindist?),"
+                " returning empty output",
+                stacklevel=2,
+            )
+            self.pos_stream = self.empty_stream
+            self.final_chroms = []
+            return
 
         if self.nshifts > 0 and self.kind == "bedpe":
             self.intervals = self._control_regions(self.intervals)
@@ -1823,16 +1825,19 @@ class PileUpper:
             return self.make_outmap(), 0
 
         # Generate all combinations of chromosomes
-        listchr1 = []
-        listchr2 = []
+        regions1 = []
+        regions2 = []
         if self.trans:
-            for chr1, chr2 in itertools.combinations(self.view_df.index, 2):
-                if self.view_df.loc[chr1, "chrom"] != self.view_df.loc[chr2, "chrom"]:
-                    listchr1.append(chr1)
-                    listchr2.append(chr2)
+            for region1, region2 in itertools.combinations(self.view_df.index, 2):
+                if (
+                    self.view_df.loc[region1, "chrom"]
+                    != self.view_df.loc[region2, "chrom"]
+                ):
+                    regions1.append(region1)
+                    regions2.append(region2)
         else:
-            listchr1 = self.view_df.index
-            listchr2 = listchr1
+            regions1 = self.view_df.index
+            regions2 = regions1
         f = partial(
             self.pileup_region,
             groupby=groupby,
@@ -1841,10 +1846,10 @@ class PileUpper:
         )
         if nproc > 1:
             p = Pool(nproc)
-            pileups = list(p.starmap(f, zip(listchr1, listchr2)))
+            pileups = list(p.starmap(f, zip(regions1, regions2)))
             p.close()
         else:
-            pileups = list(map(f, listchr1, listchr2))
+            pileups = list(map(f, regions1, regions2))
         roi = (
             pd.DataFrame(
                 [
