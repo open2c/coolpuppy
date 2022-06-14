@@ -606,8 +606,8 @@ class CoordCreator:
         flank=100000,
         rescale_flank=None,
         chroms="all",
-        minshift=10**5,
-        maxshift=10**6,
+        minshift=10 ** 5,
+        maxshift=10 ** 6,
         nshifts=10,
         mindist="auto",
         maxdist=None,
@@ -676,7 +676,7 @@ class CoordCreator:
         Object that generates coordinates for pileups required for PileUpper.
 
         """
-        self.intervals = features
+        self.intervals = features.copy()
         self.resolution = resolution
         self.features_format = features_format
         self.flank = flank
@@ -725,14 +725,6 @@ class CoordCreator:
         else:
             self.kind = self.features_format
 
-        if self.intervals.shape[0] == 0:
-            warnings.warn(
-                "No regions in features, returning empty output", stacklevel=2
-            )
-            self.pos_stream = self.empty_stream
-            self.final_chroms = []
-            return
-
         if self.subset > 0:
             self.intervals = self._subset(self.intervals)
 
@@ -774,6 +766,16 @@ class CoordCreator:
             self.intervals = expand2D(
                 self.intervals, self.flank, self.resolution, self.rescale_flank
             )
+
+        if self.intervals.shape[0] == 0:
+            warnings.warn(
+                "No regions in features (maybe all below mindist?),"
+                " returning empty output",
+                stacklevel=2,
+            )
+            self.pos_stream = self.empty_stream
+            self.final_chroms = []
+            return
 
         if self.nshifts > 0 and self.kind == "bedpe":
             self.intervals = self._control_regions(self.intervals)
@@ -836,13 +838,7 @@ class CoordCreator:
                 sign2 = np.random.choice([-1, 1], control_intervals.shape[0])
                 shift2 = shift2 * sign2
                 control_intervals[["exp_start1", "exp_end1", "center1"]] = (
-                    control_intervals[
-                        [
-                            "exp_start1",
-                            "exp_end1",
-                            "center1",
-                        ]
-                    ]
+                    control_intervals[["exp_start1", "exp_end1", "center1",]]
                     + shift[:, np.newaxis]
                 )
                 control_intervals[["exp_start2", "exp_end2", "center2"]] = (
@@ -1331,51 +1327,47 @@ class PileUpper:
             )
 
         if self.expected is not False:
+            # subset expected if some regions not mentioned in view
+            self.expected = self.expected[
+                (self.expected["region1"].isin(self.view_df["name"]))
+                & (self.expected["region2"].isin(self.view_df["name"]))
+            ].reset_index(drop=True)
+            if self.control:
+                warnings.warn(
+                    "Can't do both expected and control shifts; defaulting to expected",
+                    stacklevel=2,
+                )
+                self.control = False
             if self.trans:
                 try:
                     _ = checks.is_valid_expected(
-                        expected,
+                        self.expected,
                         "trans",
                         self.view_df,
                         verify_cooler=clr,
-                        expected_value_cols=[
-                            self.expected_value_col,
-                        ],
+                        expected_value_cols=[self.expected_value_col,],
                         raise_errors=True,
                     )
                 except Exception as e:
                     raise ValueError("provided expected is not valid") from e
-                if self.control:
-                    warnings.warn(
-                        "Can't do both expected and control shifts; defaulting to expected",
-                        stacklevel=2,
-                    )
-                    self.control = False
+
                 self.expected_df = self.expected
                 self.expected = True
             else:
                 self.expected = self.expected[
                     self.expected["region1"] == self.expected["region2"]
-                ]
+                ].reset_index(drop=True)
                 try:
                     _ = checks.is_valid_expected(
-                        expected,
+                        self.expected,
                         "cis",
                         self.view_df,
                         verify_cooler=clr,
-                        expected_value_cols=[
-                            self.expected_value_col,
-                        ],
+                        expected_value_cols=[self.expected_value_col,],
                         raise_errors=True,
                     )
                 except Exception as e:
                     raise ValueError("provided expected is not valid") from e
-                if self.control:
-                    warnings.warn(
-                        "Can't do both expected and control shifts; defaulting to expected",
-                        stacklevel=2,
-                    )
-                    self.control = False
                 self.ExpSnipper = snipping.ExpectedSnipper(
                     self.clr, self.expected, view_df=self.view_df
                 )
@@ -1383,6 +1375,7 @@ class PileUpper:
                     region_name: self.ExpSnipper.select(region_name, region_name)
                     for region_name in self.view_df["name"]
                 }
+                self.expected_df = self.expected
                 self.expected = True
         self.view_df = self.view_df.set_index("name")
         self.view_df_extents = {}
@@ -1396,9 +1389,6 @@ class PileUpper:
             list(set(self.CC.final_chroms) & set(self.clr.chromnames))
         )
         self.view_df = self.view_df[self.view_df["chrom"].isin(self.chroms)]
-        self.regions = {
-            chrom: (chrom, 0, self.clr.chromsizes[chrom]) for chrom in self.chroms
-        }
         if self.trans:
             if self.view_df["chrom"].unique().shape[0] < 2:
                 raise ValueError("Trying to do trans with fewer than two chromosomes")
@@ -1443,9 +1433,7 @@ class PileUpper:
         ].item()
         return exp_value
 
-    def make_outmap(
-        self,
-    ):
+    def make_outmap(self,):
         """Generate zero-filled array of the right shape
 
         Returns
@@ -1837,16 +1825,19 @@ class PileUpper:
             return self.make_outmap(), 0
 
         # Generate all combinations of chromosomes
-        listchr1 = []
-        listchr2 = []
+        regions1 = []
+        regions2 = []
         if self.trans:
-            for chr1, chr2 in itertools.combinations(self.view_df.index, 2):
-                if self.view_df.loc[chr1, "chrom"] != self.view_df.loc[chr2, "chrom"]:
-                    listchr1.append(chr1)
-                    listchr2.append(chr2)
+            for region1, region2 in itertools.combinations(self.view_df.index, 2):
+                if (
+                    self.view_df.loc[region1, "chrom"]
+                    != self.view_df.loc[region2, "chrom"]
+                ):
+                    regions1.append(region1)
+                    regions2.append(region2)
         else:
-            listchr1 = self.view_df.index
-            listchr2 = listchr1
+            regions1 = self.view_df.index
+            regions2 = regions1
         f = partial(
             self.pileup_region,
             groupby=groupby,
@@ -1855,10 +1846,10 @@ class PileUpper:
         )
         if nproc > 1:
             p = Pool(nproc)
-            pileups = list(p.starmap(f, zip(listchr1, listchr2)))
+            pileups = list(p.starmap(f, zip(regions1, regions2)))
             p.close()
         else:
-            pileups = list(map(f, listchr1, listchr2))
+            pileups = list(map(f, regions1, regions2))
         roi = (
             pd.DataFrame(
                 [
@@ -1901,7 +1892,7 @@ class PileUpper:
         normalized_roi["data"] = normalized_roi["data"].apply(
             lambda x: np.where(x == np.inf, np.nan, x)
         )
-        
+
         normalized_roi["n"] = roi["n"]
         normalized_roi["num"] = roi["num"]
         if self.store_stripes:
@@ -1995,8 +1986,7 @@ class PileUpper:
         return normalized_roi
 
     def pileupsByWindowWithControl(
-        self,
-        nproc=1,
+        self, nproc=1,
     ):
         """Perform by-window pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl
@@ -2153,8 +2143,7 @@ class PileUpper:
         """
 
         normalized_pileups = self.pileupsWithControl(
-            nproc=nproc,
-            groupby=["strand1", "strand2"],
+            nproc=nproc, groupby=["strand1", "strand2"],
         )
         normalized_pileups = normalized_pileups.drop(index=("all", "all")).reset_index()
         normalized_pileups["orientation"] = (
