@@ -47,7 +47,13 @@ def save_pileup_df(filename, df, metadata=None, mode="w"):
     """
     if metadata is None:
         metadata = {}
-    df[df.columns[df.columns != "data"]].to_hdf(filename, "annotation", mode=mode)
+    df[
+        df.columns[
+            ~df.columns.isin(
+                ["data", "corner_stripe", "vertical_stripe", "horizontal_stripe"]
+            )
+        ]
+    ].to_hdf(filename, "annotation", mode=mode)
 
     with h5py.File(filename, "a") as f:
         width = df["data"].iloc[0].shape[0]
@@ -57,7 +63,19 @@ def save_pileup_df(filename, df, metadata=None, mode="w"):
         )
         for i, arr in df["data"].reset_index(drop=True).items():
             ds[i * width : (i + 1) * width, :] = arr
-
+        if df["store_stripes"].any():
+            for i, arr in df["corner_stripe"].reset_index(drop=True).items():
+                f.create_dataset(
+                    "corner_stripe_" + str(i), shape=(len(arr), width), data=arr
+                )
+            for i, arr in df["vertical_stripe"].reset_index(drop=True).items():
+                f.create_dataset(
+                    "vertical_stripe_" + str(i), shape=(len(arr), width), data=arr
+                )
+            for i, arr in df["horizontal_stripe"].reset_index(drop=True).items():
+                f.create_dataset(
+                    "horizontal_stripe_" + str(i), shape=(len(arr), width), data=arr
+                )
         group = f.create_group("attrs")
         if metadata is not None:
             for key, val in metadata.items():
@@ -94,6 +112,22 @@ def load_pileup_df(filename, quaich=False):
             data.append(chunk)
         annotation = pd.read_hdf(filename, "annotation")
         annotation["data"] = data
+        corner_stripe = []
+        vertical_stripe = []
+        horizontal_stripe = []
+        try:
+            for i in range(len(data)):
+                cstripe = "corner_stripe_" + str(i)
+                vstripe = "vertical_stripe_" + str(i)
+                hstripe = "horizontal_stripe_" + str(i)
+                corner_stripe.append(f[cstripe][:])
+                vertical_stripe.append(f[vstripe][:])
+                horizontal_stripe.append(f[hstripe][:])
+            annotation["corner_stripe"] = corner_stripe
+            annotation["vertical_stripe"] = vertical_stripe
+            annotation["horizontal_stripe"] = horizontal_stripe
+        except:
+            pass
     for key, val in metadata.items():
         annotation[key] = val
     if quaich:
@@ -606,8 +640,8 @@ class CoordCreator:
         flank=100000,
         rescale_flank=None,
         chroms="all",
-        minshift=10 ** 5,
-        maxshift=10 ** 6,
+        minshift=10**5,
+        maxshift=10**6,
         nshifts=10,
         mindist="auto",
         maxdist=None,
@@ -838,7 +872,13 @@ class CoordCreator:
                 sign2 = np.random.choice([-1, 1], control_intervals.shape[0])
                 shift2 = shift2 * sign2
                 control_intervals[["exp_start1", "exp_end1", "center1"]] = (
-                    control_intervals[["exp_start1", "exp_end1", "center1",]]
+                    control_intervals[
+                        [
+                            "exp_start1",
+                            "exp_end1",
+                            "center1",
+                        ]
+                    ]
                     + shift[:, np.newaxis]
                 )
                 control_intervals[["exp_start2", "exp_end2", "center2"]] = (
@@ -1345,7 +1385,9 @@ class PileUpper:
                         "trans",
                         self.view_df,
                         verify_cooler=clr,
-                        expected_value_cols=[self.expected_value_col,],
+                        expected_value_cols=[
+                            self.expected_value_col,
+                        ],
                         raise_errors=True,
                     )
                 except Exception as e:
@@ -1363,7 +1405,9 @@ class PileUpper:
                         "cis",
                         self.view_df,
                         verify_cooler=clr,
-                        expected_value_cols=[self.expected_value_col,],
+                        expected_value_cols=[
+                            self.expected_value_col,
+                        ],
                         raise_errors=True,
                     )
                 except Exception as e:
@@ -1433,7 +1477,9 @@ class PileUpper:
         ].item()
         return exp_value
 
-    def make_outmap(self,):
+    def make_outmap(
+        self,
+    ):
         """Generate zero-filled array of the right shape
 
         Returns
@@ -1986,7 +2032,8 @@ class PileUpper:
         return normalized_roi
 
     def pileupsByWindowWithControl(
-        self, nproc=1,
+        self,
+        nproc=1,
     ):
         """Perform by-window pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl
@@ -2143,7 +2190,8 @@ class PileUpper:
         """
 
         normalized_pileups = self.pileupsWithControl(
-            nproc=nproc, groupby=["strand1", "strand2"],
+            nproc=nproc,
+            groupby=["strand1", "strand2"],
         )
         normalized_pileups = normalized_pileups.drop(index=("all", "all")).reset_index()
         normalized_pileups["orientation"] = (
