@@ -16,6 +16,7 @@ import logging
 import warnings
 
 warnings.filterwarnings(action="ignore", message=".*tight_layout.*")
+warnings.filterwarnings(action="ignore", message=".*Tight layout.*")
 pd.options.mode.chained_assignment = None
 import natsort
 import copy

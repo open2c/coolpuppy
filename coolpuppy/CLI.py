@@ -42,6 +42,7 @@ def parse_args_coolpuppy():
     parser.add_argument(
         "--features_format",
         "--features-format",
+        "--format",
         "--basetype",
         type=str,
         choices=["bed", "bedpe", "auto"],
