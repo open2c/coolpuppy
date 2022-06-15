@@ -172,7 +172,7 @@ def make_heatmap_stripes(
     scale="log",
     height=2,
     stripe="corner_stripe",
-    stripe_sort="center_pixel",
+    stripe_sort="sum",
     out_sorted_bedpe=None,
     font=False,
     **kwargs,
