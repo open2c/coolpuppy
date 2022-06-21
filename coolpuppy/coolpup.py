@@ -762,10 +762,6 @@ class CoordCreator:
         if self.subset > 0:
             self.intervals = self._subset(self.intervals)
 
-        if self.rescale_flank is not None:
-            if self.rescale_flank % 2 == 0:
-                raise ValueError("Please provide an odd rescale_flank")
-
         if self.kind == "bed":
             assert all(
                 [name in self.intervals.columns for name in ["chrom", "start", "end"]]
@@ -1449,6 +1445,8 @@ class PileUpper:
         if self.rescale:
             if self.rescale_flank is None:
                 raise ValueError("Cannot use rescale without setting rescale_flank")
+            elif self.rescale_size % 2 == 0:
+                raise ValueError("Please provide an odd rescale_size")
             else:
                 logging.info(
                     "Rescaling with rescale_flank = "
