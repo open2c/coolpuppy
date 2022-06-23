@@ -762,10 +762,6 @@ class CoordCreator:
         if self.subset > 0:
             self.intervals = self._subset(self.intervals)
 
-        if self.rescale_flank is not None:
-            if self.rescale_flank % 2 == 0:
-                raise ValueError("Please provide an odd rescale_flank")
-
         if self.kind == "bed":
             assert all(
                 [name in self.intervals.columns for name in ["chrom", "start", "end"]]
@@ -1039,14 +1035,23 @@ class CoordCreator:
     def _filter_func_trans_pairs(self, intervals, region1, region2):
         chrom1, start1, end1 = region1
         chrom2, start2, end2 = region2
-        return intervals[
+        return pd.concat([intervals[
             (intervals["chrom1"] == chrom1)
             & (intervals["chrom2"] == chrom2)
             & (intervals["start1"] >= start1)
             & (intervals["end1"] < end1)
             & (intervals["start2"] >= start2)
             & (intervals["end2"] < end2)
+        ].reset_index(drop=True),
+                          intervals[
+            (intervals["chrom2"] == chrom1)
+            & (intervals["chrom1"] == chrom2)
+            & (intervals["start2"] >= start1)
+            & (intervals["end2"] < end1)
+            & (intervals["start1"] >= start2)
+            & (intervals["end1"] < end2)
         ].reset_index(drop=True)
+                         ])
 
     def filter_func_trans_pairs(self, region1, region2):
         return partial(self._filter_func_trans_pairs, region1=region1, region2=region2)
@@ -1440,6 +1445,8 @@ class PileUpper:
         if self.rescale:
             if self.rescale_flank is None:
                 raise ValueError("Cannot use rescale without setting rescale_flank")
+            elif self.rescale_size % 2 == 0:
+                raise ValueError("Please provide an odd rescale_size")
             else:
                 logging.info(
                     "Rescaling with rescale_flank = "
@@ -1556,10 +1563,10 @@ class PileUpper:
         try:
             row1 = next(intervals)
         except StopIteration:
-            logging.info(f"Nothing to sum up between regions {region1} & {region2}")
+            #logging.info(f"Nothing to sum up between regions {region1} & {region2}")
             return
         if row1 is None:
-            logging.info(f"Nothing to sum up between region {region1} & {region2}")
+            #logging.info(f"Nothing to sum up between region {region1} & {region2}")
             return
 
         intervals = itertools.chain([row1], intervals)
@@ -1832,7 +1839,8 @@ class PileUpper:
             self._stream_snips(intervals=intervals, region1=region1, region2=region2),
             postprocess_func=postprocess_func,
         )
-        logging.info(f"{region1, region2}: {final['ROI']['all']['n']}")
+        if final['ROI']['all']['n'] > 0:
+            logging.info(f"{region1, region2}: {final['ROI']['all']['n']}")
 
         return final
 
