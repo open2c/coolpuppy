@@ -175,7 +175,7 @@ def make_heatmap_stripes(
     stripe_sort="sum",
     out_sorted_bedpe=None,
     font=False,
-    font_scale=1,
+    font_scale=None,
     **kwargs,
 ):
     pupsdf = pupsdf.copy()
