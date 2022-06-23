@@ -175,6 +175,7 @@ def make_heatmap_stripes(
     stripe_sort="sum",
     out_sorted_bedpe=None,
     font=False,
+    font_scale=1,
     **kwargs,
 ):
     pupsdf = pupsdf.copy()
@@ -288,8 +289,13 @@ def make_heatmap_stripes(
                 pd.DataFrame(pupsdf.loc[0, "coordinates"]).to_csv(
                     out_sorted_bedpe, sep="\t", header=None, index=False
                 )
-    if font:
-        sns.set(font=font, style="white")
+                
+    if font and font_scale:
+        sns.set(font=font, font_scale=font_scale, style="ticks")
+    elif font:
+        sns.set(font=font, style="ticks")
+    elif font_scale:
+        sns.set(font_scale=font_scale, style="ticks")
 
     fg = sns.FacetGrid(
         pupsdf,
@@ -401,6 +407,7 @@ def make_heatmap_grid(
     scale="log",
     height=1,
     font=False,
+    font_scale=None,
     **kwargs,
 ):
     pupsdf = pupsdf.copy()
@@ -408,8 +415,12 @@ def make_heatmap_grid(
     cmap = copy.copy(cm.get_cmap(cmap))
     cmap.set_bad(cmap_emptypixel)
 
-    if font:
-        sns.set(font=font, style="white")
+    if font and font_scale:
+        sns.set(font=font, font_scale=font_scale, style="ticks")
+    elif font:
+        sns.set(font=font, style="ticks")
+    elif font_scale:
+        sns.set(font_scale=font_scale, style="ticks")
 
     if norm_corners:
         pupsdf["data"] = pupsdf.apply(
@@ -459,7 +470,6 @@ def make_heatmap_grid(
 
     right = ncols / (ncols + 0.25)
 
-    # sns.set(font_scale=5)
     fg = sns.FacetGrid(
         pupsdf,
         col=cols,

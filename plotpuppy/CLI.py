@@ -94,6 +94,14 @@ def parse_args_plotpuppy():
         required=False,
         help="""Font to use for plotting""",
     )
+    
+    parser.add_argument(
+        "--font_scale",
+        type=float,
+        default=False,
+        required=False,
+        help="""Font scale to use for plotting. Defaults to 1""",
+    )
 
     # parser.add_argument(
     #     "--cbar_mode",
@@ -253,6 +261,7 @@ def main():
     if args.cols:
         if args.col_order:
             col_order = args.col_order
+            pups = pups[pups[args.cols].isin(args.col_order)]            
         elif args.cols == "separation":
             col_order = sort_separation(pups["separation"])
         else:
@@ -263,6 +272,7 @@ def main():
     if args.rows:
         if args.row_order:
             row_order = args.row_order
+            pups = pups[pups[args.rows].isin(args.row_order)] 
         elif args.rows == "separation":
             row_order = sort_separation(pups["separation"])
         else:
@@ -303,6 +313,7 @@ def main():
             stripe_sort=args.stripe_sort,
             out_sorted_bedpe=args.out_sorted_bedpe,
             font=args.font,
+            font_scale=args.font_scale,
         )
     else:
         fg = make_heatmap_grid(
@@ -319,6 +330,7 @@ def main():
             scale=args.scale,
             height=height,
             font=args.font,
+            font_scale=args.font_scale,
         )
 
     plt.savefig(args.output, bbox_inches="tight", dpi=args.dpi)
