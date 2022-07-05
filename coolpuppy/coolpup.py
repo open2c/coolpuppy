@@ -590,6 +590,8 @@ def sum_pups(pup1, pup2):
     Assumes n=1 if not present, and calculates num if not present
     If store_stripes is set to False, stripes and coordinates will be empty
     """
+    pup1["data"] = np.nan_to_num(pup1["data"])
+    pup2["data"] = np.nan_to_num(pup2["data"])
     pup = {
         "data": pup1["data"] + pup2["data"],
         "cov_start": pup1["cov_start"] + pup2["cov_start"],
@@ -1438,6 +1440,15 @@ class PileUpper:
             list(set(self.CC.final_chroms) & set(self.clr.chromnames))
         )
         self.view_df = self.view_df[self.view_df["chrom"].isin(self.chroms)]
+        
+        if self.view_df["chrom"].unique().shape[0] == 0:
+            raise ValueError(
+                """No chromosomes are in common between the coordinate
+                   file and the cooler file. Are they in the same
+                   format, e.g. starting with "chr"?
+                   """
+            )
+            
         if self.trans:
             if self.view_df["chrom"].unique().shape[0] < 2:
                 raise ValueError("Trying to do trans with fewer than two chromosomes")
@@ -1581,11 +1592,13 @@ class PileUpper:
         bigdata = self.get_data(region1=region1, region2=region2)
 
         if self.clr_weight_name:
+            startbin1 = self.clr.extent(region1)[0]
+            startbin2 = self.clr.extent(region2)[0]
             isnan1 = np.isnan(
-                self.clr.bins()[min_left1:max_right1][self.clr_weight_name].values
+                self.clr.bins()[(min_left1+startbin1):(max_right1+startbin1)][self.clr_weight_name].values
             )
             isnan2 = np.isnan(
-                self.clr.bins()[min_left2:max_right2][self.clr_weight_name].values
+                self.clr.bins()[(min_left2+startbin2):(max_right2+startbin2)][self.clr_weight_name].values
             )
         else:
             isnan1 = isnan = np.zeros(max_right1 - min_left1).astype(bool)
@@ -1617,7 +1630,6 @@ class PileUpper:
                 .toarray()
                 .astype(float)
             )
-
             data[isnan1[snip["stBin1"] : snip["endBin1"]], :] = np.nan
             data[:, isnan2[snip["stBin2"] : snip["endBin2"]]] = np.nan
 
