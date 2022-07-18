@@ -1581,28 +1581,31 @@ class PileUpper:
             return
 
         intervals = itertools.chain([row1], intervals)
-
-        min_left1, max_right1 = self.view_df_extents[region1]
-
+        
         if region2 is None:
-            min_left2, max_right2 = min_left1, max_right1
-        else:
-            min_left2, max_right2 = self.view_df_extents[region2]
+            region2 = region1
+        
+        min_left1, max_right1 = self.view_df_extents[region1]
+        min_left2, max_right2 = self.view_df_extents[region2]      
 
         bigdata = self.get_data(region1=region1, region2=region2)
-
+        
+        region1_coords = self.view_df.loc[region1]
+        region2_coords = self.view_df.loc[region2]
         if self.clr_weight_name:
-            startbin1 = self.clr.extent(region1)[0]
-            startbin2 = self.clr.extent(region2)[0]
             isnan1 = np.isnan(
-                self.clr.bins()[(min_left1+startbin1):(max_right1+startbin1)][self.clr_weight_name].values
+                self.clr.bins()[self.clr_weight_name].fetch(region1_coords).values
             )
             isnan2 = np.isnan(
-                self.clr.bins()[(min_left2+startbin2):(max_right2+startbin2)][self.clr_weight_name].values
+                self.clr.bins()[self.clr_weight_name].fetch(region2_coords).values
             )
         else:
-            isnan1 = isnan = np.zeros(max_right1 - min_left1).astype(bool)
-            isnan2 = isnan = np.zeros(max_right2 - min_left2).astype(bool)
+            isnan1 = isnan = np.zeros_like(
+                self.clr.bins()["start"].fetch(region1_coords).values
+            ).astype(bool)
+            isnan2 = isnan = np.zeros_like(
+                self.clr.bins()["start"].fetch(region2_coords).values
+            ).astype(bool)
 
         if self.coverage_norm:
             coverage = self.get_coverage(bigdata)
