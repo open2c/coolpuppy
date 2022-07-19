@@ -10,6 +10,7 @@ from coolpuppy.coolpup import (
     load_pileup_df,
     load_pileup_df_list,
     get_score,
+    divide_pups,
 )
 from plotpuppy.plotpup import make_heatmap_grid, make_heatmap_stripes
 from coolpuppy._version import __version__
@@ -47,6 +48,9 @@ def parse_args_plotpuppy():
     )
     parser.add_argument(
         "--not_symmetric",
+        "--not-symmetric",
+        "--not_symmetrical",
+        "--not-symmetrical",
         default=False,
         action="store_true",
         help="""Whether to **not** make colormap symmetric around 1, if log scale""",
@@ -86,7 +90,12 @@ def parse_args_plotpuppy():
         required=False,
         help="""Output bedpe of sorted stripe regions""",
     )
-
+    parser.add_argument(
+        "--divide_pups",
+        default=False,
+        action="store_true",
+        help="""Whether to divide two pileups and plot the result""",
+    )
     parser.add_argument(
         "--font",
         type=str,
@@ -102,7 +111,6 @@ def parse_args_plotpuppy():
         required=False,
         help="""Font scale to use for plotting. Defaults to 1""",
     )
-
     # parser.add_argument(
     #     "--cbar_mode",
     #     type=str,
@@ -242,11 +250,20 @@ def main():
         sys.excepthook = _excepthook
     mpl.rcParams["svg.fonttype"] = "none"
     mpl.rcParams["pdf.fonttype"] = 42
-    pups = load_pileup_df_list(args.input_pups, quaich=args.quaich, nice_metadata=True)
+    if args.divide_pups:
+        if len(args.input_pups) != 2:
+            raise ValueError("Need exactly two input pups when using --divide_pups")
+        else:
+            pup1 = load_pileup_df(args.input_pups[0])
+            pup2 = load_pileup_df(args.input_pups[1])
+            pups = divide_pups(pup1, pup2)
+    else:
+        pups = load_pileup_df_list(args.input_pups, quaich=args.quaich, nice_metadata=True)
+        
     if args.query is not None:
         for q in args.query:
             pups = pups.query(q)
-
+            
     if args.norm_corners > 0:
         pups["data"] = pups["data"].apply(norm_cis, i=int(args.norm_corners))
 

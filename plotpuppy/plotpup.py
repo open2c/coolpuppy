@@ -179,7 +179,9 @@ def make_heatmap_stripes(
     **kwargs,
 ):
     pupsdf = pupsdf.copy()
-
+    
+    if not set(["corner_stripe", "vertical_stripe", "horizontal_stripe"]).issubset(pupsdf.columns):
+        raise ValueError("No stripes stored in pup")
     if cols == "separation":
         col_order = sort_separation(pupsdf["separation"])
         ncols = len(col_order)
@@ -254,7 +256,7 @@ def make_heatmap_stripes(
             if not np.array_equal(pupsdf["coordinates"][0], pupsdf["coordinates"][i]):
                 different = True
                 warnings.warn(
-                    "Cannot sort, samples have different regions. Plot one by one if you want to sort",
+                    "Cannot sort stripes, rows or columns contain different regions. Plot one by one if you want to sort",
                     stacklevel=2,
                 )
         if not different:

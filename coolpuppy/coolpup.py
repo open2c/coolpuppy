@@ -606,6 +606,25 @@ def sum_pups(pup1, pup2):
     }
     return pd.Series(pup)
 
+def divide_pups(pup1, pup2):
+    drop_columns = ['control_n', 'control_num', 'n', 'num', 'clr', 'chroms', 'minshift',
+                    'maxshift', 'nshifts', 'mindist', 'maxdist', 'subset', 'seed', 
+                    'data', 'horizontal_stripe', 'vertical_stripe', 'corner_stripe', 
+                    'cool_path', 'features', 'outname']   
+    drop_columns = list(set(drop_columns) & set(pup1.columns))
+    div_pup = pup1.drop(columns=drop_columns)
+    for col in div_pup.drop(columns="coordinates").columns:
+        assert np.all(np.sort(pup1[col]) == np.sort(pup2[col])), f"Cannot divide these pups, {col} is different between them"
+    div_pup["data"] = pup1["data"] / pup2["data"]
+    div_pup["clrs"] = str(pup1["clr"]) + "/" + str(pup2["clr"])
+    if set(["corner_stripe", "vertical_stripe", "horizontal_stripe"]).issubset(pup1.columns):
+        if np.all(np.sort(pup1['coordinates']) == np.sort(pup2['coordinates'])):
+            for stripe in ['corner_stripe', 'vertical_stripe', 'horizontal_stripe']:
+                div_pup[stripe] = pup1[stripe] / pup2[stripe]
+                div_pup[stripe] = div_pup[stripe].apply(lambda x: np.where(np.isin(x, [np.inf, np.nan]), 0, x))
+        else:
+            logging.info("Stripes cannot be divided, coordinates differ between pups")
+    return div_pup
 
 def norm_coverage(snip):
     """Normalize a pileup by coverage arrays
