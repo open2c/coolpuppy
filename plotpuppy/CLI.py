@@ -216,6 +216,13 @@ def parse_args_plotpuppy():
         help="""Height of the plot""",
     )
     parser.add_argument(
+        "--plot_ticks",
+        action="store_true",
+        default=False,
+        required=False,
+        help="""Whether to plot ticks demarkating the center and flanking regions, only applicable for non-stripes""",
+    )
+    parser.add_argument(
         "--output",
         "-o",
         type=str,
@@ -348,6 +355,7 @@ def main():
             height=height,
             font=args.font,
             font_scale=args.font_scale,
+            plot_ticks=args.plot_ticks,
         )
 
     plt.savefig(args.output, bbox_inches="tight", dpi=args.dpi)

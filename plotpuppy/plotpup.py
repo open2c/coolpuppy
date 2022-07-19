@@ -87,21 +87,7 @@ def get_min_max(pups, vmin=None, vmax=None, sym=True):
     return vmin, vmax
 
 
-def add_heatmap(data, color=None, cmap="coolwarm", norm=LogNorm(0.5, 2)):
-    """
-    Adds the array contained in data.values[0] to the current axes as a heatmap
-    """
-    if len(data) > 1:
-        raise ValueError(
-            "Multiple pileups for one of the conditions, ensure unique correspondence for each col/row combination"
-        )
-    elif len(data) == 0:
-        return
-    ax = plt.gca()
-    ax.imshow(data.values[0], cmap=cmap, norm=norm, interpolation="none")
-
-
-def add_stripe_heatmap(
+def add_heatmap(
     data,
     resolution,
     flank,
@@ -110,6 +96,8 @@ def add_stripe_heatmap(
     color=None,
     cmap="coolwarm",
     norm=LogNorm(0.5, 2),
+    plot_ticks=False,
+    stripe=False,
 ):
     """
     Adds the array contained in data.values[0] to the current axes as a heatmap of stripes
@@ -122,19 +110,22 @@ def add_stripe_heatmap(
         return
     ax = plt.gca()
     ax.imshow(data.values[0], cmap=cmap, norm=norm, aspect="auto", interpolation="none")
-
-    resolution = int(resolution)
-    flank = int(flank)
-
-    if not rescale.any():
-        ticks_pixels = np.linspace(0, flank * 2 // resolution, 5)
-        ticks_kbp = ((ticks_pixels - ticks_pixels[-1] / 2) * resolution // 1000).astype(
-            int
-        )
-        plt.xticks(ticks_pixels.tolist(), ticks_kbp.tolist())
-    else:
-        if not rescale_flank.any():
-            plt.xticks([], [])
+    
+    if plot_ticks:
+        ax.tick_params(axis='both', which='major', labelsize=7, width=1, length=2)
+        resolution = int(resolution)
+        flank = int(flank)
+        if not rescale.any():
+            ticks_pixels = np.linspace(0, flank * 2 // resolution, 5)
+            ticks_kbp = ((ticks_pixels - ticks_pixels[-1] / 2) * resolution // 1000).astype(
+                int
+            )
+            plt.xticks(ticks_pixels.tolist(), ticks_kbp.tolist())
+            if not stripe:
+                plt.yticks(ticks_pixels.tolist(), [])               
+        else:
+            if not rescale_flank.any():
+                plt.xticks([], [])
 
 
 def add_score(score, color=None):
@@ -176,6 +167,7 @@ def make_heatmap_stripes(
     out_sorted_bedpe=None,
     font=False,
     font_scale=None,
+    plot_ticks=False,
     **kwargs,
 ):
     pupsdf = pupsdf.copy()
@@ -317,7 +309,7 @@ def make_heatmap_stripes(
 
     if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
         fg.map(
-            add_stripe_heatmap,
+            add_heatmap,
             stripe,
             "resolution",
             "flank",
@@ -325,6 +317,8 @@ def make_heatmap_stripes(
             "rescale_flank",
             norm=norm,
             cmap=cmap,
+            plot_ticks=plot_ticks,
+            stripe=stripe,
         )
     else:
         raise ValueError(
@@ -344,7 +338,7 @@ def make_heatmap_stripes(
                 else:
                     ax.set_xlabel("relative position, kbp\n" + stripe)
             if col_val == col_order[0]:
-                ax.set_ylabel(row_val)
+                ax.set_ylabel(row_val, rotation=0, ha="right")
     else:
         if nrows == 1 and ncols > 1:
             for col_val, ax in fg.axes_dict.items():
@@ -410,6 +404,7 @@ def make_heatmap_grid(
     height=1,
     font=False,
     font_scale=None,
+    plot_ticks=False,
     **kwargs,
 ):
     pupsdf = pupsdf.copy()
@@ -433,27 +428,22 @@ def make_heatmap_grid(
         ncols = len(col_order)
     elif cols is not None and col_order is None:
         col_order = list(set(pupsdf[cols].dropna()))
-        #     pupsdf = pupsdf[pupsdf[cols].isin(col_order + ["data"])]
         ncols = len(col_order)
     elif col_order is not None:
         ncols = len(col_order)
     else:
         ncols = 1
-        # colvals = ['']
 
     if rows == "separation":
         row_order = sort_separation(pupsdf["separation"])
         nrows = len(row_order)
     elif rows is not None and row_order is None:
         row_order = list(set(pupsdf[rows].dropna()))
-        # else:
-        #     pupsdf = pupsdf[pupsdf[rows].isin(row_order)]
         nrows = len(row_order)
     elif row_order is not None:
         nrows = len(row_order)
     else:
         nrows = 1
-        # rowvals = ['']
     if cols is None and rows is None:
         nrows, ncols = auto_rows_cols(pupsdf.shape[0])
 
@@ -492,33 +482,77 @@ def make_heatmap_grid(
     )
     norm = norm(vmin, vmax)
 
-    fg.map(add_heatmap, "data", norm=norm, cmap=cmap)
+    fg.map(add_heatmap, 
+           "data",             
+           "resolution",
+           "flank",
+           "rescale",
+           "rescale_flank",
+           norm=norm, 
+           cmap=cmap,
+           plot_ticks=plot_ticks,
+           )
 
     if score:
         pupsdf["score"] = pupsdf.apply(
             coolpup.get_score, center=center, ignore_central=ignore_central, axis=1
         )
         fg.map(add_score, "score")
-
-    fg.map(lambda color: plt.gca().set_xticks([]))
-    fg.map(lambda color: plt.gca().set_yticks([]))
-    fg.set_titles(col_template="", row_template="")
-
-    if nrows > 1 and ncols > 1:
-        for (row_val, col_val), ax in fg.axes_dict.items():
-            if row_val == row_order[-1]:
-                ax.set_xlabel(col_val)
-            if col_val == col_order[0]:
-                ax.set_ylabel(row_val, rotation=0, ha="right")
-    else:
-        if nrows == 1 and ncols > 1:
-            for col_val, ax in fg.axes_dict.items():
-                ax.set_xlabel(col_val)
-        elif nrows > 1 and ncols == 1:
-            for row_val, ax in fg.axes_dict.items():
-                ax.set_ylabel(row_val, rotation=0, ha="right")
+    fg.set_titles(col_template="", row_template="") 
+    if plot_ticks:
+        fg.fig.subplots_adjust(wspace=0.2, right=right)
+        if nrows > 1 and ncols > 1:
+            for (row_val, col_val), ax in fg.axes_dict.items():
+                if row_val == row_order[0]:
+                    ax.set_title(col_val)
+                if row_val == row_order[-1]:
+                    if pupsdf["rescale"].any():
+                        ax.set_xlabel("rescaled\n" + stripe)
+                    else:
+                        ax.set_xlabel("relative position, kbp")
+                if col_val == col_order[0]:
+                    ax.set_ylabel(row_val, rotation=0, ha="right")
         else:
-            plt.xlabel("")
+            if nrows == 1 and ncols > 1:
+                for col_val, ax in fg.axes_dict.items():
+                    if pupsdf["rescale"].any():
+                        ax.set_xlabel("rescaled\n" + stripe)
+                    else:
+                        ax.set_xlabel("relative position, kbp")
+                    ax.set_ylabel("")
+                    ax.set_title(col_val)
+            elif nrows > 1 and ncols == 1:
+                for row_val, ax in fg.axes_dict.items():
+                    ax.set_ylabel(row_val, rotation=0, ha="right")
+                    if pupsdf["rescale"].any():
+                        ax.set_xlabel("rescaled\n" + stripe)
+                    else:
+                        ax.set_xlabel("relative position, kbp")
+            else:
+                plt.title("")
+                plt.ylabel("")
+                if pupsdf["rescale"].any():
+                    plt.xlabel("rescaled\n" + stripe)
+                else:
+                    plt.xlabel("relative position, kbp")
+    else:
+        fg.map(lambda color: plt.gca().set_xticks([]))
+        fg.map(lambda color: plt.gca().set_yticks([]))
+        if nrows > 1 and ncols > 1:
+            for (row_val, col_val), ax in fg.axes_dict.items():
+                if row_val == row_order[-1]:
+                    ax.set_xlabel(col_val)
+                if col_val == col_order[0]:
+                    ax.set_ylabel(row_val, rotation=0, ha="right")
+        else:
+            if nrows == 1 and ncols > 1:
+                for col_val, ax in fg.axes_dict.items():
+                    ax.set_xlabel(col_val)
+            elif nrows > 1 and ncols == 1:
+                for row_val, ax in fg.axes_dict.items():
+                    ax.set_ylabel(row_val, rotation=0, ha="right")
+            else:
+                plt.xlabel("")  
 
     plt.draw()
     ax_bottom = fg.axes[-1, -1]
