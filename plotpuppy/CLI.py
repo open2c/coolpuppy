@@ -103,7 +103,7 @@ def parse_args_plotpuppy():
         required=False,
         help="""Font to use for plotting""",
     )
-    
+
     parser.add_argument(
         "--font_scale",
         type=float,
@@ -265,12 +265,14 @@ def main():
             pup2 = load_pileup_df(args.input_pups[1])
             pups = divide_pups(pup1, pup2)
     else:
-        pups = load_pileup_df_list(args.input_pups, quaich=args.quaich, nice_metadata=True)
-        
+        pups = load_pileup_df_list(
+            args.input_pups, quaich=args.quaich, nice_metadata=True
+        )
+
     if args.query is not None:
         for q in args.query:
             pups = pups.query(q)
-            
+
     if args.norm_corners > 0:
         pups["data"] = pups["data"].apply(norm_cis, i=int(args.norm_corners))
 
@@ -285,7 +287,7 @@ def main():
     if args.cols:
         if args.col_order:
             col_order = args.col_order
-            pups = pups[pups[args.cols].isin(args.col_order)]            
+            pups = pups[pups[args.cols].isin(args.col_order)]
         elif args.cols == "separation":
             col_order = sort_separation(pups["separation"])
         else:
@@ -296,7 +298,7 @@ def main():
     if args.rows:
         if args.row_order:
             row_order = args.row_order
-            pups = pups[pups[args.rows].isin(args.row_order)] 
+            pups = pups[pups[args.rows].isin(args.row_order)]
         elif args.rows == "separation":
             row_order = sort_separation(pups["separation"])
         else:
@@ -338,6 +340,7 @@ def main():
             out_sorted_bedpe=args.out_sorted_bedpe,
             font=args.font,
             font_scale=args.font_scale,
+            plot_ticks=args.plot_ticks,
         )
     else:
         fg = make_heatmap_grid(
