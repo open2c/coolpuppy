@@ -632,10 +632,13 @@ def divide_pups(pup1, pup2):
         "cool_path",
         "features",
         "outname",
+        "coordinates",
     ]
+    pup1 = pup1.reset_index(drop=True)
+    pup2 = pup2.reset_index(drop=True)
     drop_columns = list(set(drop_columns) & set(pup1.columns))
     div_pup = pup1.drop(columns=drop_columns)
-    for col in div_pup.drop(columns="coordinates").columns:
+    for col in div_pup.columns:
         assert np.all(
             np.sort(pup1[col]) == np.sort(pup2[col])
         ), f"Cannot divide these pups, {col} is different between them"
@@ -645,6 +648,7 @@ def divide_pups(pup1, pup2):
         pup1.columns
     ):
         if np.all(np.sort(pup1["coordinates"]) == np.sort(pup2["coordinates"])):
+            div_pup["coordinates"] = pup1["coordinates"]
             for stripe in ["corner_stripe", "vertical_stripe", "horizontal_stripe"]:
                 div_pup[stripe] = pup1[stripe] / pup2[stripe]
                 div_pup[stripe] = div_pup[stripe].apply(
