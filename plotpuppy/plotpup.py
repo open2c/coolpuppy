@@ -93,6 +93,7 @@ def add_heatmap(
     flank,
     rescale,
     rescale_flank,
+    height=1,
     aspect="auto",
     color=None,
     cmap="coolwarm",
@@ -113,7 +114,7 @@ def add_heatmap(
     ax.imshow(data.values[0], cmap=cmap, norm=norm, aspect=aspect, interpolation="none")
 
     if plot_ticks:
-        ax.tick_params(axis="both", which="major", labelsize=7, width=1, length=2)
+        ax.tick_params(axis="both", which="major", labelsize=6+height, width=1+(height/2), length=1+height)
         resolution = int(resolution)
         flank = int(flank)
         if not rescale.any():
@@ -325,6 +326,7 @@ def make_heatmap_stripes(
             norm=norm,
             cmap=cmap,
             aspect=aspect,
+            height=height,
             plot_ticks=plot_ticks,
             stripe=stripe,
         )
@@ -365,6 +367,7 @@ def make_heatmap_stripes(
                         ax.set_xlabel("pos. [kbp]\n" + stripe)
             else:
                 plt.title("")
+                plt.xlabel("")
                 plt.ylabel("")
                 if pupsdf["rescale"].any():
                     plt.xlabel("rescaled\n" + stripe)
@@ -385,11 +388,15 @@ def make_heatmap_stripes(
             if nrows == 1 and ncols > 1:
                 for col_val, ax in fg.axes_dict.items():
                     ax.set_xlabel(col_val)
+                    ax.set_ylabel("")
             elif nrows > 1 and ncols == 1:
                 for row_val, ax in fg.axes_dict.items():
+                    ax.set_xlabel("")
                     ax.set_ylabel(row_val, rotation=0, ha="right")
             else:
+                plt.title("")
                 plt.xlabel("")
+                plt.ylabel("")
 
     plt.draw()
     ax_bottom = fg.axes[-1, -1]
@@ -517,6 +524,7 @@ def make_heatmap_grid(
         norm=norm,
         cmap=cmap,
         aspect=aspect,
+        height=height,
         plot_ticks=plot_ticks,
     )
 
@@ -578,11 +586,15 @@ def make_heatmap_grid(
             if nrows == 1 and ncols > 1:
                 for col_val, ax in fg.axes_dict.items():
                     ax.set_xlabel(col_val)
+                    ax.set_ylabel("")
             elif nrows > 1 and ncols == 1:
                 for row_val, ax in fg.axes_dict.items():
+                    ax.set_xlabel("")
                     ax.set_ylabel(row_val, rotation=0, ha="right")
             else:
                 plt.xlabel("")
+                plt.ylabel("")
+                plt.title("")
 
     plt.draw()
     ax_bottom = fg.axes[-1, -1]
