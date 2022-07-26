@@ -899,7 +899,7 @@ class CoordCreator:
 
         if self.trans & self.local:
             raise ValueError("Cannot do local with trans=True")
-            
+
         if self.anchors:
             if self.trans:
                 raise ValueError("Anchors not currently implemented for trans")
@@ -907,10 +907,14 @@ class CoordCreator:
                 raise ValueError("Can't set anchors with both ends defined (bedpe)")
             if len(self.anchors) != 2:
                 raise ValueError("Anchors must be two lists of coordinates")
-            if (len(pd.merge(self.anchors[0], self.intervals, how="inner"))==0) or (len(pd.merge(self.anchors[1], self.intervals, how="inner"))==0):
-                                                                                   raise ValueError("One or both of anchors are not part of feature set")
-            if len(pd.merge(self.anchors[0], self.anchors[1], how="inner"))>0:
-                logging.info("Some features overlap between the two anchors. Continuing")
+            if (len(pd.merge(self.anchors[0], self.intervals, how="inner")) == 0) or (
+                len(pd.merge(self.anchors[1], self.intervals, how="inner")) == 0
+            ):
+                raise ValueError("One or both of anchors are not part of feature set")
+            if len(pd.merge(self.anchors[0], self.anchors[1], how="inner")) > 0:
+                logging.info(
+                    "Some features overlap between the two anchors. Continuing"
+                )
 
         if self.kind == "bed":
             self.pos_stream = self.get_combinations
@@ -1132,18 +1136,22 @@ class CoordCreator:
             return partial(self._filter_func_region, region=region)
         else:
             return partial(self._filter_func_pairs_region, region=region)
-    
+
     def filter_func_anchors(self, region, anchor):
         return partial(self._filter_func_anchors, region=region, anchor=anchor)
-   
+
     def _filter_func_anchors(self, intervals, region, anchor):
         chrom, start, end = region
-        return pd.merge(intervals[
-            (intervals["chrom"] == chrom)
-            & (intervals["start"] >= start)
-            & (intervals["end"] < end)
-        ], anchor, how="inner").reset_index(drop=True)
-    
+        return pd.merge(
+            intervals[
+                (intervals["chrom"] == chrom)
+                & (intervals["start"] >= start)
+                & (intervals["end"] < end)
+            ],
+            anchor,
+            how="inner",
+        ).reset_index(drop=True)
+
     def get_combinations(
         self,
         filter_func1,
@@ -1534,8 +1542,8 @@ class PileUpper:
                    file and the cooler file. Are they in the same
                    format, e.g. starting with "chr"?
                    """
-            )          
-                
+            )
+
         if self.trans:
             if self.view_df["chrom"].unique().shape[0] < 2:
                 raise ValueError("Trying to do trans with fewer than two chromosomes")
@@ -1922,8 +1930,12 @@ class PileUpper:
             )
             filter_func2 = None
         elif self.anchors:
-            filter_func1 = self.CC.filter_func_anchors(region=region1_coords, anchor=self.anchors[0])
-            filter_func2 = self.CC.filter_func_anchors(region=region1_coords, anchor=self.anchors[1])
+            filter_func1 = self.CC.filter_func_anchors(
+                region=region1_coords, anchor=self.anchors[0]
+            )
+            filter_func2 = self.CC.filter_func_anchors(
+                region=region1_coords, anchor=self.anchors[1]
+            )
         else:
             filter_func1 = self.CC.filter_func_region(region=region1_coords)
             if region2 == region1:

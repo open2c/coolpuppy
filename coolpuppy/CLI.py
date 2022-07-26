@@ -472,12 +472,10 @@ def main():
         incl_chrs = np.array(clr.chromnames).astype(str)
     else:
         incl_chrs = args.incl_chrs.split(",")
-    
+
     if args.anchors:
         if len(args.anchors) != 2:
-            raise ValueError(
-                "Anchors must be paths to two bed files"
-            )
+            raise ValueError("Anchors must be paths to two bed files")
         else:
             anchor1 = bioframe.read_table(
                 args.anchors[0], schema="bed12", index_col=False, dtype={"chrom": str}
@@ -487,7 +485,7 @@ def main():
             )
             anchors = [anchor1, anchor2]
     else:
-        anchors=False
+        anchors = False
 
     if args.rescale and args.rescale_size % 2 == 0:
         raise ValueError("Please provide an odd rescale_size")
