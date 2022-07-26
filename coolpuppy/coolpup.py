@@ -464,9 +464,9 @@ def bin_distance(snip, band_edges="default"):
 
 def group_by_region(snip):
     snip1 = snip.copy()
-    snip1["group"] = tuple(snip1[["chrom1", "start1", "end1"]])
+    snip1["group"] = tuple([snip1["chrom1"], snip1["start1"], snip1["end1"]])
     snip2 = snip.copy()
-    snip2["group"] = tuple(snip2[["chrom2", "start2", "end2"]])
+    snip2["group"] = tuple([snip2["chrom2"], snip2["start2"], snip2["end2"]])
     yield from (snip1, snip2)
 
 
@@ -605,6 +605,57 @@ def sum_pups(pup1, pup2):
         "coordinates": pup1["coordinates"] + pup2["coordinates"],
     }
     return pd.Series(pup)
+
+
+def divide_pups(pup1, pup2):
+    """
+    Divide two pups and get the resulting pup. Requires that the pups have identical shapes, resolutions, flanks, etc. If pups contain stripes, these will only be divided if stripes have identical coordinates.
+    """
+    drop_columns = [
+        "control_n",
+        "control_num",
+        "n",
+        "num",
+        "clr",
+        "chroms",
+        "minshift",
+        "maxshift",
+        "mindist",
+        "maxdist",
+        "subset",
+        "seed",
+        "data",
+        "horizontal_stripe",
+        "vertical_stripe",
+        "corner_stripe",
+        "cool_path",
+        "features",
+        "outname",
+        "coordinates",
+    ]
+    pup1 = pup1.reset_index(drop=True)
+    pup2 = pup2.reset_index(drop=True)
+    drop_columns = list(set(drop_columns) & set(pup1.columns))
+    div_pup = pup1.drop(columns=drop_columns)
+    for col in div_pup.columns:
+        assert np.all(
+            np.sort(pup1[col]) == np.sort(pup2[col])
+        ), f"Cannot divide these pups, {col} is different between them"
+    div_pup["data"] = pup1["data"] / pup2["data"]
+    div_pup["clrs"] = str(pup1["clr"]) + "/" + str(pup2["clr"])
+    if set(["corner_stripe", "vertical_stripe", "horizontal_stripe"]).issubset(
+        pup1.columns
+    ):
+        if np.all(np.sort(pup1["coordinates"]) == np.sort(pup2["coordinates"])):
+            div_pup["coordinates"] = pup1["coordinates"]
+            for stripe in ["corner_stripe", "vertical_stripe", "horizontal_stripe"]:
+                div_pup[stripe] = pup1[stripe] / pup2[stripe]
+                div_pup[stripe] = div_pup[stripe].apply(
+                    lambda x: np.where(np.isin(x, [np.inf, np.nan]), 0, x)
+                )
+        else:
+            logging.info("Stripes cannot be divided, coordinates differ between pups")
+    return div_pup
 
 
 def norm_coverage(snip):
@@ -1037,23 +1088,26 @@ class CoordCreator:
     def _filter_func_trans_pairs(self, intervals, region1, region2):
         chrom1, start1, end1 = region1
         chrom2, start2, end2 = region2
-        return pd.concat([intervals[
-            (intervals["chrom1"] == chrom1)
-            & (intervals["chrom2"] == chrom2)
-            & (intervals["start1"] >= start1)
-            & (intervals["end1"] < end1)
-            & (intervals["start2"] >= start2)
-            & (intervals["end2"] < end2)
-        ].reset_index(drop=True),
-                          intervals[
-            (intervals["chrom2"] == chrom1)
-            & (intervals["chrom1"] == chrom2)
-            & (intervals["start2"] >= start1)
-            & (intervals["end2"] < end1)
-            & (intervals["start1"] >= start2)
-            & (intervals["end1"] < end2)
-        ].reset_index(drop=True)
-                         ])
+        return pd.concat(
+            [
+                intervals[
+                    (intervals["chrom1"] == chrom1)
+                    & (intervals["chrom2"] == chrom2)
+                    & (intervals["start1"] >= start1)
+                    & (intervals["end1"] < end1)
+                    & (intervals["start2"] >= start2)
+                    & (intervals["end2"] < end2)
+                ].reset_index(drop=True),
+                intervals[
+                    (intervals["chrom2"] == chrom1)
+                    & (intervals["chrom1"] == chrom2)
+                    & (intervals["start2"] >= start1)
+                    & (intervals["end2"] < end1)
+                    & (intervals["start1"] >= start2)
+                    & (intervals["end1"] < end2)
+                ].reset_index(drop=True),
+            ]
+        )
 
     def filter_func_trans_pairs(self, region1, region2):
         return partial(self._filter_func_trans_pairs, region1=region1, region2=region2)
@@ -1440,7 +1494,7 @@ class PileUpper:
             list(set(self.CC.final_chroms) & set(self.clr.chromnames))
         )
         self.view_df = self.view_df[self.view_df["chrom"].isin(self.chroms)]
-        
+
         if self.view_df["chrom"].unique().shape[0] == 0:
             raise ValueError(
                 """No chromosomes are in common between the coordinate
@@ -1448,7 +1502,7 @@ class PileUpper:
                    format, e.g. starting with "chr"?
                    """
             )
-            
+
         if self.trans:
             if self.view_df["chrom"].unique().shape[0] < 2:
                 raise ValueError("Trying to do trans with fewer than two chromosomes")
@@ -1574,22 +1628,22 @@ class PileUpper:
         try:
             row1 = next(intervals)
         except StopIteration:
-            #logging.info(f"Nothing to sum up between regions {region1} & {region2}")
+            # logging.info(f"Nothing to sum up between regions {region1} & {region2}")
             return
         if row1 is None:
-            #logging.info(f"Nothing to sum up between region {region1} & {region2}")
+            # logging.info(f"Nothing to sum up between region {region1} & {region2}")
             return
 
         intervals = itertools.chain([row1], intervals)
-        
+
         if region2 is None:
             region2 = region1
-        
+
         min_left1, max_right1 = self.view_df_extents[region1]
-        min_left2, max_right2 = self.view_df_extents[region2]      
+        min_left2, max_right2 = self.view_df_extents[region2]
 
         bigdata = self.get_data(region1=region1, region2=region2)
-        
+
         region1_coords = self.view_df.loc[region1]
         region2_coords = self.view_df.loc[region2]
         if self.clr_weight_name:
@@ -1854,7 +1908,7 @@ class PileUpper:
             self._stream_snips(intervals=intervals, region1=region1, region2=region2),
             postprocess_func=postprocess_func,
         )
-        if final['ROI']['all']['n'] > 0:
+        if final["ROI"]["all"]["n"] > 0:
             logging.info(f"{region1, region2}: {final['ROI']['all']['n']}")
 
         return final
@@ -2088,7 +2142,7 @@ class PileUpper:
         normalized_pileups = normalized_pileups.drop(columns="index")
         return normalized_pileups
 
-    def pileupsByDistanceWithControl(self, nproc=1, distance_edges="default"):
+    def pileupsByDistanceWithControl(self, nproc=1, distance_edges="default", groupby=[]):
         """Perform by-distance pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl
 
@@ -2124,7 +2178,7 @@ class PileUpper:
                     break
         bin_func = partial(bin_distance_intervals, band_edges=distance_edges)
         normalized_pileups = self.pileupsWithControl(
-            nproc=nproc, modify_2Dintervals_func=bin_func, groupby=["distance_band"]
+            nproc=nproc, modify_2Dintervals_func=bin_func, groupby=["distance_band"]+groupby
         )
         normalized_pileups = normalized_pileups.drop(index="all").reset_index()
         normalized_pileups = normalized_pileups.loc[
@@ -2138,7 +2192,7 @@ class PileUpper:
 
         return normalized_pileups
 
-    def pileupsByStrandByDistanceWithControl(self, nproc=1, distance_edges="default"):
+    def pileupsByStrandByDistanceWithControl(self, nproc=1, distance_edges="default", groupby=[]):
         """Perform by-strand by-distance pileups across all chromosomes and applies
         required normalization. Simple wrapper around pileupsWithControl.
         Assumes the features in CoordCreator file has a "strand" column.
@@ -2175,7 +2229,7 @@ class PileUpper:
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc,
             modify_2Dintervals_func=bin_func,
-            groupby=["strand1", "strand2", "distance_band"],
+            groupby=["strand1", "strand2", "distance_band"]+groupby,
         )
         normalized_pileups = normalized_pileups.drop(index="all").reset_index()
         normalized_pileups["orientation"] = (
@@ -2192,7 +2246,7 @@ class PileUpper:
 
         return normalized_pileups
 
-    def pileupsByStrandWithControl(self, nproc=1):
+    def pileupsByStrandWithControl(self, nproc=1, groupby=[]):
         """Perform by-strand pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl.
         Assumes the features in CoordCreator file has a "strand" column.
@@ -2214,7 +2268,7 @@ class PileUpper:
 
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc,
-            groupby=["strand1", "strand2"],
+            groupby=["strand1", "strand2"]+groupby,
         )
         normalized_pileups = normalized_pileups.drop(index=("all", "all")).reset_index()
         normalized_pileups["orientation"] = (
