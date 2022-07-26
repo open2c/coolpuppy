@@ -464,9 +464,9 @@ def bin_distance(snip, band_edges="default"):
 
 def group_by_region(snip):
     snip1 = snip.copy()
-    snip1["group"] = tuple(snip1[["chrom1", "start1", "end1"]])
+    snip1["group"] = tuple([snip1["chrom1"], snip1["start1"], snip1["end1"]])
     snip2 = snip.copy()
-    snip2["group"] = tuple(snip2[["chrom2", "start2", "end2"]])
+    snip2["group"] = tuple([snip2["chrom2"], snip2["start2"], snip2["end2"]])
     yield from (snip1, snip2)
 
 
@@ -2142,7 +2142,7 @@ class PileUpper:
         normalized_pileups = normalized_pileups.drop(columns="index")
         return normalized_pileups
 
-    def pileupsByDistanceWithControl(self, nproc=1, distance_edges="default"):
+    def pileupsByDistanceWithControl(self, nproc=1, distance_edges="default", groupby=[]):
         """Perform by-distance pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl
 
@@ -2178,7 +2178,7 @@ class PileUpper:
                     break
         bin_func = partial(bin_distance_intervals, band_edges=distance_edges)
         normalized_pileups = self.pileupsWithControl(
-            nproc=nproc, modify_2Dintervals_func=bin_func, groupby=["distance_band"]
+            nproc=nproc, modify_2Dintervals_func=bin_func, groupby=["distance_band"]+groupby
         )
         normalized_pileups = normalized_pileups.drop(index="all").reset_index()
         normalized_pileups = normalized_pileups.loc[
@@ -2192,7 +2192,7 @@ class PileUpper:
 
         return normalized_pileups
 
-    def pileupsByStrandByDistanceWithControl(self, nproc=1, distance_edges="default"):
+    def pileupsByStrandByDistanceWithControl(self, nproc=1, distance_edges="default", groupby=[]):
         """Perform by-strand by-distance pileups across all chromosomes and applies
         required normalization. Simple wrapper around pileupsWithControl.
         Assumes the features in CoordCreator file has a "strand" column.
@@ -2229,7 +2229,7 @@ class PileUpper:
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc,
             modify_2Dintervals_func=bin_func,
-            groupby=["strand1", "strand2", "distance_band"],
+            groupby=["strand1", "strand2", "distance_band"]+groupby,
         )
         normalized_pileups = normalized_pileups.drop(index="all").reset_index()
         normalized_pileups["orientation"] = (
@@ -2246,7 +2246,7 @@ class PileUpper:
 
         return normalized_pileups
 
-    def pileupsByStrandWithControl(self, nproc=1):
+    def pileupsByStrandWithControl(self, nproc=1, groupby=[]):
         """Perform by-strand pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl.
         Assumes the features in CoordCreator file has a "strand" column.
@@ -2268,7 +2268,7 @@ class PileUpper:
 
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc,
-            groupby=["strand1", "strand2"],
+            groupby=["strand1", "strand2"]+groupby,
         )
         normalized_pileups = normalized_pileups.drop(index=("all", "all")).reset_index()
         normalized_pileups["orientation"] = (
