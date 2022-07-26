@@ -620,7 +620,6 @@ def divide_pups(pup1, pup2):
         "chroms",
         "minshift",
         "maxshift",
-        "nshifts",
         "mindist",
         "maxdist",
         "subset",

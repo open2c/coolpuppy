@@ -43,6 +43,7 @@ setup(
         "console_scripts": [
             "coolpup.py = coolpuppy.CLI:main",
             "plotpup.py = plotpuppy.CLI:main",
+            "dividepups.py = coolpuppy.divide_pups_CLI:main",
         ]
     },
     install_requires=INSTALL_REQUIRES,
