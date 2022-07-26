@@ -242,7 +242,14 @@ def parse_args_coolpuppy():
         required=False,
         help="""Store horizontal, vertical, and corner stripes in pileup output""",
     )
-
+    parser.add_argument(
+        "--anchors",
+        type=str,
+        nargs="+",
+        required=False,
+        help="""Define two bed files as anchor regions which each must be a subset of your features.
+                The first file will be represented on the left side of the pileup, and the second on the bottom.""",
+    )
     # Rescaling
     parser.add_argument(
         "--rescale",
@@ -465,6 +472,22 @@ def main():
         incl_chrs = np.array(clr.chromnames).astype(str)
     else:
         incl_chrs = args.incl_chrs.split(",")
+    
+    if args.anchors:
+        if len(args.anchors) != 2:
+            raise ValueError(
+                "Anchors must be paths to two bed files"
+            )
+        else:
+            anchor1 = bioframe.read_table(
+                args.anchors[0], schema="bed12", index_col=False, dtype={"chrom": str}
+            )
+            anchor2 = bioframe.read_table(
+                args.anchors[1], schema="bed12", index_col=False, dtype={"chrom": str}
+            )
+            anchors = [anchor1, anchor2]
+    else:
+        anchors=False
 
     if args.rescale and args.rescale_size % 2 == 0:
         raise ValueError("Please provide an odd rescale_size")
@@ -501,6 +524,7 @@ def main():
         subset=args.subset,
         seed=args.seed,
         trans=args.trans,
+        anchors=anchors,
     )
 
     PU = PileUpper(
@@ -574,5 +598,6 @@ def main():
             headerdict["expected_col"] = headerdict["expected"][1]
             headerdict["expected"] = True
     headerdict["resolution"] = int(clr.binsize)
+    headerdict["anchors"] = str(args.anchors)
     save_pileup_df(outname, pups, headerdict)
     logging.info(f"Saved output to {outname}")

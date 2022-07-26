@@ -702,6 +702,7 @@ class CoordCreator:
         local=False,
         subset=0,
         trans=False,
+        anchors=False,
         seed=None,
     ):
         """Generator of coordinate pairs for pileups.
@@ -774,6 +775,7 @@ class CoordCreator:
         self.maxshift = maxshift
         self.nshifts = nshifts
         self.trans = trans
+        self.anchors = anchors
         if mindist == "auto":
             self.mindist = 2 * self.flank + 2 * self.resolution
         else:
@@ -897,6 +899,18 @@ class CoordCreator:
 
         if self.trans & self.local:
             raise ValueError("Cannot do local with trans=True")
+            
+        if self.anchors:
+            if self.trans:
+                raise ValueError("Anchors not currently implemented for trans")
+            if self.kind == "bedpe":
+                raise ValueError("Can't set anchors with both ends defined (bedpe)")
+            if len(self.anchors) != 2:
+                raise ValueError("Anchors must be two lists of coordinates")
+            if (len(pd.merge(self.anchors[0], self.intervals, how="inner"))==0) or (len(pd.merge(self.anchors[1], self.intervals, how="inner"))==0):
+                                                                                   raise ValueError("One or both of anchors are not part of feature set")
+            if len(pd.merge(self.anchors[0], self.anchors[1], how="inner"))>0:
+                logging.info("Some features overlap between the two anchors. Continuing")
 
         if self.kind == "bed":
             self.pos_stream = self.get_combinations
@@ -1118,7 +1132,18 @@ class CoordCreator:
             return partial(self._filter_func_region, region=region)
         else:
             return partial(self._filter_func_pairs_region, region=region)
-
+    
+    def filter_func_anchors(self, region, anchor):
+        return partial(self._filter_func_anchors, region=region, anchor=anchor)
+   
+    def _filter_func_anchors(self, intervals, region, anchor):
+        chrom, start, end = region
+        return pd.merge(intervals[
+            (intervals["chrom"] == chrom)
+            & (intervals["start"] >= start)
+            & (intervals["end"] < end)
+        ], anchor, how="inner").reset_index(drop=True)
+    
     def get_combinations(
         self,
         filter_func1,
@@ -1139,7 +1164,6 @@ class CoordCreator:
             intervals_right = intervals_left
         else:
             intervals_right = filter_func2(intervals)
-
         if self.local:
             merged = pd.merge(
                 intervals_left,
@@ -1182,7 +1206,7 @@ class CoordCreator:
                 columns=lambda x: x + "2"
             ).reset_index(drop=True)
 
-            if self.trans:
+            if (self.trans) or (self.anchors):
                 for x, y in itertools.product(
                     intervals_left.index, intervals_right.index
                 ):
@@ -1193,6 +1217,14 @@ class CoordCreator:
                         ],
                         axis=1,
                     )
+                    if not self.trans:
+                        combinations["distance"] = (
+                            combinations["center2"] - combinations["center1"]
+                        )
+                        combinations = combinations[
+                            (self.mindist <= combinations["distance"].abs())
+                            & (combinations["distance"].abs() <= self.maxdist)
+                        ]
                     combinations = self._control_regions(
                         combinations, self.nshifts * control
                     )
@@ -1502,8 +1534,8 @@ class PileUpper:
                    file and the cooler file. Are they in the same
                    format, e.g. starting with "chr"?
                    """
-            )
-
+            )          
+                
         if self.trans:
             if self.view_df["chrom"].unique().shape[0] < 2:
                 raise ValueError("Trying to do trans with fewer than two chromosomes")
@@ -1669,7 +1701,6 @@ class PileUpper:
         ar = np.arange(max_right1 - min_left1, dtype=np.int32)
 
         diag_indicator = numutils.LazyToeplitz(-ar, ar)
-
         for snip in intervals:
             snip["stBin1"], snip["endBin1"], snip["stBin2"], snip["endBin2"] = (
                 snip["stBin1"] - min_left1,
@@ -1890,6 +1921,9 @@ class PileUpper:
                 region1=region1_coords, region2=region2_coords
             )
             filter_func2 = None
+        elif self.anchors:
+            filter_func1 = self.CC.filter_func_anchors(region=region1_coords, anchor=self.anchors[0])
+            filter_func2 = self.CC.filter_func_anchors(region=region1_coords, anchor=self.anchors[1])
         else:
             filter_func1 = self.CC.filter_func_region(region=region1_coords)
             if region2 == region1:
