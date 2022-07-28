@@ -461,14 +461,12 @@ def bin_distance(snip, band_edges="default"):
     snip["distance_band"] = tuple(band_edges[i - 1 : i + 1])
     return snip
 
-
 def group_by_region(snip):
     snip1 = snip.copy()
     snip1["group"] = tuple([snip1["chrom1"], snip1["start1"], snip1["end1"]])
     snip2 = snip.copy()
     snip2["group"] = tuple([snip2["chrom2"], snip2["start2"], snip2["end2"]])
     yield from (snip1, snip2)
-
 
 def assign_groups(intervals, groupby=[]):
     """
@@ -1730,20 +1728,10 @@ class PileUpper:
                 if self.expected and not self.ooe:
                     exp_snip = self._rescale_snip(exp_snip)
 
-            if self.flip_negative_strand and "strand1" in snip and "strand2" in snip:
-                if snip["strand1"] == "-" and snip["strand2"] == "-":
-                    axes = (0, 1)
-                elif snip["strand1"] == "-":
-                    axes = 0
-                elif snip["strand2"] == "-":
-                    axes = 1
-                else:
-                    axes = None
-
-                if axes is not None:
-                    snip["data"] = np.flip(snip["data"], axes)
-                    if self.expected and not self.ooe:
-                        exp_data = np.flip(exp_data, axes)
+            if self.flip_negative_strand and "strand1" in snip and "strand2" in snip and snip["strand1"] == "-":
+                snip["data"] = np.rot90(np.flipud(snip["data"]))
+                if self.expected and not self.ooe:
+                    exp_data = np.rot90(np.flipud(exp_data))
 
             if self.store_stripes:
                 cntr = int(np.floor(snip["data"].shape[0] / 2))
@@ -1812,7 +1800,7 @@ class PileUpper:
             And any other annotations
         postprocess_func : function, optional
             Any additional postprocessing of each snip needed, in one function.
-            Can be used to modify the data in un-standard way, or creqate groups when
+            Can be used to modify the data in un-standard way, or create groups when
             it can't be done before snipping, or to assign each snippet to multiple
             groups. Example: `group_by_region`.
 
@@ -1859,7 +1847,7 @@ class PileUpper:
             Region name.
         region2 : str, optional
             Region name.
-        groupby : str or list of str, optional
+        groupby : list of str, optional
             Which attributes of each snip to assign a group to it
         modify_2Dintervals_func : function, optional
             A function to apply to a dataframe of genomic intervals used for pileups.
@@ -1924,7 +1912,7 @@ class PileUpper:
         nproc : int, optional
             How many cores to use. Sends a whole chromosome per process.
             The default is 1.
-        groupby : str or list of str, optional
+        groupby : list of str, optional
             Which attributes of each snip to assign a group to it
         modify_2Dintervals_func : function, optional
             Function to apply to the DataFrames of coordinates before fetching snippets
@@ -2112,7 +2100,7 @@ class PileUpper:
         self,
         nproc=1,
     ):
-        """Perform by-window pileups across all chromosomes and applies required
+        """Perform by-window (i.e. for each region) pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl
 
         Parameters
@@ -2154,6 +2142,8 @@ class PileUpper:
         distance_edges : list/array of int
             How to group snips by distance (based on their centres).
             Default uses separations [0, 50_000, 100_000, 200_000, ...]
+        groupby : list of str, optional
+            Which attributes of each snip to assign a group to it
 
         Returns
         -------
@@ -2205,6 +2195,9 @@ class PileUpper:
         distance_edges : list/array of int
             How to group snips by distance (based on their centres).
             Default uses separations [0, 50_000, 100_000, 200_000, ...]
+        groupby : list of str, optional
+            Which attributes of each snip to assign a group to it
+            
 
         Returns
         -------
@@ -2256,6 +2249,8 @@ class PileUpper:
         nproc : int, optional
             How many cores to use. Sends a whole chromosome per process.
             The default is 1.
+        groupby : list of str, optional
+            Which attributes of each snip to assign a group to it
 
         Returns
         -------
