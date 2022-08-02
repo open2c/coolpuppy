@@ -10,3 +10,4 @@ matplotlib
 natsort
 m2r2
 seaborn
+h5sparse
