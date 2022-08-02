@@ -1510,7 +1510,7 @@ class PileUpper:
             list(set(self.CC.final_chroms) & set(self.clr.chromnames))
         )
         self.view_df = self.view_df[self.view_df["chrom"].isin(self.chroms)]
-
+ 
         if self.view_df["chrom"].unique().shape[0] == 0:
             raise ValueError(
                 """No chromosomes are in common between the coordinate
@@ -1518,7 +1518,7 @@ class PileUpper:
                    format, e.g. starting with "chr"?
                    """
             )
-
+            
         if self.trans:
             if self.view_df["chrom"].unique().shape[0] < 2:
                 raise ValueError("Trying to do trans with fewer than two chromosomes")
