@@ -33,6 +33,7 @@ else:
         "seaborn",
         "natsort",
         "tables",
+	"h5sparse",
     ]
 
 setup(
