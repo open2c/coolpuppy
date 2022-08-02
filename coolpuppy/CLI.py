@@ -216,10 +216,22 @@ def parse_args_coolpuppy():
     parser.add_argument(
         "--coverage_norm",
         "--coverage-norm",
-        action="store_true",
+        default="",
+        type=str,
         required=False,
+        nargs="?",
+        const="total",
         help="""
-        If empty `clr_weight_name`, add coverage normalization using chromosome marginals""",
+            Whether to normalize final the final pileup by accumulated coverage as an
+            alternative to balancing. Useful for single-cell Hi-C data. Can be a string:
+            "cis" or "total" to use "cis_raw_cov" or "tot_raw_cov" columns in the cooler
+            bin table, respectively. If they are not present, will calculate coverage
+            with same ignore_diags as used in coolpup.py and store result in the cooler.
+            Alternatively, if a different string is provided, will attempt to use a
+            column with the that name in the cooler bin table, and will raise a
+            ValueError if it does not exist.
+            If no argument is given following the option string, will use "total".
+            Only allowed when using empty --clr_weight_name""",
     )
     parser.add_argument(
         "--trans",
@@ -300,7 +312,8 @@ def parse_args_coolpuppy():
         dest="n_proc",
         help="""Number of processes to use.
                 Each process works on a separate chromosome, so might require quite a
-                bit more memory, although the data are always stored as sparse matrices
+                bit more memory, although the data are always stored as sparse matrices.
+                Set to 0 to use all available cores.
                 """,
     )
     # Output
@@ -517,6 +530,7 @@ def main():
         flip_negative_strand=args.flip_negative_strand,
         ignore_diags=args.ignore_diags,
         store_stripes=args.store_stripes,
+        nproc=nproc,
     )
 
     if args.outname == "auto":
@@ -550,21 +564,21 @@ def main():
         outname = args.outname
 
     if args.by_window:
-        pups = PU.pileupsByWindowWithControl(nproc=nproc)
+        pups = PU.pileupsByWindowWithControl()
     elif args.by_strand and args.by_distance:
         pups = PU.pileupsByStrandByDistanceWithControl(
             nproc=nproc, distance_edges=distance_edges
         )
     elif args.by_strand:
-        pups = PU.pileupsByStrandWithControl(nproc=nproc)
+        pups = PU.pileupsByStrandWithControl()
     elif args.by_distance:
         pups = PU.pileupsByDistanceWithControl(
             nproc=nproc, distance_edges=distance_edges
         )
     elif args.by_chroms:
-        pups = PU.pileupsWithControl(nproc=nproc, groupby=["chrom1", "chrom2"])
+        pups = PU.pileupsWithControl(groupby=["chrom1", "chrom2"])
     else:
-        pups = PU.pileupsWithControl(nproc)
+        pups = PU.pileupsWithControl()
     headerdict = vars(args)
     if "expected" in headerdict:
         if not isinstance(headerdict["expected"], str) and isinstance(
