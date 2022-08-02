@@ -205,11 +205,10 @@ def make_heatmap_stripes(
         nrows, ncols = auto_rows_cols(pupsdf.shape[0])
 
     vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym)
-
+    if (vmin == 0) or (vmin > vmax):
+        vmin = vmax/1000     
     if scale == "log":
-        norm = LogNorm
-        if vmin == 0:
-            vmin = 1e-6
+        norm = LogNorm    
     elif scale == "linear":
         norm = Normalize
     else:
@@ -484,18 +483,16 @@ def make_heatmap_grid(
         nrows, ncols = auto_rows_cols(pupsdf.shape[0])
 
     vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym)
-
+    if (vmin == 0) or (vmin > vmax):
+        vmin = vmax/1000      
     if scale == "log":
-        norm = LogNorm
-        if vmin == 0:
-            vmin = 1e-6
+        norm = LogNorm     
     elif scale == "linear":
         norm = Normalize
     else:
         raise ValueError(
             f"Unknown scale value, only log or linear implemented, but got {scale}"
         )
-
     right = ncols / (ncols + 0.25)
 
     fg = sns.FacetGrid(
