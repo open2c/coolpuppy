@@ -1382,7 +1382,7 @@ class PileUpper:
             cooler with default column names, and use "tot_raw_cov". Alternatively, if
             a different string is provided, will attempt to use a column with the that
             name in the cooler bin table, and will raise a ValueError if it does not exist.
-            Only has effect when clr_weight_name is False.
+            Only allowed when clr_weight_name is False.
             The default is False.
         rescale : bool, optional
             Whether to rescale the pileups.
@@ -1534,6 +1534,11 @@ class PileUpper:
                     self.clr, map=pool.map, store=True, ignore_diags=self.ignore_diags
                 )
                 del _
+
+        if self.coverage_norm and self.clr_weight_name:
+            raise ValueError(
+                "Can't do coverage normalization when clr_weight_name is provided"
+            )
 
         if self.rescale:
             if self.rescale_flank is None:
