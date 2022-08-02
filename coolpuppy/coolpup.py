@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import multiprocessing
 import numpy as np
 import warnings
 import pandas as pd
@@ -11,7 +12,7 @@ from natsort import natsorted
 from scipy import sparse
 from cooltools import numutils
 from cooltools.lib import common, checks
-from cooltools.api import snipping
+from cooltools.api import snipping, coverage
 import yaml
 import io
 from more_itertools import collapse
@@ -461,12 +462,14 @@ def bin_distance(snip, band_edges="default"):
     snip["distance_band"] = tuple(band_edges[i - 1 : i + 1])
     return snip
 
+
 def group_by_region(snip):
     snip1 = snip.copy()
     snip1["group"] = tuple([snip1["chrom1"], snip1["start1"], snip1["end1"]])
     snip2 = snip.copy()
     snip2["group"] = tuple([snip2["chrom2"], snip2["start2"], snip2["end2"]])
     yield from (snip1, snip2)
+
 
 def assign_groups(intervals, groupby=[]):
     """
@@ -1341,6 +1344,7 @@ class PileUpper:
         flip_negative_strand=False,
         ignore_diags=2,
         store_stripes=False,
+        nproc=1,
     ):
         """Creates pileups
 
@@ -1369,9 +1373,16 @@ class PileUpper:
         control : bool, optional
             Whether to use randomly shifted controls.
             The default is False.
-        coverage_norm : bool, optional
+        coverage_norm : bool or str, optional
             Whether to normalize final the final pileup by accumulated coverage as an
-            alternative to balancing. Useful for single-cell Hi-C data.
+            alternative to balancing. Useful for single-cell Hi-C data. Can be either
+            boolean, or string: "cis" or "total" to use "cis_raw_cov" or "tot_raw_cov"
+            columns in the cooler bin table, respectively. If True, will attempt to use
+            "tot_raw_cov" if available, otherwise will compute and store coverage in the
+            cooler with default column names, and use "tot_raw_cov". Alternatively, if
+            a different string is provided, will attempt to use a column with the that
+            name in the cooler bin table, and will raise a ValueError if it does not exist.
+            Only has effect when clr_weight_name is False.
             The default is False.
         rescale : bool, optional
             Whether to rescale the pileups.
@@ -1390,6 +1401,8 @@ class PileUpper:
         store_stripes: bool, optional
             Whether to store horizontal, vertical, corner_stripes, and coordinates in the output
             The default is False
+        nproc : int, optional
+            Number of processes to use. The default is 1.
 
         Returns
         -------
@@ -1413,17 +1426,13 @@ class PileUpper:
         self.flip_negative_strand = flip_negative_strand
         self.ignore_diags = ignore_diags
         self.store_stripes = store_stripes
+        self.nproc = nproc
 
         if view_df is None:
             # Generate viewframe from clr.chromsizes:
             self.view_df = common.make_cooler_view(clr)
         else:
             self.view_df = bioframe.make_viewframe(view_df, check_bounds=clr.chromsizes)
-
-        if self.trans & self.coverage_norm:
-            raise ValueError(
-                "Coverage function is not implemented for trans interactions"
-            )
 
         if self.expected is not False:
             # subset expected if some regions not mentioned in view
@@ -1504,6 +1513,27 @@ class PileUpper:
         if self.trans:
             if self.view_df["chrom"].unique().shape[0] < 2:
                 raise ValueError("Trying to do trans with fewer than two chromosomes")
+
+        if self.coverage_norm is True:
+            self.coverage_norm = "tot_raw_cov"
+        elif self.coverage_norm == "cis":
+            self.coverage_norm = "cis_raw_cov"
+        elif self.coverage_norm == "total":
+            self.coverage_norm = "tot_raw_cov"
+        elif self.coverage_norm and self.coverage_norm not in self.clr.bins().columns:
+            raise ValueError(
+                f"coverage_norm {self.coverage_norm} not found in cooler bins"
+            )
+
+        if (
+            self.coverage_norm in ["cis_raw_cov", "tot_raw_cov"]
+            and self.coverage_norm not in self.clr.bins().columns
+        ):
+            with Pool(self.nproc) as pool:
+                _ = coverage.coverage(
+                    self.clr, map=pool.map, store=True, ignore_diags=self.ignore_diags
+                )
+                del _
 
         if self.rescale:
             if self.rescale_flank is None:
@@ -1599,25 +1629,6 @@ class PileUpper:
         # data = sparse.triu(data)
         return data.tocsr()
 
-    def get_coverage(self, data):
-        """Get total coverage profile for upper triangular data
-
-        Parameters
-        ----------
-        data : array_like
-            2D array with upper triangular data.
-
-        Returns
-        -------
-        coverage : array
-            1D array of coverage.
-
-        """
-        coverage = np.nan_to_num(np.ravel(data.sum(axis=0))) + np.nan_to_num(
-            np.ravel(data.sum(axis=1))
-        )
-        return coverage
-
     def _stream_snips(self, intervals, region1, region2=None):
         mymap = self.make_outmap()
         cov_start = np.zeros(mymap.shape[0])
@@ -1660,8 +1671,8 @@ class PileUpper:
             ).astype(bool)
 
         if self.coverage_norm:
-            coverage = self.get_coverage(bigdata)
-        ### TODO fix coverage for trans
+            coverage1 = self.clr.bins()[self.coverage_norm].fetch(region1_coords).values
+            coverage2 = self.clr.bins()[self.coverage_norm].fetch(region2_coords).values
 
         ar = np.arange(max_right1 - min_left1, dtype=np.int32)
 
@@ -1714,10 +1725,8 @@ class PileUpper:
                 data[D] = np.nan
 
             if self.coverage_norm:
-                cov_start = coverage[snip["stBin1"] : snip["endBin1"]]
-                cov_end = coverage[snip["stBin2"] : snip["endBin2"]]
-                snip["cov_start"] = cov_start
-                snip["cov_end"] = cov_end
+                snip["cov_start"] = coverage1[snip["stBin1"] : snip["endBin1"]]
+                snip["cov_end"] = coverage2[snip["stBin2"] : snip["endBin2"]]
             if self.expected and self.ooe:
                 with np.errstate(divide="ignore", invalid="ignore"):
                     data = data / exp_data
@@ -1728,7 +1737,12 @@ class PileUpper:
                 if self.expected and not self.ooe:
                     exp_snip = self._rescale_snip(exp_snip)
 
-            if self.flip_negative_strand and "strand1" in snip and "strand2" in snip and snip["strand1"] == "-":
+            if (
+                self.flip_negative_strand
+                and "strand1" in snip
+                and "strand2" in snip
+                and snip["strand1"] == "-"
+            ):
                 snip["data"] = np.rot90(np.flipud(snip["data"]))
                 if self.expected and not self.ooe:
                     exp_data = np.rot90(np.flipud(exp_data))
@@ -1902,7 +1916,11 @@ class PileUpper:
         return final
 
     def pileupsWithControl(
-        self, nproc=1, groupby=[], modify_2Dintervals_func=None, postprocess_func=None
+        self,
+        nproc=None,
+        groupby=[],
+        modify_2Dintervals_func=None,
+        postprocess_func=None,
     ):
         """Perform pileups across all chromosomes and applies required
         normalization
@@ -1911,7 +1929,8 @@ class PileUpper:
         ----------
         nproc : int, optional
             How many cores to use. Sends a whole chromosome per process.
-            The default is 1.
+            The default is None, which uses the same number as nproc set at creation of
+            the object.
         groupby : list of str, optional
             Which attributes of each snip to assign a group to it
         modify_2Dintervals_func : function, optional
@@ -1932,6 +1951,8 @@ class PileUpper:
             data.
 
         """
+        if nproc is None:
+            nproc = self.nproc
         if len(self.chroms) == 0:
             return self.make_outmap(), 0
 
@@ -1956,9 +1977,8 @@ class PileUpper:
             postprocess_func=postprocess_func,
         )
         if nproc > 1:
-            p = Pool(nproc)
-            pileups = list(p.starmap(f, zip(regions1, regions2)))
-            p.close()
+            with Pool(nproc) as p:
+                pileups = list(p.starmap(f, zip(regions1, regions2)))
         else:
             pileups = list(map(f, regions1, regions2))
         roi = (
@@ -2098,7 +2118,7 @@ class PileUpper:
 
     def pileupsByWindowWithControl(
         self,
-        nproc=1,
+        nproc=None,
     ):
         """Perform by-window (i.e. for each region) pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl
@@ -2107,7 +2127,8 @@ class PileUpper:
         ----------
         nproc : int, optional
             How many cores to use. Sends a whole chromosome per process.
-            The default is 1.
+            The default is None, which uses the same number as nproc set at creation of
+            the object.
 
         Returns
         -------
@@ -2117,6 +2138,8 @@ class PileUpper:
             combined (the regions of interest, not control regions). Each window is a
             row, plus an additional row `all` is created with all data.
         """
+        if nproc is None:
+            nproc = self.nproc
         if self.local:
             raise ValueError("Cannot do by-window pileups for local")
 
@@ -2130,7 +2153,9 @@ class PileUpper:
         normalized_pileups = normalized_pileups.drop(columns="index")
         return normalized_pileups
 
-    def pileupsByDistanceWithControl(self, nproc=1, distance_edges="default", groupby=[]):
+    def pileupsByDistanceWithControl(
+        self, nproc=None, distance_edges="default", groupby=[]
+    ):
         """Perform by-distance pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl
 
@@ -2138,7 +2163,8 @@ class PileUpper:
         ----------
         nproc : int, optional
             How many cores to use. Sends a whole chromosome per process.
-            The default is 1.
+            The default is None, which uses the same number as nproc set at creation of
+            the object.
         distance_edges : list/array of int
             How to group snips by distance (based on their centres).
             Default uses separations [0, 50_000, 100_000, 200_000, ...]
@@ -2153,6 +2179,8 @@ class PileUpper:
             combined (the regions of interest, not control regions).
             Each distance band is a row, annotated in column `distance_band`
         """
+        if nproc is None:
+            nproc = self.nproc
         if self.trans:
             raise ValueError("Cannot do by-distance pileups for trans")
         elif self.local:
@@ -2168,7 +2196,9 @@ class PileUpper:
                     break
         bin_func = partial(bin_distance_intervals, band_edges=distance_edges)
         normalized_pileups = self.pileupsWithControl(
-            nproc=nproc, modify_2Dintervals_func=bin_func, groupby=["distance_band"]+groupby
+            nproc=nproc,
+            modify_2Dintervals_func=bin_func,
+            groupby=["distance_band"] + groupby,
         )
         normalized_pileups = normalized_pileups.drop(index="all").reset_index()
         normalized_pileups = normalized_pileups.loc[
@@ -2182,7 +2212,9 @@ class PileUpper:
 
         return normalized_pileups
 
-    def pileupsByStrandByDistanceWithControl(self, nproc=1, distance_edges="default", groupby=[]):
+    def pileupsByStrandByDistanceWithControl(
+        self, nproc=None, distance_edges="default", groupby=[]
+    ):
         """Perform by-strand by-distance pileups across all chromosomes and applies
         required normalization. Simple wrapper around pileupsWithControl.
         Assumes the features in CoordCreator file has a "strand" column.
@@ -2191,13 +2223,14 @@ class PileUpper:
         ----------
         nproc : int, optional
             How many cores to use. Sends a whole chromosome per process.
-            The default is 1.
+            The default is None, which uses the same number as nproc set at creation of
+            the object.
         distance_edges : list/array of int
             How to group snips by distance (based on their centres).
             Default uses separations [0, 50_000, 100_000, 200_000, ...]
         groupby : list of str, optional
             Which attributes of each snip to assign a group to it
-            
+
 
         Returns
         -------
@@ -2207,6 +2240,8 @@ class PileUpper:
             combined (the regions of interest, not control regions).
             Each distance band is a row, annotated in columns `separation`
         """
+        if nproc is None:
+            nproc = self.nproc
         if self.trans:
             raise ValueError("Cannot do by-distance pileups for trans")
         if distance_edges != "default":
@@ -2222,7 +2257,7 @@ class PileUpper:
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc,
             modify_2Dintervals_func=bin_func,
-            groupby=["strand1", "strand2", "distance_band"]+groupby,
+            groupby=["strand1", "strand2", "distance_band"] + groupby,
         )
         normalized_pileups = normalized_pileups.drop(index="all").reset_index()
         normalized_pileups["orientation"] = (
@@ -2239,7 +2274,7 @@ class PileUpper:
 
         return normalized_pileups
 
-    def pileupsByStrandWithControl(self, nproc=1, groupby=[]):
+    def pileupsByStrandWithControl(self, nproc=None, groupby=[]):
         """Perform by-strand pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl.
         Assumes the features in CoordCreator file has a "strand" column.
@@ -2248,7 +2283,8 @@ class PileUpper:
         ----------
         nproc : int, optional
             How many cores to use. Sends a whole chromosome per process.
-            The default is 1.
+            The default is None, which uses the same number as nproc set at creation of
+            the object.
         groupby : list of str, optional
             Which attributes of each snip to assign a group to it
 
@@ -2260,10 +2296,11 @@ class PileUpper:
             combined (the regions of interest, not control regions).
             Each distance band is a row, annotated in columns `separation`
         """
-
+        if nproc is None:
+            nproc = self.nproc
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc,
-            groupby=["strand1", "strand2"]+groupby,
+            groupby=["strand1", "strand2"] + groupby,
         )
         normalized_pileups = normalized_pileups.drop(index=("all", "all")).reset_index()
         normalized_pileups["orientation"] = (
