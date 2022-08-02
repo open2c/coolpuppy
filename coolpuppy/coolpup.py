@@ -15,12 +15,11 @@ from cooltools.api import snipping
 import yaml
 import io
 from more_itertools import collapse
-import h5py
+import h5sparse
 import os
 import re
 
-
-def save_pileup_df(filename, df, metadata=None, mode="w"):
+def save_pileup_df(filename, df, metadata=None, mode="w", compression="lzf"):
     """
     Saves a dataframe with metadata into a binary HDF5 file`
 
@@ -35,6 +34,8 @@ def save_pileup_df(filename, df, metadata=None, mode="w"):
     mode : str, optional
         Mode for the first time access to the output file: 'w' to overwrite if file
         exists, or 'a' to fail if output file already exists
+    compression : str, optional
+        Compression to use for saving, e.g. 'gzip'. Defaults to 'lzf'
 
     Returns
     -------
@@ -50,31 +51,35 @@ def save_pileup_df(filename, df, metadata=None, mode="w"):
     df[
         df.columns[
             ~df.columns.isin(
-                ["data", "corner_stripe", "vertical_stripe", "horizontal_stripe"]
+                ["data", "corner_stripe", "vertical_stripe", "horizontal_stripe", "coordinates"]
             )
         ]
     ].to_hdf(filename, "annotation", mode=mode)
 
-    with h5py.File(filename, "a") as f:
+    with h5sparse.File(filename, "a") as f:
         width = df["data"].iloc[0].shape[0]
         height = width * df["data"].shape[0]
         ds = f.create_dataset(
-            "data", compression="lzf", chunks=(width, width), shape=(height, width)
+            "data", compression=compression, chunks=(width, width), shape=(height, width)
         )
         for i, arr in df["data"].reset_index(drop=True).items():
             ds[i * width : (i + 1) * width, :] = arr
         if df["store_stripes"].any():
             for i, arr in df["corner_stripe"].reset_index(drop=True).items():
                 f.create_dataset(
-                    "corner_stripe_" + str(i), shape=(len(arr), width), data=arr
+                    "corner_stripe_" + str(i), compression=compression, shape=(len(arr), width), data=sparse.csr_matrix(arr)
                 )
             for i, arr in df["vertical_stripe"].reset_index(drop=True).items():
                 f.create_dataset(
-                    "vertical_stripe_" + str(i), shape=(len(arr), width), data=arr
+                    "vertical_stripe_" + str(i), compression=compression, shape=(len(arr), width), data=sparse.csr_matrix(arr)
                 )
             for i, arr in df["horizontal_stripe"].reset_index(drop=True).items():
                 f.create_dataset(
-                    "horizontal_stripe_" + str(i), shape=(len(arr), width), data=arr
+                    "horizontal_stripe_" + str(i), compression=compression, shape=(len(arr), width), data=sparse.csr_matrix(arr)
+                )
+            for i, arr in df["coordinates"].reset_index(drop=True).items():
+                f.create_dataset(
+                    "coordinates_" + str(i), compression=compression, shape=(len(arr), 6), data=arr.astype(object)
                 )
         group = f.create_group("attrs")
         if metadata is not None:
@@ -103,7 +108,7 @@ def load_pileup_df(filename, quaich=False):
         Pileups are in the "data" column, all metadata in other columns
 
     """
-    with h5py.File(filename, "r", libver="latest") as f:
+    with h5sparse.File(filename, "r", libver="latest") as f:
         metadata = dict(zip(f["attrs"].attrs.keys(), f["attrs"].attrs.values()))
         dstore = f["data"]
         data = []
@@ -115,17 +120,21 @@ def load_pileup_df(filename, quaich=False):
         corner_stripe = []
         vertical_stripe = []
         horizontal_stripe = []
+        coordinates = []
         try:
             for i in range(len(data)):
                 cstripe = "corner_stripe_" + str(i)
                 vstripe = "vertical_stripe_" + str(i)
                 hstripe = "horizontal_stripe_" + str(i)
-                corner_stripe.append(f[cstripe][:])
-                vertical_stripe.append(f[vstripe][:])
-                horizontal_stripe.append(f[hstripe][:])
+                coords = "coordinates_" + str(i)
+                corner_stripe.append(f[cstripe][:].toarray())
+                vertical_stripe.append(f[vstripe][:].toarray())
+                horizontal_stripe.append(f[hstripe][:].toarray())
+                coordinates.append(f[coords][:].astype('U13'))
             annotation["corner_stripe"] = corner_stripe
             annotation["vertical_stripe"] = vertical_stripe
             annotation["horizontal_stripe"] = horizontal_stripe
+            annotation["coordinates"] = coordinates
         except:
             pass
     for key, val in metadata.items():
@@ -2046,7 +2055,11 @@ class PileUpper:
                     lambda row: np.divide(row["corner_stripe"], control_cornerstripe),
                     axis=1,
                 )
-        # pileup[~np.isfinite(pileup)] = 0
+            normalized_roi["corner_stripe"] = normalized_roi["corner_stripe"].apply(np.vstack)
+            normalized_roi["vertical_stripe"] = normalized_roi["vertical_stripe"].apply(np.vstack)
+            normalized_roi["horizontal_stripe"] = normalized_roi["horizontal_stripe"].apply(np.vstack)
+            normalized_roi["coordinates"] = normalized_roi["coordinates"].apply(np.vstack)
+
         if self.local:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", category=RuntimeWarning)
