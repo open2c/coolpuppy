@@ -83,7 +83,10 @@ def get_min_max(pups, vmin=None, vmax=None, sym=True):
         vmin = np.nanmin(comb)
     if sym:
         vmax = np.max(np.abs([vmin, vmax]))
-        vmin = 2 ** -np.log2(vmax)
+        if vmax>=1:
+            vmin = 2 ** -np.log2(vmax)
+        else:
+            raise ValueError("Maximum value is less than 1.0, can't plot using symmetrical scale")
     return vmin, vmax
 
 
@@ -205,8 +208,7 @@ def make_heatmap_stripes(
         nrows, ncols = auto_rows_cols(pupsdf.shape[0])
 
     vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym)
-    if (vmin == 0) or (vmin > vmax):
-        vmin = vmax/1000     
+    
     if scale == "log":
         norm = LogNorm    
     elif scale == "linear":
@@ -483,8 +485,7 @@ def make_heatmap_grid(
         nrows, ncols = auto_rows_cols(pupsdf.shape[0])
 
     vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym)
-    if (vmin == 0) or (vmin > vmax):
-        vmin = vmax/1000      
+    
     if scale == "log":
         norm = LogNorm     
     elif scale == "linear":
