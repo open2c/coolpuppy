@@ -230,7 +230,8 @@ def parse_args_coolpuppy():
             Alternatively, if a different string is provided, will attempt to use a
             column with the that name in the cooler bin table, and will raise a
             ValueError if it does not exist.
-            If no argument is given following the option string, will use "total".""",
+            If no argument is given following the option string, will use "total".
+            Only allowed when using empty --clr_weight_name""",
     )
     parser.add_argument(
         "--trans",
