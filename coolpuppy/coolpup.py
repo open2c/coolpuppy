@@ -20,6 +20,7 @@ import h5sparse
 import os
 import re
 
+
 def save_pileup_df(filename, df, metadata=None, mode="w", compression="lzf"):
     """
     Saves a dataframe with metadata into a binary HDF5 file`
@@ -52,7 +53,13 @@ def save_pileup_df(filename, df, metadata=None, mode="w", compression="lzf"):
     df[
         df.columns[
             ~df.columns.isin(
-                ["data", "corner_stripe", "vertical_stripe", "horizontal_stripe", "coordinates"]
+                [
+                    "data",
+                    "corner_stripe",
+                    "vertical_stripe",
+                    "horizontal_stripe",
+                    "coordinates",
+                ]
             )
         ]
     ].to_hdf(filename, "annotation", mode=mode)
@@ -61,26 +68,41 @@ def save_pileup_df(filename, df, metadata=None, mode="w", compression="lzf"):
         width = df["data"].iloc[0].shape[0]
         height = width * df["data"].shape[0]
         ds = f.create_dataset(
-            "data", compression=compression, chunks=(width, width), shape=(height, width)
+            "data",
+            compression=compression,
+            chunks=(width, width),
+            shape=(height, width),
         )
         for i, arr in df["data"].reset_index(drop=True).items():
             ds[i * width : (i + 1) * width, :] = arr
         if df["store_stripes"].any():
             for i, arr in df["corner_stripe"].reset_index(drop=True).items():
                 f.create_dataset(
-                    "corner_stripe_" + str(i), compression=compression, shape=(len(arr), width), data=sparse.csr_matrix(arr)
+                    "corner_stripe_" + str(i),
+                    compression=compression,
+                    shape=(len(arr), width),
+                    data=sparse.csr_matrix(arr),
                 )
             for i, arr in df["vertical_stripe"].reset_index(drop=True).items():
                 f.create_dataset(
-                    "vertical_stripe_" + str(i), compression=compression, shape=(len(arr), width), data=sparse.csr_matrix(arr)
+                    "vertical_stripe_" + str(i),
+                    compression=compression,
+                    shape=(len(arr), width),
+                    data=sparse.csr_matrix(arr),
                 )
             for i, arr in df["horizontal_stripe"].reset_index(drop=True).items():
                 f.create_dataset(
-                    "horizontal_stripe_" + str(i), compression=compression, shape=(len(arr), width), data=sparse.csr_matrix(arr)
+                    "horizontal_stripe_" + str(i),
+                    compression=compression,
+                    shape=(len(arr), width),
+                    data=sparse.csr_matrix(arr),
                 )
             for i, arr in df["coordinates"].reset_index(drop=True).items():
                 f.create_dataset(
-                    "coordinates_" + str(i), compression=compression, shape=(len(arr), 6), data=arr.astype(object)
+                    "coordinates_" + str(i),
+                    compression=compression,
+                    shape=(len(arr), 6),
+                    data=arr.astype(object),
                 )
         group = f.create_group("attrs")
         if metadata is not None:
@@ -131,7 +153,7 @@ def load_pileup_df(filename, quaich=False):
                 corner_stripe.append(f[cstripe][:].toarray())
                 vertical_stripe.append(f[vstripe][:].toarray())
                 horizontal_stripe.append(f[hstripe][:].toarray())
-                coordinates.append(f[coords][:].astype('U13'))
+                coordinates.append(f[coords][:].astype("U13"))
             annotation["corner_stripe"] = corner_stripe
             annotation["vertical_stripe"] = vertical_stripe
             annotation["horizontal_stripe"] = horizontal_stripe
@@ -1368,11 +1390,11 @@ class PileUpper:
             Whether to use balanced data, and which column to use as weights.
             The default is "weight". Provide False to use raw data.
         expected : DataFrame, optional
-            If using expected, pandas DataFrame with chromosome-wide expected.
+            If using expected, pandas DataFrame with by-distance expected.
             The default is False.
         view_df : DataFrame
-            A datafrome with region coordinates used in expected (see bioframe
-            documentation for details). Can be ommited if no expected is prodiced, or
+            A dataframe with region coordinates used in expected (see bioframe
+            documentation for details). Can be ommited if no expected is provided, or
             expected is for whole chromosomes.
         ooe : bool, optional
             Whether to normalize each snip by expected value. If False, all snips are
@@ -1510,7 +1532,7 @@ class PileUpper:
             list(set(self.CC.final_chroms) & set(self.clr.chromnames))
         )
         self.view_df = self.view_df[self.view_df["chrom"].isin(self.chroms)]
- 
+
         if self.view_df["chrom"].unique().shape[0] == 0:
             raise ValueError(
                 """No chromosomes are in common between the coordinate
@@ -1518,7 +1540,7 @@ class PileUpper:
                    format, e.g. starting with "chr"?
                    """
             )
-            
+
         if self.trans:
             if self.view_df["chrom"].unique().shape[0] < 2:
                 raise ValueError("Trying to do trans with fewer than two chromosomes")
@@ -2080,10 +2102,18 @@ class PileUpper:
                     lambda row: np.divide(row["corner_stripe"], control_cornerstripe),
                     axis=1,
                 )
-            normalized_roi["corner_stripe"] = normalized_roi["corner_stripe"].apply(np.vstack)
-            normalized_roi["vertical_stripe"] = normalized_roi["vertical_stripe"].apply(np.vstack)
-            normalized_roi["horizontal_stripe"] = normalized_roi["horizontal_stripe"].apply(np.vstack)
-            normalized_roi["coordinates"] = normalized_roi["coordinates"].apply(np.vstack)
+            normalized_roi["corner_stripe"] = normalized_roi["corner_stripe"].apply(
+                np.vstack
+            )
+            normalized_roi["vertical_stripe"] = normalized_roi["vertical_stripe"].apply(
+                np.vstack
+            )
+            normalized_roi["horizontal_stripe"] = normalized_roi[
+                "horizontal_stripe"
+            ].apply(np.vstack)
+            normalized_roi["coordinates"] = normalized_roi["coordinates"].apply(
+                np.vstack
+            )
 
         if self.local:
             with warnings.catch_warnings():
