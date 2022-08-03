@@ -43,7 +43,7 @@ def parse_args_plotpuppy():
         type=str,
         required=False,
         default="coolwarm",
-        help="""Colourmap to use
+        help="""Colormap to use
                 (see https://matplotlib.org/users/colormaps.html)""",
     )
     parser.add_argument(
@@ -157,7 +157,7 @@ def parse_args_plotpuppy():
         type=str,
         required=False,
         action="append",
-        help=""""Pandas query top select pups to plot from concatenated input files""",
+        help="""Pandas query top select pups to plot from concatenated input files""",
     )
     parser.add_argument(
         "--norm_corners",
@@ -180,24 +180,21 @@ def parse_args_plotpuppy():
         type=int,
         required=False,
         default=3,
-        help="""How many central pixels to consider when calculating enrichment for
-                off-diagonal pileups.""",
+        help="""How many central pixels to consider when calculating enrichment for off-diagonal pileups.""",
     )
     parser.add_argument(
         "--ignore_central",
         type=int,
         required=False,
         default=3,
-        help="""How many central bins to ignore when calculating insulation for
-                local (on-diagonal) non-rescaled pileups.""",
+        help="""How many central bins to ignore when calculating insulation for local (on-diagonal) non-rescaled pileups.""",
     )
     parser.add_argument(
         "--quaich",
         required=False,
         default=False,
         action="store_true",
-        help="""Activate if pileups are named accodring to Quaich naming convention
-                to get information from the file name""",
+        help="""Activate if pileups are named accodring to Quaich naming convention to get information from the file name""",
     )
     parser.add_argument(
         "--dpi",
