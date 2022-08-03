@@ -7,10 +7,30 @@
 
 .**cool** file **p**ile-**up**s with **py**thon.
 
+A versatile tool to perform pile-up analysis on Hi-C data in .cool format (https://github.com/mirnylab/cooler). And who doesn't like cool pupppies?
+
 # Introduction
 
+## What are pileups?
+
+Pileups is the generic term we use to describe any procedure that averages multiple 2D regions (snippets) of a 2D matrix, e.g. Hi-C data. In some contexts they are also known as APA (aggregate peak analysis, from Rao et al., 2014), or aggregate region/TAD analysis (in GENOVA, van der Weide et al., 2021), and other names.
+The most typical use case is to quantify average strength of called dots (loops) in Hi-C data, or strength of TAD boundaries. However the approach can do much more than that.
+This is the idea of how pileups work to check whether certain regions tend to interact with each other:
+
+<img src="https://raw.githubusercontent.com/open2c/coolpuppy/master/loop_quant.png" alt="Pileup schematic" width="1000px"/>
+
+On the right is the more typical se case for quantification of loop strength. On the left is a different approach, designed to check whether specific regions in the genome (e.g. binding sites of a certain factor) tend to interact with each other.
+
+What is very important for this quantification, is the normalization to expected values. This can be done in two ways: either using a chromosome- (or arm-) wide by-distance expected interactions, using a file with average values of interactions at different distances (e.g. output of `cooltools compute-expected`), or directly from Hi-C data by dividing the pileups over randomly shifted control regions. If neither expected normalization approach is used (just set `--nshifts 0`), this becomes essentially identical to the APA approach (Rao et al., 2014), which can be used for averaging strongly interacting regions, e.g. annotated loops. For weaker interactors, decay of contact probability with distance can hide any focal enrichment that could be observed otherwise. However, most importantly, when comparing different sets of regions at even slightly different distances, or comparing different datasets, the decay of contact probability with distance will very strongly affect the resulting values, hence normalizing to it is essential in many cases, and generally recommended.
+
+## `coolpup.py` vs `cooltools pileup`
+
+`cooltools` is the main package with Hi-C analysis maintained by open2C. It also has a tool to perform pileups. Why does `coolpup.py` exit then?
+The way `cooltools pileup` works, is it accumulates all snippets for the pileup into one 3D array (stack). Which gives a lot of flexibility in case one wants to subset the snippets based on some features later, or do some other non-standard computations based on the stack. But this is only advantageous when one performs analysis using the Python API, and moreover limits the application of `cooltools pileup` so it can't be applied to a truly large number of snippets due to memory requirements. That's where `coolpup.py` comes in: internally it never stores more than one snippet in memory, hence there is no limit to how many snippets can be processed. `coolpup.py` is particularly well suited performance-wise for analysing huge numbers of potential interactions, since it loads whole chromosomes into memory one by one (or in parallel to speed it up) to extract small submatrices quickly. Having to read everything into memory makes it relatively slow for small numbers of loops, but performance doesn't decrease until you reach a huge number of interactions. Additionally, `cooltools pileup` doesn't support inter-chromosomal (trans) pileups, however it is possible in `coolpup.py`.
+
+While there is no way to subset the snippets after the pileup is generated (since they are not stored), `coolpup.py` allows one to perfeorm various subsetting during the pileup procedure. Builtin options in the CLI are subsetting by distance, by strand, by strand and distance at the same time, and by window/region - in case of a provided BED file, one pileup is generated for each row against all others in the same chromosome; in case of trans-pileups, pileups for each chromosome pair can be generated. Importantly, in Python API any arbitrary grouping of snippets is possible.
+
 ## .cool format
-A versatile tool to perform pile-up analysis on Hi-C data in .cool format (https://github.com/mirnylab/cooler). And who doesn't like cool pupppies?
 
 .cool is a modern and flexible format to store Hi-C data.
 It uses HDF5 to store a sparse representation of the Hi-C data, which allows low memory requirements when dealing with high resolution datasets. Another popular format to store Hi-C data, .hic, can be converted into .cool files using `hic2cool` (https://github.com/4dn-dcic/hic2cool).
@@ -18,16 +38,6 @@ It uses HDF5 to store a sparse representation of the Hi-C data, which allows low
 See for details:
 
 Abdennur, N., and Mirny, L. (2019). Cooler: scalable storage for Hi-C data and other genomically-labeled arrays. Bioinformatics. [10.1093/bioinformatics/btz540](https://doi.org/10.1093/bioinformatics/btz540)
-
-## What are pileups?
-
-This is the idea of how pileups work to check whether certain regions tend to interacts with each other:
-
-<img src="https://raw.githubusercontent.com/open2c/coolpuppy/master/loop_quant.png" alt="Pileup schematic" width="1000px"/>
-     
-What's not shown here is normalization to the expected values. This can be done in two ways: either using a provided file with expected values of interactions at different distances (output of `cooltools compute-expected`), or directly from Hi-C data by dividing the pileups over randomly shifted control regions. If neither expected normalization approach is used (just set `--nshifts 0`), this becomes essentially identical to the APA approach (Rao et al., 2014), which can be used for averaging strongly interacting regions, e.g. annotated loops. For weaker interactors, decay of contact probability with distance can hide any focal enrichment that could be observed otherwise.
-
-`coolpup.py` is particularly well suited performance-wise for analysing huge numbers of potential interactions, since it loads whole chromosomes into memory one by one (or in parallel to speed it up) to extract small submatrices quickly. Having to read everything into memory makes it relatively slow for small numbers of loops, but performance doesn't decrease until you reach a huge number of interactions.
 
 # Getting started
 
@@ -64,23 +74,4 @@ Ilya M Flyamer, Robert S Illingworth, Wendy A Bickmore (2020). Coolpup.py: versa
 [https://academic.oup.com/bioinformatics/article/36/10/2980/5719023](https://academic.oup.com/bioinformatics/article/36/10/2980/5719023)
 
 doi: 10.1093/bioinformatics/btaa073
-
-
-## This tool has been used in the following publications
-
-*Please let me know if I've missed any and you'd like your paper ot be mentioned here!*
-
-McLaughlin, K., Flyamer, I.M., Thomson, J.P., Mjoseng, H.K., Shukla, R., Williamson, I., Grimes, G.R., Illingworth, R.S., Adams, I.R., Pennings, S., et al. (2019). DNA Methylation Directs Polycomb-Dependent 3D Genome Re-organization in Naive Pluripotency. Cell Reports 29, 1974-1985.e6.
-
-[https://www.sciencedirect.com/science/article/pii/S2211124719313312?via%3Dihub](https://www.sciencedirect.com/science/article/pii/S2211124719313312?via%3Dihub)
-
-
-Boyle, S., Flyamer, I.M., Williamson, I., Sengupta, D., Bickmore, W.A., and Illingworth, R.S. (2019). A Central Role for Canonical PRC1 in Shaping the 3D Nuclear Landscape. Genes & Development 2020
-
-[http://genesdev.cshlp.org/content/early/2020/05/21/gad.336487.120.abstract](http://genesdev.cshlp.org/content/early/2020/05/21/gad.336487.120.abstract)
-
-
-Rhodes, J.D.P., Feldmann, A., Hernández-Rodríguez, B., Díaz, N., Brown, J.M., Fursova, N.A., Blackledge, N.P., Prathapan, P., Dobrinic, P., Huseyin, M.K., et al. (2020). Cohesin Disrupts Polycomb-Dependent Chromosome Interactions in Embryonic Stem Cells. Cell Reports 30, 820-835.e10.
-
-[https://www.sciencedirect.com/science/article/pii/S2211124719317140?via%3Dihub](https://www.sciencedirect.com/science/article/pii/S2211124719317140?via%3Dihub)
 
