@@ -31,7 +31,7 @@ def parse_args_coolpuppy():
                 i.e. chr1,start1,end1,chr2,start2,end2.
                 Should be tab-delimited.
 
-                With a bed file, will consider all cis combinations
+                With a bed file, will consider all combinations
                 of intervals. To pileup features along the diagonal
                 instead, use the ``--local`` argument.
 
@@ -46,7 +46,8 @@ def parse_args_coolpuppy():
         "--basetype",
         type=str,
         choices=["bed", "bedpe", "auto"],
-        help="""Format of the features. Options:
+        help="""Format of the features.
+                Options:
                 bed: chrom, start, end
                 bedpe: chrom1, start1, end1, chrom2, start2, end2
                 auto (default): determined from the file name extension
@@ -110,9 +111,7 @@ def parse_args_coolpuppy():
         dest="ooe",
         default=True,
         action="store_false",
-        help="""If expected is provided, will accumulate all expected snippets just like 
-                for randomly shifted controls, instead of normalizing each snippet 
-                individually""",
+        help="""If expected is provided, will accumulate all expected snippets just like for randomly shifted controls, instead of normalizing each snippet individually""",
     )
     # Filtering
     parser.add_argument(
@@ -160,8 +159,7 @@ def parse_args_coolpuppy():
         type=int,
         required=False,
         help="""Take a random sample of the bed file.
-                Useful for files with too many featuers to run as is, i.e.
-                some repetitive elements. Set to 0 or lower to keep all data""",
+                Useful for files with too many featuers to run as is, i.e. some repetitive elements. Set to 0 or lower to keep all data""",
     )
     # Modes of action
     parser.add_argument(
@@ -222,11 +220,11 @@ def parse_args_coolpuppy():
         nargs="?",
         const="total",
         help="""
-            Whether to normalize final the final pileup by accumulated coverage as an
-            alternative to balancing. Useful for single-cell Hi-C data. Can be a string:
-            "cis" or "total" to use "cis_raw_cov" or "tot_raw_cov" columns in the cooler
-            bin table, respectively. If they are not present, will calculate coverage
-            with same ignore_diags as used in coolpup.py and store result in the cooler.
+            Normalize the final pileup by accumulated coverage as an alternative to balancing.
+            Useful for single-cell Hi-C data. Can be a string: "cis" or "total" to use 
+            "cis_raw_cov" or "tot_raw_cov" columns in the cooler bin table, respectively.
+            If they are not present, will calculate coverage with same ignore_diags as
+            used in coolpup.py and store result in the cooler.
             Alternatively, if a different string is provided, will attempt to use a
             column with the that name in the cooler bin table, and will raise a
             ValueError if it does not exist.
