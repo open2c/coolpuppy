@@ -37,7 +37,7 @@ extensions = [
     "myst_nb",
     # 'sphinx_argparse_cli',
     # 'myst_parser',
-    # "sphinx.ext.napoleon",
+    "sphinx.ext.napoleon",
     "sphinx.ext.autodoc",
     # "sphinx.ext.viewcode",
     # "sphinx.ext.githubpages",
@@ -45,7 +45,7 @@ extensions = [
     "sphinxarg.ext",
     # 'm2r2'
 ]
-
+napoleon_numpy_docstring = True
 
 MOCK_MODULES = [
     "Cython",
