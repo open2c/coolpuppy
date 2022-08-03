@@ -21,14 +21,14 @@ This is the idea of how pileups work to check whether certain regions tend to in
 
 On the right is the more typical use case for quantification of loop strength. On the left is a different approach, designed to check whether specific regions in the genome (e.g. binding sites of a certain factor) tend to interact with each other.
 
-What is very important for this quantification, is the normalization to expected values. This can be done in two ways: either using a chromosome- (or arm-) wide by-distance expected interactions, using a file with average values of interactions at different distances (e.g. output of `cooltools compute-expected`), or directly from Hi-C data by dividing the pileups over randomly shifted control regions. If neither expected normalization approach is used (just set `--nshifts 0`), this becomes essentially identical to the APA approach (Rao et al., 2014), which can be used for averaging strongly interacting regions, e.g. annotated loops. For weaker interactors, decay of contact probability with distance can hide any focal enrichment that could be observed otherwise. However, most importantly, when comparing different sets of regions at even slightly different distances, or comparing different datasets, the decay of contact probability with distance will very strongly affect the resulting values, hence normalizing to it is essential in many cases, and generally recommended.
+What is very important for this quantification, is the normalization to expected values. This can be done in two ways: either using a chromosome- (or arm-) wide by-distance expected interactions, using a file with average values of interactions at different distances (e.g. output of `cooltools expected-cis`), or directly from Hi-C data by dividing the pileups over randomly shifted control regions. If neither expected normalization approach is used (just set `--nshifts 0`), this becomes essentially identical to the APA approach (Rao et al., 2014), which can be used for averaging strongly interacting regions, e.g. annotated loops. For weaker interactors, decay of contact probability with distance can hide any focal enrichment that could be observed otherwise. However, most importantly, when comparing different sets of regions at even slightly different distances, or comparing different datasets, the decay of contact probability with distance will very strongly affect the resulting values, hence normalizing to it is essential in many cases, and generally recommended.
 
 ## `coolpup.py` vs `cooltools pileup`
 
 `cooltools` is the main package with Hi-C analysis maintained by open2C. It also has a tool to perform pileups. Why does `coolpup.py` exit then?
 The way `cooltools pileup` works, is it accumulates all snippets for the pileup into one 3D array (stack). Which gives a lot of flexibility in case one wants to subset the snippets based on some features later, or do some other non-standard computations based on the stack. But this is only advantageous when one performs analysis using the Python API, and moreover limits the application of `cooltools pileup` so it can't be applied to a truly large number of snippets due to memory requirements. That's where `coolpup.py` comes in: internally it never stores more than one snippet in memory, hence there is no limit to how many snippets can be processed. `coolpup.py` is particularly well suited performance-wise for analysing huge numbers of potential interactions, since it loads whole chromosomes into memory one by one (or in parallel to speed it up) to extract small submatrices quickly. Having to read everything into memory makes it relatively slow for small numbers of loops, but performance doesn't decrease until you reach a huge number of interactions. Additionally, `cooltools pileup` doesn't support inter-chromosomal (trans) pileups, however it is possible in `coolpup.py`.
 
-While there is no way to subset the snippets after the pileup is generated (since they are not stored), `coolpup.py` allows one to perfeorm various subsetting during the pileup procedure. Builtin options in the CLI are subsetting by distance, by strand, by strand and distance at the same time, and by window/region - in case of a provided BED file, one pileup is generated for each row against all others in the same chromosome; in case of trans-pileups, pileups for each chromosome pair can be generated. Importantly, in Python API any arbitrary grouping of snippets is possible.
+While there is no way to subset the snippets after the pileup is generated (since they are not stored), `coolpup.py` allows one to perform various subsetting during the pileup procedure. Builtin options in the CLI are subsetting by distance, by strand, by strand and distance at the same time, and by window/region - in case of a provided BED file, one pileup is generated for each row against all others in the same chromosome; in case of trans-pileups, pileups for each chromosome pair can be generated. Importantly, in Python API any arbitrary grouping of snippets is possible.
 
 ## .cool format
 
@@ -44,7 +44,7 @@ Abdennur, N., and Mirny, L. (2019). Cooler: scalable storage for Hi-C data and o
 ## Installation
 All requirements apart are available from PyPI or conda. 
 
-Before installing everything you need to obtain `cython` using either pip or conda. Then for coolpuppy (and other dependencies) simply do:
+Before installing everything you need to obtain `Cython` using either pip or conda. Then for coolpuppy (and other dependencies) simply do:
 
 `pip install coolpuppy`
 
@@ -56,17 +56,18 @@ to get the latest version from GitHub. This will make `coolpup.py` callable in y
 
 ## Usage
 
+The basic usage syntax is as follows:
+
+`coolpup.py [OPTIONS] coolfile.cool regionfile.bed` 
+
 A guide walkthrough to pile-up analysis is available here (WIP): [Walkthrough](https://coolpuppy.readthedocs.io/en/latest/walkthrough.html)
 
 Docs for the command line interface are available here: [CLI docs](https://coolpuppy.readthedocs.io/en/latest/coolpup_py_cli.html)
 
 Some examples to get you started with CLI interface are available [here](https://coolpuppy.readthedocs.io/en/latest/Examples/Walkthrough_CLI.html) and for the python API examples see [here](https://coolpuppy.readthedocs.io/en/latest/Examples/Walkthrough_API.html).
 
-Currently, `coolpup.py` doesn't support inter-chromosomal pileups, but this is an addition that is planned for the future.
-
 ### Plotting results
 For flexible plotting, I suggest to use `matplotlib` or another library. However simple plotting capabilities are included in this package. Just run `plotpup.py` with desired options and list all the output files of `coolpup.py` you'd like to plot.
-
 
 ## Citing coolpup.py
 Ilya M Flyamer, Robert S Illingworth, Wendy A Bickmore (2020). Coolpup.py: versatile pile-up analysis of Hi-C data. Bioinformatics, 36, 10, 2980–2985.
