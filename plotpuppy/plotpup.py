@@ -117,7 +117,7 @@ def add_heatmap(
     ax.imshow(data.values[0], cmap=cmap, norm=norm, aspect=aspect, interpolation="none")
 
     if plot_ticks:
-        ax.tick_params(axis="both", which="major", labelsize=6+height, width=1+(height/2), length=1+height)
+        ax.tick_params(axis="both", which="major", labelsize=4.94+height, width=1+(height/2), length=1+height)
         resolution = int(resolution)
         flank = int(flank)
         if not rescale.any():
@@ -129,11 +129,13 @@ def add_heatmap(
             if not stripe:
                 plt.yticks(ticks_pixels.tolist(), [])
         else:
+            if not stripe:
+                plt.yticks([], [])
             if not rescale_flank.any():
                 plt.xticks([], [])
 
 
-def add_score(score, color=None):
+def add_score(score, height=1, color=None):
     """
     Adds the value contained in score.values[0] to the current axes as a label in top left corner
     """
@@ -145,14 +147,14 @@ def add_score(score, color=None):
             x=0.05,
             ha="left",
             va="top",
-            size="x-small",
+            #size="x-small",
+            size=4.94+height,
             transform=ax.transAxes,
         )
 
 
 def sort_separation(sep_string_series, sep="Mb"):
     return sorted(set(sep_string_series.dropna()), key=lambda x: float(x.split(sep)[0]))
-
 
 def make_heatmap_stripes(
     pupsdf,
@@ -178,7 +180,7 @@ def make_heatmap_stripes(
 ):
     pupsdf = pupsdf.copy()
 
-    if not set(["corner_stripe", "vertical_stripe", "horizontal_stripe"]).issubset(
+    if not set(["vertical_stripe", "horizontal_stripe"]).issubset(
         pupsdf.columns
     ):
         raise ValueError("No stripes stored in pup")
@@ -219,10 +221,22 @@ def make_heatmap_stripes(
         )
 
     right = ncols / (ncols + 0.25)
-
+    
+    pupsdf = pupsdf.reset_index()
+    
+    #Generate corner stripes
+    cntr = int(np.floor(pupsdf["data"][0].shape[0] / 2))
+    pupsdf["corner_stripe"] = pupsdf["horizontal_stripe"]
+    for i in range(len(pupsdf)):
+        pupsdf["corner_stripe"][i] = np.concatenate(
+            (
+                pupsdf["horizontal_stripe"][i][:,:(cntr)],
+                pupsdf["vertical_stripe"][i][:,cntr:],
+            ), axis=1
+        )
+    
     # Sorting stripes
     if not stripe_sort == None:
-        pupsdf = pupsdf.reset_index()
         different = False
         for i in range(len(pupsdf)):
             pupsdf["coordinates"][i] = np.array(pupsdf["coordinates"][i], dtype=object)
@@ -250,7 +264,6 @@ def make_heatmap_stripes(
                 lambda x: x[ind_regions]
             )
         for i in range(len(pupsdf)):
-            # if not np.all(pupsdf["coordinates"][0] == pupsdf["coordinates"][i]):
             if not np.array_equal(pupsdf["coordinates"][0], pupsdf["coordinates"][i]):
                 different = True
                 warnings.warn(
@@ -530,7 +543,7 @@ def make_heatmap_grid(
         pupsdf["score"] = pupsdf.apply(
             coolpup.get_score, center=center, ignore_central=ignore_central, axis=1
         )
-        fg.map(add_score, "score")
+        fg.map(add_score, "score", height=height)
 
     if plot_ticks:
         fg.fig.subplots_adjust(wspace=0.2, hspace=0.05)
@@ -566,7 +579,7 @@ def make_heatmap_grid(
                 plt.title("")
                 plt.ylabel("")
                 if pupsdf["rescale"].any():
-                    plt.xlabel("rescaled\n" + stripe)
+                    plt.xlabel("rescaled")
                 else:
                     plt.xlabel("pos. [kbp]")
     else:
