@@ -52,7 +52,7 @@ def save_pileup_df(filename, df, metadata=None, mode="w", compression="lzf"):
     df[
         df.columns[
             ~df.columns.isin(
-                ["data", "corner_stripe", "vertical_stripe", "horizontal_stripe", "coordinates"]
+                ["data", "vertical_stripe", "horizontal_stripe", "coordinates"]
             )
         ]
     ].to_hdf(filename, "annotation", mode=mode)
@@ -66,10 +66,6 @@ def save_pileup_df(filename, df, metadata=None, mode="w", compression="lzf"):
         for i, arr in df["data"].reset_index(drop=True).items():
             ds[i * width : (i + 1) * width, :] = arr
         if df["store_stripes"].any():
-            for i, arr in df["corner_stripe"].reset_index(drop=True).items():
-                f.create_dataset(
-                    "corner_stripe_" + str(i), compression=compression, shape=(len(arr), width), data=sparse.csr_matrix(arr)
-                )
             for i, arr in df["vertical_stripe"].reset_index(drop=True).items():
                 f.create_dataset(
                     "vertical_stripe_" + str(i), compression=compression, shape=(len(arr), width), data=sparse.csr_matrix(arr)
@@ -118,21 +114,17 @@ def load_pileup_df(filename, quaich=False):
             data.append(chunk)
         annotation = pd.read_hdf(filename, "annotation")
         annotation["data"] = data
-        corner_stripe = []
         vertical_stripe = []
         horizontal_stripe = []
         coordinates = []
         try:
             for i in range(len(data)):
-                cstripe = "corner_stripe_" + str(i)
                 vstripe = "vertical_stripe_" + str(i)
                 hstripe = "horizontal_stripe_" + str(i)
                 coords = "coordinates_" + str(i)
-                corner_stripe.append(f[cstripe][:].toarray())
                 vertical_stripe.append(f[vstripe][:].toarray())
                 horizontal_stripe.append(f[hstripe][:].toarray())
                 coordinates.append(f[coords][:].astype('U13'))
-            annotation["corner_stripe"] = corner_stripe
             annotation["vertical_stripe"] = vertical_stripe
             annotation["horizontal_stripe"] = horizontal_stripe
             annotation["coordinates"] = coordinates
@@ -420,6 +412,10 @@ def prepare_single(item):
     cv5 = corner_cv(amap, 5)
     return list(key) + [n, enr1, enr3, cv3, cv5]
 
+def copy_array_halves(x):
+    cntr = int(np.floor(x.shape[1] / 2))
+    x[:,:(cntr+1)] = np.fliplr(x[:,cntr:])
+    return x        
 
 def bin_distance_intervals(intervals, band_edges="default"):
     """
@@ -567,7 +563,6 @@ def _add_snip(outdict, key, snip):
         outdict[key]["coordinates"] = [snip["coordinates"]]
         outdict[key]["horizontal_stripe"] = [snip["horizontal_stripe"]]
         outdict[key]["vertical_stripe"] = [snip["vertical_stripe"]]
-        outdict[key]["corner_stripe"] = [snip["corner_stripe"]]
         outdict[key]["num"] = np.isfinite(snip["data"]).astype(int)
         outdict[key]["n"] = 1
     else:
@@ -585,9 +580,6 @@ def _add_snip(outdict, key, snip):
         ]
         outdict[key]["vertical_stripe"] = outdict[key]["vertical_stripe"] + [
             snip["vertical_stripe"]
-        ]
-        outdict[key]["corner_stripe"] = outdict[key]["corner_stripe"] + [
-            snip["corner_stripe"]
         ]
         outdict[key]["coordinates"] = outdict[key]["coordinates"] + [
             snip["coordinates"]
@@ -611,7 +603,6 @@ def sum_pups(pup1, pup2):
         + pup2.get("num", np.isfinite(pup2["data"]).astype(int)),
         "horizontal_stripe": pup1["horizontal_stripe"] + pup2["horizontal_stripe"],
         "vertical_stripe": pup1["vertical_stripe"] + pup2["vertical_stripe"],
-        "corner_stripe": pup1["corner_stripe"] + pup2["corner_stripe"],
         "coordinates": pup1["coordinates"] + pup2["coordinates"],
     }
     return pd.Series(pup)
@@ -637,7 +628,6 @@ def divide_pups(pup1, pup2):
         "data",
         "horizontal_stripe",
         "vertical_stripe",
-        "corner_stripe",
         "cool_path",
         "features",
         "outname",
@@ -653,12 +643,12 @@ def divide_pups(pup1, pup2):
         ), f"Cannot divide these pups, {col} is different between them"
     div_pup["data"] = pup1["data"] / pup2["data"]
     div_pup["clrs"] = str(pup1["clr"]) + "/" + str(pup2["clr"])
-    if set(["corner_stripe", "vertical_stripe", "horizontal_stripe"]).issubset(
+    if set(["vertical_stripe", "horizontal_stripe"]).issubset(
         pup1.columns
     ):
         if np.all(np.sort(pup1["coordinates"]) == np.sort(pup2["coordinates"])):
             div_pup["coordinates"] = pup1["coordinates"]
-            for stripe in ["corner_stripe", "vertical_stripe", "horizontal_stripe"]:
+            for stripe in ["vertical_stripe", "horizontal_stripe"]:
                 div_pup[stripe] = pup1[stripe] / pup2[stripe]
                 div_pup[stripe] = div_pup[stripe].apply(
                     lambda x: np.where(np.isin(x, [np.inf, np.nan]), 0, x)
@@ -1177,7 +1167,6 @@ class CoordCreator:
                     "cov_end",
                     "horizontal_stripe",
                     "vertical_stripe",
-                    "corner_stripe",
                 ]
             )
             for row in merged.to_dict(orient="records"):
@@ -1230,7 +1219,6 @@ class CoordCreator:
                             "data",
                             "horizontal_stripe",
                             "vertical_stripe",
-                            "corner_stripe",
                             "cov_start",
                             "cov_end",
                         ]
@@ -1281,7 +1269,6 @@ class CoordCreator:
                             "data",
                             "horizontal_stripe",
                             "vertical_stripe",
-                            "corner_stripe",
                             "cov_start",
                             "cov_end",
                         ]
@@ -1322,7 +1309,6 @@ class CoordCreator:
                 "cov_end",
                 "horizontal_stripe",
                 "vertical_stripe",
-                "corner_stripe",
             ]
         )
         if not len(intervals) >= 1:
@@ -1408,7 +1394,7 @@ class PileUpper:
             How many diagonals to ignore to avoid short-distance artefacts.
             The default is 2.
         store_stripes: bool, optional
-            Whether to store horizontal, vertical, corner_stripes, and coordinates in the output
+            Whether to store horizontal and vertical stripes and coordinates in the output
             The default is False
         nproc : int, optional
             Number of processes to use. The default is 1.
@@ -1575,7 +1561,6 @@ class PileUpper:
             "data": self.empty_outmap,
             "horizontal_stripe": [],
             "vertical_stripe": [],
-            "corner_stripe": [],
             "n": 0,
             "num": self.empty_outmap,
             "cov_start": np.zeros((self.empty_outmap.shape[0])),
@@ -1767,16 +1752,9 @@ class PileUpper:
                 snip["vertical_stripe"] = np.array(
                     snip["data"][:, cntr][::-1], dtype=float
                 )
-                snip["corner_stripe"] = np.concatenate(
-                    (
-                        snip["horizontal_stripe"][: int(np.floor(cntr)) + 1],
-                        snip["vertical_stripe"][: int(np.floor(cntr))][::-1],
-                    )
-                )
             else:
                 snip["horizontal_stripe"] = []
                 snip["vertical_stripe"] = []
-                snip["corner_stripe"] = []
                 snip["coordinates"] = []
 
             yield snip
@@ -1806,9 +1784,20 @@ class PileUpper:
         if snip["data"].size == 0 or np.all(np.isnan(snip["data"])):
             snip["data"] = np.zeros((self.rescale_size, self.rescale_size))
         else:
+            if self.local:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", category=RuntimeWarning)
+                    snip["data"] = np.nanmean(np.dstack((snip["data"], snip["data"].T)), 2)
+            nans = np.isnan(snip["data"])*1
+            snip["data"] = np.nan_to_num(snip["data"])
             snip["data"] = numutils.zoom_array(
                 snip["data"], (self.rescale_size, self.rescale_size)
             )
+            nanzoom = numutils.zoom_array(
+                nans, (self.rescale_size, self.rescale_size)
+            )
+            snip["data"][np.floor(nanzoom).astype(bool)] = np.nan
+            snip["data"] = snip["data"] * (1/np.isfinite(nanzoom))
         if self.coverage_norm:
             snip["cov_start"] = numutils.zoom_array(
                 snip["cov_start"], (self.rescale_size,)
@@ -2047,7 +2036,6 @@ class PileUpper:
             ]
             normalized_roi["horizontal_stripe"] = roi["horizontal_stripe"]
             normalized_roi["vertical_stripe"] = roi["vertical_stripe"]
-            normalized_roi["corner_stripe"] = roi["corner_stripe"]
 
             if self.control or (self.expected and not self.ooe):
                 # Generate stripes of normalized control arrays
@@ -2057,12 +2045,6 @@ class PileUpper:
                 )
                 control_verticalstripe = np.array(
                     normalized_control["data"]["all"][:, cntr][::-1], dtype=float
-                )
-                control_cornerstripe = np.concatenate(
-                    (
-                        control_horizontalstripe[: int(np.floor(cntr)) + 1],
-                        control_verticalstripe[: int(np.floor(cntr))][::-1],
-                    )
                 )
                 normalized_roi["horizontal_stripe"] = normalized_roi.apply(
                     lambda row: np.divide(
@@ -2076,14 +2058,12 @@ class PileUpper:
                     ),
                     axis=1,
                 )
-                normalized_roi["corner_stripe"] = normalized_roi.apply(
-                    lambda row: np.divide(row["corner_stripe"], control_cornerstripe),
-                    axis=1,
-                )
-            normalized_roi["corner_stripe"] = normalized_roi["corner_stripe"].apply(np.vstack)
             normalized_roi["vertical_stripe"] = normalized_roi["vertical_stripe"].apply(np.vstack)
             normalized_roi["horizontal_stripe"] = normalized_roi["horizontal_stripe"].apply(np.vstack)
             normalized_roi["coordinates"] = normalized_roi["coordinates"].apply(np.vstack)
+            if self.local:
+                normalized_roi["vertical_stripe"] = normalized_roi["vertical_stripe"].apply(lambda x: copy_array_halves(x))
+                normalized_roi["horizontal_stripe"] = normalized_roi["horizontal_stripe"].apply(lambda x: copy_array_halves(x))
 
         if self.local:
             with warnings.catch_warnings():
