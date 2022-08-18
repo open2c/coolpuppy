@@ -2,6 +2,7 @@ pyyaml
 sphinx>=1.4
 ipykernel
 sphinx-argparse
+sphinxcontrib-napoleon
 natsort
 sphinx_rtd_theme
 myst_nb
