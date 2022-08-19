@@ -2067,7 +2067,7 @@ class PileUpper:
                     for pileup in pileups
                 ]
             )
-            .apply(lambda x: reduce(sum_pups, x.dropna()))
+            .apply(lambda x: reduce(sum_func, x.dropna()))
             .T
         )
         if self.control or (self.expected and not self.ooe):
@@ -2078,7 +2078,7 @@ class PileUpper:
                         for pileup in pileups
                     ]
                 )
-                .apply(lambda x: reduce(sum_pups, x.dropna()))
+                .apply(lambda x: reduce(sum_func, x.dropna()))
                 .T
             )
 
