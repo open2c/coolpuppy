@@ -15,12 +15,12 @@ walkthrough.md
 Examples/Walkthrough_API.ipynb
 Examples/Walkthrough_CLI.ipynb
 Examples/TAD_score.ipynb
+```
 ```{toctree}
 :caption: 'API reference:'
 :maxdepth: 2
 coolpup_py_cli.md
 modules.md
-
 ```
 
 # Indices and tables
