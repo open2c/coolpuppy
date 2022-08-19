@@ -9,14 +9,18 @@ Please feel free to report any problems or contribute.
 ```
 
 ```{toctree}
-:caption: 'Contents:'
+:caption: 'Tutorials:'
 :maxdepth: 2
-
 walkthrough.md
-coolpup_py_cli.md
-modules.md
 Examples/Walkthrough_API.ipynb
 Examples/Walkthrough_CLI.ipynb
+Examples/TAD_score.ipynb
+```
+```{toctree}
+:caption: 'API reference:'
+:maxdepth: 2
+coolpup_py_cli.md
+modules.md
 ```
 
 # Indices and tables
