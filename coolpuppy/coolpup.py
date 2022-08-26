@@ -53,7 +53,6 @@ def save_pileup_df(filename, df, metadata=None, mode="w", compression="lzf"):
     df[
         df.columns[
             ~df.columns.isin(
-
                 ["data", "vertical_stripe", "horizontal_stripe", "coordinates"]
             )
         ]
@@ -138,7 +137,7 @@ def load_pileup_df(filename, quaich=False):
                 coords = "coordinates_" + str(i)
                 vertical_stripe.append(f[vstripe][:].toarray())
                 horizontal_stripe.append(f[hstripe][:].toarray())
-                coordinates.append(f[coords][:].astype('U13'))
+                coordinates.append(f[coords][:].astype("U13"))
             annotation["vertical_stripe"] = vertical_stripe
             annotation["horizontal_stripe"] = horizontal_stripe
             annotation["coordinates"] = coordinates
@@ -316,7 +315,7 @@ def get_enrichment(amap, n):
 
 
 def get_local_enrichment(amap, flank=1):
-    """Get values from the central part of a pileup for a square, ignoring padding
+    """Get values for a square from the central part of a pileup, ignoring padding
 
     Parameters
     ----------
@@ -337,6 +336,35 @@ def get_local_enrichment(amap, flank=1):
     assert int(c) == c
     c = int(c)
     return np.nanmean(amap[c:-c, c:-c])
+
+
+def get_domain_score(amap, flank=1):
+    """Divide sum of values in a square from the central part of a matrix by the upper
+    and right rectangles corresponding to interactions of the central region with
+    its surroundings.
+
+    Parameters
+    ----------
+    amap : 2D array
+        Pileup.
+    flank : int
+        Relative padding used, i.e. if 1 the central third is used, if 2 the central
+        fifth is used.
+        The default is 1.
+
+    Returns
+    -------
+    score : float
+        Domain score.
+
+    """
+    c = amap.shape[0] / (flank * 2 + 1)
+    assert int(c) == c
+    c = int(c)
+    central = np.nansum(amap[c:-c, c:-c])
+    top = np.nansum(amap[:c, c:-c])
+    right = np.nansum(amap[c:-c, -c:])
+    return central / (top + right) * 2
 
 
 def get_insulation_strength(amap, ignore_central=0, ignore_diags=2):
@@ -400,7 +428,7 @@ def get_score(pup, center=3, ignore_central=3):
         return get_enrichment(pup["data"], center)
     else:
         if pup["rescale"]:
-            return get_local_enrichment(pup["data"], pup["rescale_flank"])
+            return get_domain_score(pup["data"], pup["rescale_flank"])
         else:
             return get_insulation_strength(pup["data"], ignore_central)
 
@@ -426,10 +454,12 @@ def prepare_single(item):
     cv5 = corner_cv(amap, 5)
     return list(key) + [n, enr1, enr3, cv3, cv5]
 
+
 def copy_array_halves(x):
     cntr = int(np.floor(x.shape[1] / 2))
-    x[:,:(cntr+1)] = np.fliplr(x[:,cntr:])
-    return x        
+    x[:, : (cntr + 1)] = np.fliplr(x[:, cntr:])
+    return x
+
 
 def bin_distance_intervals(intervals, band_edges="default"):
     """
@@ -571,7 +601,16 @@ def combine_rows(row1, row2, normalize_order=True):
     return double_row
 
 
-def _add_snip(outdict, key, snip):
+def accumulate_values(dict1, dict2, key):
+    assert key in dict2, f"{key} not in dict2"
+    if key in dict1:
+        dict1[key] = list(collapse([dict1[key], dict2[key]]))
+    else:
+        dict1[key] = [dict2[key]]
+    return dict1
+
+
+def _add_snip(outdict, key, snip, extra_funcs=None):
     if key not in outdict:
         outdict[key] = {key: snip[key] for key in ["data", "cov_start", "cov_end"]}
         outdict[key]["coordinates"] = [snip["coordinates"]]
@@ -598,13 +637,19 @@ def _add_snip(outdict, key, snip):
         outdict[key]["coordinates"] = outdict[key]["coordinates"] + [
             snip["coordinates"]
         ]
+    if extra_funcs is not None:
+        for key2, func in extra_funcs.items():
+            outdict[key] = func(outdict[key], snip)
 
 
-def sum_pups(pup1, pup2):
+def sum_pups(pup1, pup2, extra_funcs={}):
     """
     Preserves data, stripes, cov_start, cov_end, n, num and coordinates
     Assumes n=1 if not present, and calculates num if not present
     If store_stripes is set to False, stripes and coordinates will be empty
+
+    extra_funcs allows to give arbitrary functions to accumulate additio to accumulate
+    extra information from the two pups.
     """
     pup1["data"] = np.nan_to_num(pup1["data"])
     pup2["data"] = np.nan_to_num(pup2["data"])
@@ -619,6 +664,9 @@ def sum_pups(pup1, pup2):
         "vertical_stripe": pup1["vertical_stripe"] + pup2["vertical_stripe"],
         "coordinates": pup1["coordinates"] + pup2["coordinates"],
     }
+    if extra_funcs:
+        for key, func in extra_funcs.items():
+            pup = func(pup1, pup2)
     return pd.Series(pup)
 
 
@@ -657,9 +705,7 @@ def divide_pups(pup1, pup2):
         ), f"Cannot divide these pups, {col} is different between them"
     div_pup["data"] = pup1["data"] / pup2["data"]
     div_pup["clrs"] = str(pup1["clr"]) + "/" + str(pup2["clr"])
-    if set(["vertical_stripe", "horizontal_stripe"]).issubset(
-        pup1.columns
-    ):
+    if set(["vertical_stripe", "horizontal_stripe"]).issubset(pup1.columns):
         if np.all(np.sort(pup1["coordinates"]) == np.sort(pup2["coordinates"])):
             div_pup["coordinates"] = pup1["coordinates"]
             for stripe in ["vertical_stripe", "horizontal_stripe"]:
@@ -1801,17 +1847,17 @@ class PileUpper:
             if self.local:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore", category=RuntimeWarning)
-                    snip["data"] = np.nanmean(np.dstack((snip["data"], snip["data"].T)), 2)
-            nans = np.isnan(snip["data"])*1
+                    snip["data"] = np.nanmean(
+                        np.dstack((snip["data"], snip["data"].T)), 2
+                    )
+            nans = np.isnan(snip["data"]) * 1
             snip["data"] = np.nan_to_num(snip["data"])
             snip["data"] = numutils.zoom_array(
                 snip["data"], (self.rescale_size, self.rescale_size)
             )
-            nanzoom = numutils.zoom_array(
-                nans, (self.rescale_size, self.rescale_size)
-            )
+            nanzoom = numutils.zoom_array(nans, (self.rescale_size, self.rescale_size))
             snip["data"][np.floor(nanzoom).astype(bool)] = np.nan
-            snip["data"] = snip["data"] * (1/np.isfinite(nanzoom))
+            snip["data"] = snip["data"] * (1 / np.isfinite(nanzoom))
         if self.coverage_norm:
             snip["cov_start"] = numutils.zoom_array(
                 snip["cov_start"], (self.rescale_size,)
@@ -1819,7 +1865,7 @@ class PileUpper:
             snip["cov_end"] = numutils.zoom_array(snip["cov_end"], (self.rescale_size,))
         return snip
 
-    def accumulate_stream(self, snip_stream, postprocess_func=None):
+    def accumulate_stream(self, snip_stream, postprocess_func=None, extra_funcs=None):
         """
 
         Parameters
@@ -1834,6 +1880,9 @@ class PileUpper:
             Can be used to modify the data in un-standard way, or create groups when
             it can't be done before snipping, or to assign each snippet to multiple
             groups. Example: `group_by_region`.
+        extra_funcs : dict, optional
+            Any additional functions to be applied every time a snip is added to a
+            pileup or two pileups are summed up - see `_add_snip` and `sum_pups`.
 
         Returns
         -------
@@ -1848,17 +1897,20 @@ class PileUpper:
             kind = snip["kind"]
             key = snip["group"]
             if isinstance(key, str):
-                _add_snip(outdict[kind], key, snip)
+                _add_snip(outdict[kind], key, snip, extra_funcs=extra_funcs)
             else:
-                _add_snip(outdict[kind], tuple(key), snip)
+                _add_snip(outdict[kind], tuple(key), snip, extra_funcs=extra_funcs)
+        sum_func = partial(sum_pups, extra_funcs=extra_funcs)
         if "all" not in outdict["ROI"]:
             outdict["ROI"]["all"] = reduce(
-                sum_pups, outdict["ROI"].values(), self.empty_pup
+                sum_func, outdict["ROI"].values(), self.empty_pup
             )
         if self.control or (self.expected and not self.ooe):
             if "all" not in outdict["control"]:
                 outdict["control"]["all"] = reduce(
-                    sum_pups, outdict["control"].values(), self.empty_pup
+                    sum_func,
+                    outdict["control"].values(),
+                    self.empty_pup,
                 )
         return outdict
 
@@ -1869,6 +1921,7 @@ class PileUpper:
         groupby=[],
         modify_2Dintervals_func=None,
         postprocess_func=None,
+        extra_sum_funcs=None,
     ):
         """
 
@@ -1888,6 +1941,9 @@ class PileUpper:
             Additional function to apply to each snippet before grouping.
             Good example is the `bin_distance` function above, but using
             bin_distance_intervals as modify_2Dintervals_func is much faster.
+        extra_sum_funcs : dict, optional
+            Any additional functions to be applied every time a snip is added to a
+            pileup or two pileups are summed up - see `_add_snip` and `sum_pups`.
 
         Returns
         -------
@@ -1926,6 +1982,7 @@ class PileUpper:
         final = self.accumulate_stream(
             self._stream_snips(intervals=intervals, region1=region1, region2=region2),
             postprocess_func=postprocess_func,
+            extra_funcs=extra_sum_funcs,
         )
         if final["ROI"]["all"]["n"] > 0:
             logging.info(f"{region1, region2}: {final['ROI']['all']['n']}")
@@ -1938,6 +1995,7 @@ class PileUpper:
         groupby=[],
         modify_2Dintervals_func=None,
         postprocess_func=None,
+        extra_sum_funcs=None,
     ):
         """Perform pileups across all chromosomes and applies required
         normalization
@@ -1957,6 +2015,9 @@ class PileUpper:
         postprocess_func : function, optional
             Additional function to apply to each snippet before grouping.
             Good example is the `bin_distance` function above.
+        extra_sum_funcs : dict, optional
+            Any additional functions to be applied every time a snip is added to a
+            pileup or two pileups are summed up - see `_add_snip` and `sum_pups`.
 
         Returns
         -------
@@ -1972,7 +2033,7 @@ class PileUpper:
             nproc = self.nproc
         if len(self.chroms) == 0:
             return self.make_outmap(), 0
-
+        sum_func = partial(sum_pups, extra_funcs=extra_sum_funcs)
         # Generate all combinations of chromosomes
         regions1 = []
         regions2 = []
@@ -1992,6 +2053,7 @@ class PileUpper:
             groupby=groupby,
             modify_2Dintervals_func=modify_2Dintervals_func,
             postprocess_func=postprocess_func,
+            extra_sum_funcs=extra_sum_funcs,
         )
         if nproc > 1:
             with Pool(nproc) as p:
@@ -2005,7 +2067,7 @@ class PileUpper:
                     for pileup in pileups
                 ]
             )
-            .apply(lambda x: reduce(sum_pups, x.dropna()))
+            .apply(lambda x: reduce(sum_func, x.dropna()))
             .T
         )
         if self.control or (self.expected and not self.ooe):
@@ -2016,7 +2078,7 @@ class PileUpper:
                         for pileup in pileups
                     ]
                 )
-                .apply(lambda x: reduce(sum_pups, x.dropna()))
+                .apply(lambda x: reduce(sum_func, x.dropna()))
                 .T
             )
 
@@ -2072,12 +2134,22 @@ class PileUpper:
                     ),
                     axis=1,
                 )
-            normalized_roi["vertical_stripe"] = normalized_roi["vertical_stripe"].apply(np.vstack)
-            normalized_roi["horizontal_stripe"] = normalized_roi["horizontal_stripe"].apply(np.vstack)
-            normalized_roi["coordinates"] = normalized_roi["coordinates"].apply(np.vstack)
+            normalized_roi["vertical_stripe"] = normalized_roi["vertical_stripe"].apply(
+                np.vstack
+            )
+            normalized_roi["horizontal_stripe"] = normalized_roi[
+                "horizontal_stripe"
+            ].apply(np.vstack)
+            normalized_roi["coordinates"] = normalized_roi["coordinates"].apply(
+                np.vstack
+            )
             if self.local:
-                normalized_roi["vertical_stripe"] = normalized_roi["vertical_stripe"].apply(lambda x: copy_array_halves(x))
-                normalized_roi["horizontal_stripe"] = normalized_roi["horizontal_stripe"].apply(lambda x: copy_array_halves(x))
+                normalized_roi["vertical_stripe"] = normalized_roi[
+                    "vertical_stripe"
+                ].apply(lambda x: copy_array_halves(x))
+                normalized_roi["horizontal_stripe"] = normalized_roi[
+                    "horizontal_stripe"
+                ].apply(lambda x: copy_array_halves(x))
 
         if self.local:
             with warnings.catch_warnings():
@@ -2099,6 +2171,11 @@ class PileUpper:
             n = normalized_roi.loc["all", "n"]
         else:
             n = normalized_roi.loc["all", "n"]
+        if extra_sum_funcs:
+            for key in extra_sum_funcs:
+                normalized_roi[key] = roi[key]
+                if self.control:
+                    normalized_roi[f"control_{key}"] = ctrl[key]
         logging.info(f"Total number of piled up windows: {int(n)}")
 
         # Store attributes
