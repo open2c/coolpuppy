@@ -682,6 +682,7 @@ def divide_pups(pup1, pup2):
         "clr",
         "chroms",
         "minshift",
+        "expected_file",
         "maxshift",
         "mindist",
         "maxdist",
@@ -879,6 +880,7 @@ class CoordCreator:
             assert all(
                 [name in self.intervals.columns for name in ["chrom", "start", "end"]]
             )
+            self.intervals["chrom"] = self.intervals["chrom"].astype(str)
             self.intervals["center"] = (
                 self.intervals["start"] + self.intervals["end"]
             ) / 2
@@ -892,6 +894,7 @@ class CoordCreator:
                     for name in ["chrom1", "start1", "end1", "chrom2", "start2", "end2"]
                 ]
             )
+            self.intervals[["chrom1", "chrom2"]] = self.intervals[["chrom1", "chrom2"]].astype(str)
             self.intervals["center1"] = (
                 self.intervals["start1"] + self.intervals["end1"]
             ) / 2
@@ -944,6 +947,7 @@ class CoordCreator:
             self.final_chroms = natsorted(
                 list(set(self.chroms).intersection(set(self.basechroms)))
             )
+        
         if len(self.final_chroms) == 0:
             raise ValueError(
                 """No chromosomes are in common between the coordinate
@@ -1482,13 +1486,12 @@ class PileUpper:
         self.ignore_diags = ignore_diags
         self.store_stripes = store_stripes
         self.nproc = nproc
-
+        
         if view_df is None:
             # Generate viewframe from clr.chromsizes:
             self.view_df = common.make_cooler_view(clr)
         else:
             self.view_df = bioframe.make_viewframe(view_df, check_bounds=clr.chromsizes)
-
         if self.expected is not False:
             # subset expected if some regions not mentioned in view
             self.expected = self.expected[
@@ -1551,7 +1554,7 @@ class PileUpper:
             lo, hi = self.clr.extent(region)
             chroffset = self.clr.offset(region[0])
             self.view_df_extents[region_name] = lo - chroffset, hi - chroffset
-
+        
         self.chroms = natsorted(
             list(set(self.CC.final_chroms) & set(self.clr.chromnames))
         )
