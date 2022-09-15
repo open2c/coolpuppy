@@ -12,7 +12,10 @@ import os
 import argparse
 import logging
 import numpy as np
-from collections import Iterable
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 import sys
 import pdb, traceback
 
