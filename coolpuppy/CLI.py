@@ -12,6 +12,7 @@ import os
 import argparse
 import logging
 import numpy as np
+
 try:
     from collections.abc import Iterable
 except ImportError:
@@ -388,7 +389,7 @@ def main():
 
     logging.basicConfig(format="%(message)s", level=getattr(logging, args.logLevel))
 
-    logging.info(args)
+    logging.debug(args)
 
     if args.seed is not None:
         np.random.seed(args.seed)
