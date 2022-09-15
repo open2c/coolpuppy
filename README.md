@@ -1,7 +1,7 @@
 # coolpup.py
 [![DOI](https://zenodo.org/badge/147190130.svg)](https://zenodo.org/badge/latestdoi/147190130)
 [![PyPI version](https://badge.fury.io/py/coolpuppy.svg)](https://badge.fury.io/py/coolpuppy)
-[![Pytest](https://github.com/open2c/coolpuppy/actions/workflows/pytest.yml/badge.svg)](https://github.com/open2c/coolpuppy/actions/workflows/pytest.yml)
+[![Pytest](https://github.com/open2c/coolpuppy/actions/workflows/python-app.yml/badge.svg)](https://github.com/open2c/coolpuppy/actions/workflows/python-app.yml)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Docs status](https://readthedocs.org/projects/coolpuppy/badge/)](https://coolpuppy.readthedocs.io/en/latest/)
 
