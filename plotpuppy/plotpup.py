@@ -562,7 +562,7 @@ def make_heatmap_grid(
                     ax.set_title(col_val)
                 if row_val == row_order[-1]:
                     if pupsdf["rescale"].any():
-                        ax.set_xlabel("rescaled\n")
+                        ax.set_xlabel("rescaled")
                     else:
                         ax.set_xlabel("pos. [kbp]")
                 if col_val == col_order[0]:
@@ -571,7 +571,7 @@ def make_heatmap_grid(
             if nrows == 1 and ncols > 1:
                 for col_val, ax in fg.axes_dict.items():
                     if pupsdf["rescale"].any():
-                        ax.set_xlabel("rescaled\n")
+                        ax.set_xlabel("rescaled")
                     else:
                         ax.set_xlabel("pos. [kbp]")
                     ax.set_ylabel("")
@@ -580,7 +580,7 @@ def make_heatmap_grid(
                 for row_val, ax in fg.axes_dict.items():
                     ax.set_ylabel(row_val, rotation=0, ha="right")
                     if pupsdf["rescale"].any():
-                        ax.set_xlabel("rescaled\n")
+                        ax.set_xlabel("rescaled")
                     else:
                         ax.set_xlabel("pos. [kbp]")
             else:
