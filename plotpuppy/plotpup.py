@@ -83,10 +83,12 @@ def get_min_max(pups, vmin=None, vmax=None, sym=True):
         vmin = np.nanmin(comb)
     if sym:
         vmax = np.max(np.abs([vmin, vmax]))
-        if vmax>=1:
+        if vmax >= 1:
             vmin = 2 ** -np.log2(vmax)
         else:
-            raise ValueError("Maximum value is less than 1.0, can't plot using symmetrical scale")
+            raise ValueError(
+                "Maximum value is less than 1.0, can't plot using symmetrical scale"
+            )
     return vmin, vmax
 
 
@@ -117,7 +119,13 @@ def add_heatmap(
     ax.imshow(data.values[0], cmap=cmap, norm=norm, aspect=aspect, interpolation="none")
 
     if plot_ticks:
-        ax.tick_params(axis="both", which="major", labelsize=4.94+height, width=1+(height/2), length=1+height)
+        ax.tick_params(
+            axis="both",
+            which="major",
+            labelsize=4.94 + height,
+            width=1 + (height / 2),
+            length=1 + height,
+        )
         resolution = int(resolution)
         flank = int(flank)
         if not rescale.any():
@@ -147,14 +155,15 @@ def add_score(score, height=1, color=None):
             x=0.05,
             ha="left",
             va="top",
-            #size="x-small",
-            size=4.94+height,
+            # size="x-small",
+            size=4.94 + height,
             transform=ax.transAxes,
         )
 
 
 def sort_separation(sep_string_series, sep="Mb"):
     return sorted(set(sep_string_series.dropna()), key=lambda x: float(x.split(sep)[0]))
+
 
 def make_heatmap_stripes(
     pupsdf,
@@ -180,9 +189,7 @@ def make_heatmap_stripes(
 ):
     pupsdf = pupsdf.copy()
 
-    if not set(["vertical_stripe", "horizontal_stripe"]).issubset(
-        pupsdf.columns
-    ):
+    if not set(["vertical_stripe", "horizontal_stripe"]).issubset(pupsdf.columns):
         raise ValueError("No stripes stored in pup")
     if cols == "separation":
         col_order = sort_separation(pupsdf["separation"])
@@ -210,9 +217,9 @@ def make_heatmap_stripes(
         nrows, ncols = auto_rows_cols(pupsdf.shape[0])
 
     vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym)
-    
+
     if scale == "log":
-        norm = LogNorm    
+        norm = LogNorm
     elif scale == "linear":
         norm = Normalize
     else:
@@ -221,20 +228,21 @@ def make_heatmap_stripes(
         )
 
     right = ncols / (ncols + 0.25)
-    
+
     pupsdf = pupsdf.reset_index()
-    
-    #Generate corner stripes
+
+    # Generate corner stripes
     cntr = int(np.floor(pupsdf["data"][0].shape[0] / 2))
     pupsdf["corner_stripe"] = pupsdf["horizontal_stripe"]
     for i in range(len(pupsdf)):
         pupsdf["corner_stripe"][i] = np.concatenate(
             (
-                pupsdf["horizontal_stripe"][i][:,:(cntr)],
-                pupsdf["vertical_stripe"][i][:,cntr:],
-            ), axis=1
+                pupsdf["horizontal_stripe"][i][:, :(cntr)],
+                pupsdf["vertical_stripe"][i][:, cntr:],
+            ),
+            axis=1,
         )
-    
+
     # Sorting stripes
     if not stripe_sort == None:
         different = False
@@ -498,9 +506,9 @@ def make_heatmap_grid(
         nrows, ncols = auto_rows_cols(pupsdf.shape[0])
 
     vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym)
-    
+
     if scale == "log":
-        norm = LogNorm     
+        norm = LogNorm
     elif scale == "linear":
         norm = Normalize
     else:
@@ -554,7 +562,7 @@ def make_heatmap_grid(
                     ax.set_title(col_val)
                 if row_val == row_order[-1]:
                     if pupsdf["rescale"].any():
-                        ax.set_xlabel("rescaled\n" + stripe)
+                        ax.set_xlabel("rescaled\n")
                     else:
                         ax.set_xlabel("pos. [kbp]")
                 if col_val == col_order[0]:
@@ -563,7 +571,7 @@ def make_heatmap_grid(
             if nrows == 1 and ncols > 1:
                 for col_val, ax in fg.axes_dict.items():
                     if pupsdf["rescale"].any():
-                        ax.set_xlabel("rescaled\n" + stripe)
+                        ax.set_xlabel("rescaled\n")
                     else:
                         ax.set_xlabel("pos. [kbp]")
                     ax.set_ylabel("")
@@ -572,7 +580,7 @@ def make_heatmap_grid(
                 for row_val, ax in fg.axes_dict.items():
                     ax.set_ylabel(row_val, rotation=0, ha="right")
                     if pupsdf["rescale"].any():
-                        ax.set_xlabel("rescaled\n" + stripe)
+                        ax.set_xlabel("rescaled\n")
                     else:
                         ax.set_xlabel("pos. [kbp]")
             else:
