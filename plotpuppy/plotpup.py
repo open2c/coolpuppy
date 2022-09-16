@@ -446,7 +446,7 @@ def make_heatmap_stripes(
     max_coordinates = [
         pupsdf.loc[pd.to_numeric(pupsdf["flank"]).idxmax(), "flank"],
         pupsdf.loc[pd.to_numeric(pupsdf["flank"]).idxmax(), "resolution"],
-        max(pupsdf.loc[pupsdf.iloc[:,1] != "all", "n"]),
+        max(pupsdf.loc[pupsdf.drop(columns="index").iloc[:,1] != "all", "n"]),
     ]
 
     if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
@@ -611,7 +611,7 @@ def make_heatmap_stripes(
             string = "rescaled"
         else:
             string = "pos. [kb]"
-        fg.fig.text((right + left) / 2, bottom - 0.2 / nrows, s=string, ha="center")
+        fg.fig.text((right + left) / 2, bottom - (0.2 / nrows), s=string, ha="center")
     if sym and scale == "log":
         ticks = [vmin, 1, vmax]
     else:
@@ -714,7 +714,6 @@ def make_heatmap_grid(
         **kwargs,
     )
     norm = norm(vmin, vmax)
-
     max_coordinates = [
         pupsdf.loc[pd.to_numeric(pupsdf["flank"]).idxmax(), "flank"],
         pupsdf.loc[pd.to_numeric(pupsdf["flank"]).idxmax(), "resolution"],
@@ -861,7 +860,7 @@ def make_heatmap_grid(
             string = "rescaled"
         else:
             string = "pos. [kb]"
-        fg.fig.text((right + left) / 2, bottom - 0.2 / nrows, s=string, ha="center")
+        fg.fig.text((right + left) / 2, bottom - (0.3 / nrows), s=string, ha="center")
     if sym and scale == "log":
         ticks = [vmin, 1, vmax]
     else:
