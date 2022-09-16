@@ -297,7 +297,9 @@ def make_heatmap_stripes(
     **kwargs,
 ):
     pupsdf = pupsdf.copy()
-
+    if np.any(pupsdf.index.duplicated()):
+        pupsdf = pupsdf.reset_index(drop=True)
+        logging.info("There are duplicated indices in the pileup. Resetting indices")
     if not set(["vertical_stripe", "horizontal_stripe"]).issubset(pupsdf.columns):
         raise ValueError("No stripes stored in pup")
     if cols == "separation" and col_order is None:
@@ -444,7 +446,7 @@ def make_heatmap_stripes(
     max_coordinates = [
         pupsdf.loc[pd.to_numeric(pupsdf["flank"]).idxmax(), "flank"],
         pupsdf.loc[pd.to_numeric(pupsdf["flank"]).idxmax(), "resolution"],
-        max(pupsdf["n"]),
+        max(pupsdf.loc[pupsdf.iloc[:,1] != "all", "n"]),
     ]
 
     if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
@@ -651,7 +653,8 @@ def make_heatmap_grid(
 ):
     pupsdf = pupsdf.copy()
     if np.any(pupsdf.index.duplicated()):
-        raise ValueError("There are duplicated indices in the pileup")
+        pupsdf = pupsdf.reset_index(drop=True)
+        logging.info("There are duplicated indices in the pileup. Resetting indices")
     cmap = copy.copy(cm.get_cmap(cmap))
     cmap.set_bad(cmap_emptypixel)
 

@@ -697,6 +697,7 @@ def divide_pups(pup1, pup2):
         ), f"Cannot divide these pups, {col} is different between them"
     div_pup["data"] = pup1["data"] / pup2["data"]
     div_pup["clrs"] = str(pup1["clr"]) + "/" + str(pup2["clr"])
+    div_pup["n"] =  pup1["n"] + pup2["n"]
     if set(["vertical_stripe", "horizontal_stripe"]).issubset(pup1.columns):
         if np.all(np.sort(pup1["coordinates"]) == np.sort(pup2["coordinates"])):
             div_pup["coordinates"] = pup1["coordinates"]
@@ -2360,7 +2361,7 @@ class PileUpper:
         normalized_pileups = pd.concat(
             [
                 normalized_pileups.drop(i).sort_values("distance_band"),
-                normalized_pileups.iloc[i, :].to_frame().transpose(),
+                normalized_pileups.iloc[i, :],
             ],
             ignore_index=True,
         ).reset_index(drop=True)
