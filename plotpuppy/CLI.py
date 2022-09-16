@@ -84,6 +84,12 @@ def parse_args_plotpuppy():
         help="""Whether to sort stripe stackups by total signal (sum), central pixel signal (center_pixel), or not at all (None)""",
     )
     parser.add_argument(
+        "--lineplot",
+        default=False,
+        action="store_true",
+        help="""Whether to plot the average lineplot above stripes""",
+    )
+    parser.add_argument(
         "--out_sorted_bedpe",
         type=str,
         default=None,
@@ -99,7 +105,7 @@ def parse_args_plotpuppy():
     parser.add_argument(
         "--font",
         type=str,
-        default=False,
+        default="DejaVu Sans",
         required=False,
         help="""Font to use for plotting""",
     )
@@ -107,7 +113,7 @@ def parse_args_plotpuppy():
     parser.add_argument(
         "--font_scale",
         type=float,
-        default=False,
+        default=1,
         required=False,
         help="""Font scale to use for plotting. Defaults to 1""",
     )
@@ -142,15 +148,31 @@ def parse_args_plotpuppy():
     )
     parser.add_argument(
         "--col_order",
-        type=lambda s: re.split(" |, ", s),
+        type=str,
+        nargs="+",
         required=False,
-        help="""Order of columns to use, space or comma separated""",
+        help="""Order of columns to use, space separated""",
     )
     parser.add_argument(
         "--row_order",
-        type=lambda s: re.split(" |, ", s),
+        type=str,
+        nargs="+",
         required=False,
-        help="""Order of rows to use, space or comma separated""",
+        help="""Order of rows to use, space separated""",
+    )
+    parser.add_argument(
+        "--colnames",
+        type=str,
+        nargs="+",
+        required=False,
+        help="""Names for columns, space separated""",
+    )
+    parser.add_argument(
+        "--rownames",
+        type=str,
+        nargs="+",
+        required=False,
+        help="""Names for rows, space separated""",
     )
     parser.add_argument(
         "--query",
@@ -254,6 +276,7 @@ def main():
         sys.excepthook = _excepthook
     mpl.rcParams["svg.fonttype"] = "none"
     mpl.rcParams["pdf.fonttype"] = 42
+    
     if args.divide_pups:
         if len(args.input_pups) != 2:
             raise ValueError("Need exactly two input pups when using --divide_pups")
@@ -263,7 +286,7 @@ def main():
             pups = divide_pups(pup1, pup2)
     else:
         pups = load_pileup_df_list(
-            args.input_pups, quaich=args.quaich, nice_metadata=True
+            args.input_pups, quaich=args.quaich, nice_metadata=True, skipstripes=not args.stripe
         )
 
     if args.query is not None:
@@ -284,6 +307,7 @@ def main():
     if args.cols:
         if args.col_order:
             col_order = args.col_order
+            pups[args.cols] = pups[args.cols].astype(str)
             pups = pups[pups[args.cols].isin(args.col_order)]
         elif args.cols == "separation":
             col_order = sort_separation(pups["separation"])
@@ -295,7 +319,8 @@ def main():
     if args.rows:
         if args.row_order:
             row_order = args.row_order
-            pups = pups[pups[args.rows].isin(args.row_order)]
+            pups[args.rows] = pups[args.rows].astype(str)
+            pups = pups[pups[args.rows].isin(args.row_order)]           
         elif args.rows == "separation":
             row_order = sort_separation(pups["separation"])
         else:
@@ -338,6 +363,9 @@ def main():
             font=args.font,
             font_scale=args.font_scale,
             plot_ticks=args.plot_ticks,
+            colnames=args.colnames,
+            rownames=args.rownames,
+            lineplot=args.lineplot,
         )
     else:
         fg = make_heatmap_grid(
@@ -356,6 +384,8 @@ def main():
             font=args.font,
             font_scale=args.font_scale,
             plot_ticks=args.plot_ticks,
+            colnames=args.colnames,
+            rownames=args.rownames,
         )
 
     plt.savefig(args.output, bbox_inches="tight", dpi=args.dpi)

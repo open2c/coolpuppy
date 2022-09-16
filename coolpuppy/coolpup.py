@@ -100,7 +100,7 @@ def save_pileup_df(filename, df, metadata=None, mode="w", compression="lzf"):
     return
 
 
-def load_pileup_df(filename, quaich=False):
+def load_pileup_df(filename, quaich=False, skipstripes=False):
     """
     Loads a dataframe saved using `save_pileup_df`
 
@@ -130,19 +130,20 @@ def load_pileup_df(filename, quaich=False):
         vertical_stripe = []
         horizontal_stripe = []
         coordinates = []
-        try:
-            for i in range(len(data)):
-                vstripe = "vertical_stripe_" + str(i)
-                hstripe = "horizontal_stripe_" + str(i)
-                coords = "coordinates_" + str(i)
-                vertical_stripe.append(f[vstripe][:].toarray())
-                horizontal_stripe.append(f[hstripe][:].toarray())
-                coordinates.append(f[coords][:].astype("U13"))
-            annotation["vertical_stripe"] = vertical_stripe
-            annotation["horizontal_stripe"] = horizontal_stripe
-            annotation["coordinates"] = coordinates
-        except:
-            pass
+        if not skipstripes:
+            try:
+                for i in range(len(data)):
+                    vstripe = "vertical_stripe_" + str(i)
+                    hstripe = "horizontal_stripe_" + str(i)
+                    coords = "coordinates_" + str(i)
+                    vertical_stripe.append(f[vstripe][:].toarray())
+                    horizontal_stripe.append(f[hstripe][:].toarray())
+                    coordinates.append(f[coords][:].astype("U13"))
+                annotation["vertical_stripe"] = vertical_stripe
+                annotation["horizontal_stripe"] = horizontal_stripe
+                annotation["coordinates"] = coordinates
+            except:
+                pass
     for key, val in metadata.items():
         annotation[key] = val
     if quaich:
@@ -155,7 +156,7 @@ def load_pileup_df(filename, quaich=False):
     return annotation
 
 
-def load_pileup_df_list(files, quaich=False, nice_metadata=True):
+def load_pileup_df_list(files, quaich=False, nice_metadata=True, skipstripes=False):
     """
 
     Parameters
@@ -177,7 +178,7 @@ def load_pileup_df_list(files, quaich=False, nice_metadata=True):
         Combined dataframe with all pileups and annotations from all files.
 
     """
-    pups = pd.concat([load_pileup_df(path, quaich=quaich) for path in files])
+    pups = pd.concat([load_pileup_df(path, quaich=quaich, skipstripes=skipstripes) for path in files])
     if nice_metadata:
         pups["norm"] = np.where(
             pups["expected"], ["expected"] * pups.shape[0], ["shifts"] * pups.shape[0]
