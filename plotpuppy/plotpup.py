@@ -162,7 +162,12 @@ def add_score(score, height=1, color=None):
 
 
 def sort_separation(sep_string_series, sep="Mb"):
-    return sorted(set(sep_string_series.dropna()), key=lambda x: float(x.split(sep)[0]))
+    s = set(sep_string_series.dropna())
+    s.discard("all")
+    return sorted(
+        s,
+        key=lambda x: float(x.split(sep)[0]),
+    )
 
 
 def make_heatmap_stripes(
@@ -191,7 +196,7 @@ def make_heatmap_stripes(
 
     if not set(["vertical_stripe", "horizontal_stripe"]).issubset(pupsdf.columns):
         raise ValueError("No stripes stored in pup")
-    if cols == "separation":
+    if cols == "separation" and col_order is None:
         col_order = sort_separation(pupsdf["separation"])
         ncols = len(col_order)
     elif cols is not None and col_order is None:
@@ -202,7 +207,7 @@ def make_heatmap_stripes(
     else:
         ncols = 1
 
-    if rows == "separation":
+    if rows == "separation" and row_order is None:
         row_order = sort_separation(pupsdf["separation"])
         nrows = len(row_order)
     elif rows is not None and row_order is None:
@@ -481,7 +486,7 @@ def make_heatmap_grid(
         pupsdf["data"] = pupsdf.apply(
             lambda x: coolpup.norm_cis(x["data"], norm_corners), axis=1
         )
-    if cols == "separation":
+    if cols == "separation" and col_order is None:
         col_order = sort_separation(pupsdf["separation"])
         ncols = len(col_order)
     elif cols is not None and col_order is None:
@@ -492,7 +497,7 @@ def make_heatmap_grid(
     else:
         ncols = 1
 
-    if rows == "separation":
+    if rows == "separation" and col_order is None:
         row_order = sort_separation(pupsdf["separation"])
         nrows = len(row_order)
     elif rows is not None and row_order is None:

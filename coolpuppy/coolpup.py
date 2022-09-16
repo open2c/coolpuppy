@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import multiprocessing
 import numpy as np
 import warnings
 import pandas as pd
@@ -10,6 +9,7 @@ from functools import partial, reduce
 import logging
 from natsort import natsorted
 from scipy import sparse
+import cooler
 from cooltools import numutils
 from cooltools.lib import common, checks
 from cooltools.api import snipping, coverage
@@ -168,8 +168,7 @@ def load_pileup_df_list(files, quaich=False, nice_metadata=True):
     nice_metadata : bool, optional
         Whether to add nicer metadata for direct plotting. The default is True.
         Adds a "norm" column ("expected", "shifts" or "none").
-        If any of the pileups were done by-distance, adds a "separation" column with a
-        strign encoding the distance bands
+
 
     Returns
     -------
@@ -185,15 +184,6 @@ def load_pileup_df_list(files, quaich=False, nice_metadata=True):
         pups["norm"][
             np.logical_not(np.logical_or(pups["nshifts"] > 0, pups["expected"]))
         ] = "none"
-        if "distance_band" in pups.columns:
-            pups["separation"] = pups["distance_band"].apply(
-                lambda x: np.nan
-                if pd.isnull(x)
-                # else f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
-                else f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
-                if len(x) == 2
-                else f"{x[0]/1000000}Mb+"
-            )
     return pups.reset_index(drop=False)
 
 
@@ -2157,23 +2147,23 @@ class PileUpper:
                 normalized_roi["data"] = normalized_roi["data"].apply(
                     lambda x: np.nanmean(np.dstack((x, x.T)), 2)
                 )
+        n = normalized_roi.loc["all", "n"]
+        normalized_roi = normalized_roi.reset_index().rename(columns={"index": "group"})
         if groupby:
-            normalized_roi = normalized_roi.reset_index()
             normalized_roi[groupby] = pd.DataFrame(
                 [
                     ("all",) * len(groupby) if i == "all" else i
-                    for i in normalized_roi["index"].to_list()
+                    for i in normalized_roi["group"].to_list()
                 ],
                 columns=groupby,
             )
-            normalized_roi = normalized_roi.drop(columns="index")
-            normalized_roi = normalized_roi.set_index(groupby)
-            n = normalized_roi.loc["all", "n"]
-        else:
-            n = normalized_roi.loc["all", "n"]
+            normalized_roi.assign(**dict(zip(groupby, zip(*normalized_roi["group"]))))
+            normalized_roi = normalized_roi.drop(columns="group")
+            for i, val in enumerate(groupby):
+                normalized_roi.insert(0, val, normalized_roi.pop(val))
         if extra_sum_funcs:
             for key in extra_sum_funcs:
-                normalized_roi[key] = roi[key]
+                normalized_roi[key] = roi[key].values
                 if self.control:
                     normalized_roi[f"control_{key}"] = ctrl[key]
         logging.info(f"Total number of piled up windows: {int(n)}")
@@ -2201,9 +2191,47 @@ class PileUpper:
             if name not in exclude_attributes:
                 if type(attr) == list:
                     attr = str(attr)
+                if type(attr) == cooler.api.Cooler:
+                    attr = os.path.abspath(attr.filename)
                 normalized_roi[name] = attr
-
         return normalized_roi
+
+    def pileupsByStrandWithControl(self, nproc=None, groupby=[]):
+        """Perform by-strand pileups across all chromosomes and applies required
+        normalization. Simple wrapper around pileupsWithControl.
+        Assumes the features in CoordCreator file has a "strand" column.
+
+        Parameters
+        ----------
+        nproc : int, optional
+            How many cores to use. Sends a whole chromosome per process.
+            The default is None, which uses the same number as nproc set at creation of
+            the object.
+        groupby : list of str, optional
+            Which attributes of each snip to assign a group to it
+
+        Returns
+        -------
+        pileup_df : 2D array
+            Normalized pileups in a pandas DataFrame, with columns `data` and `num`.
+            `data` contains the normalized pileups, and `num` - how many snippets were
+            combined (the regions of interest, not control regions).
+            Each distance band is a row, annotated in columns `separation`
+        """
+        if nproc is None:
+            nproc = self.nproc
+        normalized_pileups = self.pileupsWithControl(
+            nproc=nproc,
+            groupby=["strand1", "strand2"] + groupby,
+        )
+        normalized_pileups.insert(
+            0,
+            "orientation",
+            (normalized_pileups["strand1"] + normalized_pileups["strand2"]).replace(
+                {"allall": "all"}
+            ),
+        )
+        return normalized_pileups
 
     def pileupsByWindowWithControl(
         self,
@@ -2225,7 +2253,9 @@ class PileUpper:
             Normalized pileups in a pandas DataFrame, with columns `data` and `num`.
             `data` contains the normalized pileups, and `num` - how many snippets were
             combined (the regions of interest, not control regions). Each window is a
-            row, plus an additional row `all` is created with all data.
+            row (coordinates are recorded in columns ['chrom', 'start', 'end']), plus
+            an additional row is created with all data (with "all" in the "chrom" column
+            and -1 in start and end).
         """
         if nproc is None:
             nproc = self.nproc
@@ -2235,11 +2265,28 @@ class PileUpper:
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc, postprocess_func=group_by_region
         )
-        normalized_pileups = normalized_pileups.drop(index="all").reset_index()
-        normalized_pileups[["chrom", "start", "end"]] = pd.DataFrame(
-            normalized_pileups["index"].to_list(), index=normalized_pileups.index
+        normalized_pileups = pd.concat(
+            [
+                pd.DataFrame(
+                    normalized_pileups["group"].to_list(),
+                    index=normalized_pileups.index,
+                    columns=["chrom", "start", "end"],
+                ),
+                normalized_pileups,
+            ],
+            axis=1,
         )
-        normalized_pileups = normalized_pileups.drop(columns="index")
+        normalized_pileups.loc[
+            normalized_pileups["group"] == "all", ["chrom", "start", "end"]
+        ] = ["all", -1, -1]
+        normalized_pileups[["start", "end"]] = normalized_pileups[
+            ["start", "end"]
+        ].astype(int)
+        normalized_pileups = normalized_pileups.drop(columns="group")
+        # Sorting places "all" at the end! So no need to drop and append
+        normalized_pileups = bioframe.sort_bedframe(
+            normalized_pileups, view_df=self.view_df.reset_index()
+        ).reset_index(drop=True)
         return normalized_pileups
 
     def pileupsByDistanceWithControl(
@@ -2289,16 +2336,30 @@ class PileUpper:
             modify_2Dintervals_func=bin_func,
             groupby=["distance_band"] + groupby,
         )
-        normalized_pileups = normalized_pileups.drop(index="all").reset_index()
         normalized_pileups = normalized_pileups.loc[
             normalized_pileups["distance_band"] != (), :
         ].reset_index(drop=True)
-        normalized_pileups["separation"] = normalized_pileups["distance_band"].apply(
-            lambda x: f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
-            if len(x) == 2
-            else f"{x[0]/1000000}Mb+"
+        # Create a nicely formatted "distance_band" columns (e.g. for plotting)
+        normalized_pileups.insert(
+            0,
+            "separation",
+            normalized_pileups["distance_band"].apply(
+                lambda x: x
+                if x == "all"
+                else f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
+                if len(x) == 2
+                else f"{x[0]/1000000}Mb+"
+            ),
         )
-
+        # Move "all" to the bottom while sorting the distances
+        i = np.where(normalized_pileups["separation"] == "all")[0]
+        normalized_pileups = pd.concat(
+            [
+                normalized_pileups.drop(i).sort_values("distance_band"),
+                normalized_pileups.iloc[i, :].to_frame().transpose(),
+            ],
+            ignore_index=True,
+        ).reset_index(drop=True)
         return normalized_pileups
 
     def pileupsByStrandByDistanceWithControl(
@@ -2348,51 +2409,36 @@ class PileUpper:
             modify_2Dintervals_func=bin_func,
             groupby=["strand1", "strand2", "distance_band"] + groupby,
         )
-        normalized_pileups = normalized_pileups.drop(index="all").reset_index()
-        normalized_pileups["orientation"] = (
-            normalized_pileups["strand1"] + normalized_pileups["strand2"]
+        normalized_pileups.insert(
+            0,
+            "orientation",
+            (normalized_pileups["strand1"] + normalized_pileups["strand2"]).replace(
+                {"allall": "all"}
+            ),
         )
         normalized_pileups = normalized_pileups.loc[
             normalized_pileups["distance_band"] != (), :
         ].reset_index(drop=True)
-        normalized_pileups["separation"] = normalized_pileups["distance_band"].apply(
-            lambda x: f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
-            if len(x) == 2
-            else f"{x[0]/1000000}Mb+"
+        normalized_pileups.insert(
+            0,
+            "separation",
+            normalized_pileups["distance_band"].apply(
+                lambda x: x
+                if x == "all"
+                else f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
+                if len(x) == 2
+                else f"{x[0]/1000000}Mb+"
+            ),
         )
-
-        return normalized_pileups
-
-    def pileupsByStrandWithControl(self, nproc=None, groupby=[]):
-        """Perform by-strand pileups across all chromosomes and applies required
-        normalization. Simple wrapper around pileupsWithControl.
-        Assumes the features in CoordCreator file has a "strand" column.
-
-        Parameters
-        ----------
-        nproc : int, optional
-            How many cores to use. Sends a whole chromosome per process.
-            The default is None, which uses the same number as nproc set at creation of
-            the object.
-        groupby : list of str, optional
-            Which attributes of each snip to assign a group to it
-
-        Returns
-        -------
-        pileup_df : 2D array
-            Normalized pileups in a pandas DataFrame, with columns `data` and `num`.
-            `data` contains the normalized pileups, and `num` - how many snippets were
-            combined (the regions of interest, not control regions).
-            Each distance band is a row, annotated in columns `separation`
-        """
-        if nproc is None:
-            nproc = self.nproc
-        normalized_pileups = self.pileupsWithControl(
-            nproc=nproc,
-            groupby=["strand1", "strand2"] + groupby,
-        )
-        normalized_pileups = normalized_pileups.drop(index=("all", "all")).reset_index()
-        normalized_pileups["orientation"] = (
-            normalized_pileups["strand1"] + normalized_pileups["strand2"]
-        )
+        # Move "all" to the bottom while sorting the distances
+        i = np.where(normalized_pileups["separation"] == "all")[0]
+        normalized_pileups = pd.concat(
+            [
+                normalized_pileups.drop(i).sort_values(
+                    ["orientation", "distance_band"]
+                ),
+                normalized_pileups.iloc[i, :],
+            ],
+            ignore_index=True,
+        ).reset_index(drop=True)
         return normalized_pileups

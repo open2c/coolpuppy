@@ -281,31 +281,6 @@ def main():
     else:
         score = False
 
-    if args.cols:
-        if args.col_order:
-            col_order = args.col_order
-            pups = pups[pups[args.cols].isin(args.col_order)]
-        elif args.cols == "separation":
-            col_order = sort_separation(pups["separation"])
-        else:
-            col_order = pups[args.cols].unique()
-    else:
-        col_order = None
-
-    if args.rows:
-        if args.row_order:
-            row_order = args.row_order
-            pups = pups[pups[args.rows].isin(args.row_order)]
-        elif args.rows == "separation":
-            row_order = sort_separation(pups["separation"])
-        else:
-            row_order = pups[args.rows].unique()
-    else:
-        row_order = None
-
-    if args.stripe_sort == "None":
-        args.stripe_sort = None
-
     if args.not_symmetric:
         symmetric = False
     else:
@@ -324,8 +299,8 @@ def main():
             pups,
             cols=args.cols,
             rows=args.rows,
-            col_order=col_order,
-            row_order=row_order,
+            col_order=args.col_order,
+            row_order=args.row_order,
             vmin=args.vmin,
             vmax=args.vmax,
             sym=symmetric,
@@ -345,8 +320,8 @@ def main():
             cols=args.cols,
             rows=args.rows,
             score=score,
-            col_order=col_order,
-            row_order=row_order,
+            col_order=args.col_order,
+            row_order=args.row_order,
             vmin=args.vmin,
             vmax=args.vmax,
             sym=symmetric,
