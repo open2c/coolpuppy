@@ -14,6 +14,7 @@ from cooltools.lib import plotting
 import random
 import logging
 import warnings
+import matplotlib.gridspec as grd
 
 warnings.filterwarnings(action="ignore", message=".*tight_layout.*")
 warnings.filterwarnings(action="ignore", message=".*Tight layout.*")
@@ -43,7 +44,7 @@ def auto_rows_cols(n):
     return rows, cols
 
 
-def get_min_max(pups, vmin=None, vmax=None, sym=True):
+def get_min_max(pups, vmin=None, vmax=None, sym=True, scale="log"):
     """Automatically determine minimal and maximal colour intensity for pileups
 
     Parameters
@@ -66,6 +67,10 @@ def get_min_max(pups, vmin=None, vmax=None, sym=True):
 
     """
     if vmin is not None and vmax is not None:
+        if sym:
+            logging.info(
+                "Can't set both vmin and vmax and get symmetrical scale. Plotting non-symmetrical"
+            )
         return vmin, vmax
     else:
         comb = np.concatenate([pup.ravel() for pup in pups.ravel()])
@@ -82,22 +87,30 @@ def get_min_max(pups, vmin=None, vmax=None, sym=True):
     elif vmax is not None:
         vmin = np.nanmin(comb)
     if sym:
-        vmax = np.max(np.abs([vmin, vmax]))
-        if vmax >= 1:
-            vmin = 2 ** -np.log2(vmax)
-        else:
-            raise ValueError(
-                "Maximum value is less than 1.0, can't plot using symmetrical scale"
+
+        if scale == "linear":
+            logging.info(
+                "Can't use symmetrical scale with linear. Plotting non-symmetrical"
             )
+            pass
+        else:
+            vmax = np.max(np.abs([vmin, vmax]))
+            if vmax >= 1:
+                vmin = 2 ** -np.log2(vmax)
+            else:
+                raise ValueError(
+                    "Maximum value is less than 1.0, can't plot using symmetrical scale"
+                )
     return vmin, vmax
 
 
 def add_heatmap(
     data,
-    resolution,
     flank,
     rescale,
     rescale_flank,
+    n,
+    max_coordinates,
     height=1,
     aspect="auto",
     color=None,
@@ -105,6 +118,7 @@ def add_heatmap(
     norm=LogNorm(0.5, 2),
     plot_ticks=False,
     stripe=False,
+    font_scale=1,
 ):
     """
     Adds the array contained in data.values[0] to the current axes as a heatmap of stripes
@@ -115,35 +129,121 @@ def add_heatmap(
         )
     elif len(data) == 0:
         return
+    flank = int(flank)
     ax = plt.gca()
-    ax.imshow(data.values[0], cmap=cmap, norm=norm, aspect=aspect, interpolation="none")
-
+    if stripe:
+        extents = [-flank / max_coordinates[1], flank / max_coordinates[1], -int(n), 0]
+        ax.set_ylim(-max_coordinates[2], 0)
+    else:
+        extents = [
+            -flank / max_coordinates[1],
+            flank / max_coordinates[1],
+            -flank / max_coordinates[1],
+            flank / max_coordinates[1],
+        ]
+        ax.set_xlim(-(flank / max_coordinates[1]), (flank / max_coordinates[1]))
+        ax.set_ylim(-(flank / max_coordinates[1]), (flank / max_coordinates[1]))
+    ax.imshow(
+        data.values[0],
+        cmap=cmap,
+        norm=norm,
+        aspect=aspect,
+        interpolation="none",
+        extent=extents,
+    )
     if plot_ticks:
         ax.tick_params(
             axis="both",
             which="major",
-            labelsize=4.94 + height,
+            labelsize=font_scale * (4.94 + height),
             width=1 + (height / 2),
             length=1 + height,
         )
-        resolution = int(resolution)
-        flank = int(flank)
+
         if not rescale.any():
-            ticks_pixels = np.linspace(0, flank * 2 // resolution, 5)
-            ticks_kbp = (
-                (ticks_pixels - ticks_pixels[-1] / 2) * resolution // 1000
-            ).astype(int)
+            ticks_pixels = np.linspace(
+                -max_coordinates[0] / max_coordinates[1],
+                max_coordinates[0] / max_coordinates[1],
+                5,
+            )
+            ticks_kbp = ((ticks_pixels * max_coordinates[1]) // 1000).astype(int)
             plt.xticks(ticks_pixels.tolist(), ticks_kbp.tolist())
             if not stripe:
                 plt.yticks(ticks_pixels.tolist(), [])
-        else:
-            if not stripe:
-                plt.yticks([], [])
-            if not rescale_flank.any():
-                plt.xticks([], [])
+            else:
+                ticks_n = np.floor(np.linspace(0, -max_coordinates[2], 5)).astype(int)
+                plt.yticks(ticks_n, np.append("", np.negative(ticks_n)[1:]))
+    else:
+        plt.yticks([], [])
+        plt.xticks([], [])
 
 
-def add_score(score, height=1, color=None):
+def add_stripe_lineplot(
+    data,
+    resolution,
+    flank,
+    rescale,
+    rescale_flank,
+    height=1,
+    aspect="auto",
+    color=None,
+    cmap="coolwarm",
+    scale="log",
+    norm=LogNorm(0.5, 2),
+    plot_ticks=False,
+    stripe=False,
+    font_scale=1,
+    colnames=None,
+):
+    """
+    Adds the array contained in data.values[0] to the current axes as a heatmap of stripes and an average lineplot on top.
+    Only works with one condition at a time.
+    """
+    gs = grd.GridSpec(
+        2, 2, height_ratios=[1, 5], width_ratios=[8.25, 1], wspace=0.05, hspace=0.05
+    )
+    flank = int(flank)
+    resolution = int(resolution)
+    ticks_pixels = np.linspace(0, flank * 2 // resolution, 5)
+    ticks_kbp = ((ticks_pixels - ticks_pixels[-1] / 2) * resolution // 1000).astype(int)
+    mean = (
+        np.nansum(data.values[0] / data.values[0].shape[1], axis=0)
+        / data.values[0].shape[0]
+    )
+    if scale == "log":
+        mean = np.log(mean + 1)
+    kbp = np.linspace(-flank, flank, int(flank / resolution * 2 + 1)) / 1000
+    ax2 = plt.subplot(gs[0])
+    ax2.plot(kbp, mean)
+    ax2.spines["right"].set_visible(False)
+    ax2.spines["top"].set_visible(False)
+    plt.xlim(-(flank + (resolution / 2)) / 1000, (flank + (resolution / 2)) / 1000)
+    plt.yticks([np.round(min(mean), 2), np.round(max(mean), 2)])
+    plt.xticks([], [])
+    if colnames is not None:
+        plt.title(colnames[0])
+    ax = plt.subplot(gs[2])
+    p = ax.imshow(
+        data.values[0], cmap=cmap, norm=norm, interpolation="none", aspect=aspect
+    )
+    if plot_ticks:
+        ax.tick_params(
+            axis="both",
+            which="major",
+            labelsize=font_scale * (4.94 + height),
+            width=1 + (height / 2),
+            length=1 + height,
+        )
+        if not rescale.any():
+            plt.xticks(ticks_pixels.tolist(), ticks_kbp.tolist())
+    else:
+        plt.xticks([], [])
+        plt.yticks([], [])
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+
+
+def add_score(score, height=1, color=None, font_scale=1):
     """
     Adds the value contained in score.values[0] to the current axes as a label in top left corner
     """
@@ -156,7 +256,7 @@ def add_score(score, height=1, color=None):
             ha="left",
             va="top",
             # size="x-small",
-            size=4.94 + height,
+            size=font_scale * (4.94 + height),
             transform=ax.transAxes,
         )
 
@@ -168,6 +268,7 @@ def sort_separation(sep_string_series, sep="Mb"):
         s,
         key=lambda x: float(x.split(sep)[0]),
     )
+
 
 
 def make_heatmap_stripes(
@@ -187,9 +288,12 @@ def make_heatmap_stripes(
     stripe="corner_stripe",
     stripe_sort="sum",
     out_sorted_bedpe=None,
-    font=False,
-    font_scale=None,
+    font="DejaVu Sans",
+    font_scale=1,
     plot_ticks=False,
+    colnames=None,
+    rownames=None,
+    lineplot=False,
     **kwargs,
 ):
     pupsdf = pupsdf.copy()
@@ -221,7 +325,7 @@ def make_heatmap_stripes(
     if cols is None and rows is None:
         nrows, ncols = auto_rows_cols(pupsdf.shape[0])
 
-    vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym)
+    vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym, scale=scale)
 
     if scale == "log":
         norm = LogNorm
@@ -316,12 +420,7 @@ def make_heatmap_stripes(
                     out_sorted_bedpe, sep="\t", header=None, index=False
                 )
 
-    if font and font_scale:
-        sns.set(font=font, font_scale=font_scale, style="ticks")
-    elif font:
-        sns.set(font=font, style="ticks")
-    elif font_scale:
-        sns.set(font_scale=font_scale, style="ticks")
+    sns.set(font=font, font_scale=font_scale, style="ticks")
 
     fg = sns.FacetGrid(
         pupsdf,
@@ -342,26 +441,54 @@ def make_heatmap_stripes(
     cmap = copy.copy(cm.get_cmap(cmap))
     cmap.set_bad(cmap_emptypixel)
 
+    max_coordinates = [
+        pupsdf.loc[pd.to_numeric(pupsdf["flank"]).idxmax(), "flank"],
+        pupsdf.loc[pd.to_numeric(pupsdf["flank"]).idxmax(), "resolution"],
+        max(pupsdf["n"]),
+    ]
+
     if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
-        fg.map(
-            add_heatmap,
-            stripe,
-            "resolution",
-            "flank",
-            "rescale",
-            "rescale_flank",
-            norm=norm,
-            cmap=cmap,
-            aspect=aspect,
-            height=height,
-            plot_ticks=plot_ticks,
-            stripe=stripe,
-        )
+        if lineplot and nrows == 1 and ncols == 1:
+            fg.map(
+                add_stripe_lineplot,
+                stripe,
+                "resolution",
+                "flank",
+                "rescale",
+                "rescale_flank",
+                scale=scale,
+                aspect=aspect,
+                height=height,
+                plot_ticks=plot_ticks,
+                stripe=stripe,
+                font_scale=font_scale,
+                colnames=colnames,
+            )
+        else:
+            fg.map(
+                add_heatmap,
+                stripe,
+                "flank",
+                "rescale",
+                "rescale_flank",
+                "n",
+                norm=norm,
+                cmap=cmap,
+                aspect=aspect,
+                height=height,
+                plot_ticks=plot_ticks,
+                stripe=stripe,
+                font_scale=font_scale,
+                max_coordinates=max_coordinates,
+            )
+            if lineplot:
+                logging.info(
+                    "Can only do lineplot for single conditions (no rows/columns). Doing normal stripe plot instead."
+                )
     else:
         raise ValueError(
             "stripe can only be 'vertical_stripe', 'horizontal_stripe' or 'corner_stripe'"
         )
-
     if plot_ticks:
         fg.fig.subplots_adjust(wspace=0.2, hspace=0.05)
         fg.set_titles(col_template="", row_template="")
@@ -370,40 +497,28 @@ def make_heatmap_stripes(
                 if row_val == row_order[0]:
                     ax.set_title(col_val)
                 if row_val == row_order[-1]:
-                    if pupsdf["rescale"].any():
-                        ax.set_xlabel("rescaled\n" + stripe)
-                    else:
-                        ax.set_xlabel("pos. [kbp]\n" + stripe)
+                    ax.set_xlabel("")
                 if col_val == col_order[0]:
-                    ax.set_ylabel(row_val, rotation=0, ha="right")
+                    ax.set_ylabel(row_val, rotation=0, ha="right", va="center")
         else:
             if nrows == 1 and ncols > 1:
                 for col_val, ax in fg.axes_dict.items():
-                    if pupsdf["rescale"].any():
-                        ax.set_xlabel("rescaled\n" + stripe)
-                    else:
-                        ax.set_xlabel("pos. [kbp]\n" + stripe)
+                    ax.set_xlabel("")
                     ax.set_ylabel("")
                     ax.set_title(col_val)
             elif nrows > 1 and ncols == 1:
                 for row_val, ax in fg.axes_dict.items():
-                    ax.set_ylabel(row_val, rotation=0, ha="right")
-                    if pupsdf["rescale"].any():
-                        ax.set_xlabel("rescaled\n" + stripe)
-                    else:
-                        ax.set_xlabel("pos. [kbp]\n" + stripe)
+                    ax.set_ylabel(row_val, rotation=0, ha="right", va="center")
+                    ax.set_xlabel("")
             else:
                 plt.title("")
-                plt.xlabel("")
                 plt.ylabel("")
-                if pupsdf["rescale"].any():
-                    plt.xlabel("rescaled\n" + stripe)
-                else:
-                    plt.xlabel("pos. [kbp]\n" + stripe)
+                plt.xlabel("")
     else:
         fg.fig.subplots_adjust(wspace=0.05, hspace=0.05)
-        fg.map(lambda color: plt.gca().set_xticks([]))
-        fg.map(lambda color: plt.gca().set_yticks([]))
+        if not lineplot:
+            fg.map(lambda color: plt.gca().set_xticks([]))
+            fg.map(lambda color: plt.gca().set_yticks([]))
         fg.set_titles(col_template="", row_template="")
         if nrows > 1 and ncols > 1:
             for (row_val, col_val), ax in fg.axes_dict.items():
@@ -425,6 +540,60 @@ def make_heatmap_stripes(
                 plt.xlabel("")
                 plt.ylabel("")
 
+    if colnames is not None:
+        if len(colnames) != ncols:
+            logging.info(f"{len(colnames)} colnames but {ncols} columns, ignoring")
+        else:
+            i = 0
+            if nrows > 1 and ncols > 1:
+                for (row_val, col_val), ax in fg.axes_dict.items():
+                    if not plot_ticks and row_val == row_order[-1]:
+                        ax.set_xlabel(colnames[i])
+                        i += 1
+                    elif plot_ticks and row_val == row_order[0]:
+                        ax.set_title(colnames[i])
+                        i += 1
+            else:
+                if nrows == 1 and ncols > 1:
+                    for col_val, ax in fg.axes_dict.items():
+                        if plot_ticks:
+                            ax.set_title(colnames[i])
+                        else:
+                            ax.set_xlabel(colnames[i])
+                        i += 1
+                elif nrows > 1 and ncols == 1:
+                    for row_val, ax in fg.axes_dict.items():
+                        if not plot_ticks and row_val == row_order[-1]:
+                            ax.set_xlabel(colnames[i])
+                            i += 1
+                        elif plot_ticks and row_val == row_order[0]:
+                            ax.set_title(colnames[i])
+                            i += 1
+                else:
+                    if not lineplot:
+                        plt.title(colnames[i])
+
+    if rownames is not None:
+        if len(rownames) != nrows:
+            logging.info(f"{len(rownames)} rownames but {nrows} columns, ignoring")
+        else:
+            i = 0
+            if nrows > 1 and ncols > 1:
+                for (row_val, col_val), ax in fg.axes_dict.items():
+                    if col_val == col_order[0]:
+                        ax.set_ylabel(rownames[i], rotation=0, ha="right", va="center")
+                        i += 1
+            else:
+                if nrows == 1 and ncols > 1:
+                    for col_val, ax in fg.axes_dict.items():
+                        ax.set_ylabel(rownames[i], rotation=0, ha="right", va="center")
+                elif nrows > 1 and ncols == 1:
+                    for row_val, ax in fg.axes_dict.items():
+                        ax.set_ylabel(rownames[i], rotation=0, ha="right", va="center")
+                        i += 1
+                else:
+                    plt.ylabel(rownames[i], rotation=0, ha="right", va="center")
+
     plt.draw()
     ax_bottom = fg.axes[-1, -1]
     bottom = ax_bottom.get_position().y0
@@ -432,8 +601,16 @@ def make_heatmap_stripes(
     top = ax_top.get_position().y1
     height = top - bottom
     right = ax_top.get_position().x1
+    ax_left = fg.axes[-1, 0]
+    left = ax_left.get_position().x0
     cax = fg.fig.add_axes([right + 0.01, bottom, (1 - right - 0.01) / 5, height])
-    if sym:
+    if plot_ticks:
+        if pupsdf["rescale"].any():
+            string = "rescaled"
+        else:
+            string = "pos. [kb]"
+        fg.fig.text((right + left) / 2, bottom - 0.2 / nrows, s=string, ha="center")
+    if sym and scale == "log":
         ticks = [vmin, 1, vmax]
     else:
         ticks = [vmin, vmax]
@@ -465,23 +642,20 @@ def make_heatmap_grid(
     scale="log",
     height=1,
     aspect=1,
-    font=False,
-    font_scale=None,
+    font="DejaVu Sans",
+    font_scale=1,
     plot_ticks=False,
+    colnames=None,
+    rownames=None,
     **kwargs,
 ):
     pupsdf = pupsdf.copy()
-
+    if np.any(pupsdf.index.duplicated()):
+        raise ValueError("There are duplicated indices in the pileup")
     cmap = copy.copy(cm.get_cmap(cmap))
     cmap.set_bad(cmap_emptypixel)
 
-    if font and font_scale:
-        sns.set(font=font, font_scale=font_scale, style="ticks")
-    elif font:
-        sns.set(font=font, style="ticks")
-    elif font_scale:
-        sns.set(font_scale=font_scale, style="ticks")
-
+    sns.set(font=font, font_scale=font_scale, style="ticks")
     if norm_corners:
         pupsdf["data"] = pupsdf.apply(
             lambda x: coolpup.norm_cis(x["data"], norm_corners), axis=1
@@ -510,7 +684,7 @@ def make_heatmap_grid(
     if cols is None and rows is None:
         nrows, ncols = auto_rows_cols(pupsdf.shape[0])
 
-    vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym)
+    vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym, scale=scale)
 
     if scale == "log":
         norm = LogNorm
@@ -538,25 +712,31 @@ def make_heatmap_grid(
     )
     norm = norm(vmin, vmax)
 
+    max_coordinates = [
+        pupsdf.loc[pd.to_numeric(pupsdf["flank"]).idxmax(), "flank"],
+        pupsdf.loc[pd.to_numeric(pupsdf["flank"]).idxmax(), "resolution"],
+    ]
     fg.map(
         add_heatmap,
         "data",
-        "resolution",
         "flank",
         "rescale",
         "rescale_flank",
+        "n",
+        max_coordinates=max_coordinates,
         norm=norm,
         cmap=cmap,
         aspect=aspect,
         height=height,
         plot_ticks=plot_ticks,
+        font_scale=font_scale,
     )
 
     if score:
         pupsdf["score"] = pupsdf.apply(
             coolpup.get_score, center=center, ignore_central=ignore_central, axis=1
         )
-        fg.map(add_score, "score", height=height)
+        fg.map(add_score, "score", height=height, font_scale=font_scale)
 
     if plot_ticks:
         fg.fig.subplots_adjust(wspace=0.2, hspace=0.05)
@@ -565,36 +745,26 @@ def make_heatmap_grid(
             for (row_val, col_val), ax in fg.axes_dict.items():
                 if row_val == row_order[0]:
                     ax.set_title(col_val)
+                    saveax = ax
                 if row_val == row_order[-1]:
-                    if pupsdf["rescale"].any():
-                        ax.set_xlabel("rescaled")
-                    else:
-                        ax.set_xlabel("pos. [kbp]")
+                    ax.set_xlabel("")
                 if col_val == col_order[0]:
-                    ax.set_ylabel(row_val, rotation=0, ha="right")
+                    ax.set_ylabel(row_val, rotation=0, ha="right", va="center")
         else:
             if nrows == 1 and ncols > 1:
                 for col_val, ax in fg.axes_dict.items():
-                    if pupsdf["rescale"].any():
-                        ax.set_xlabel("rescaled")
-                    else:
-                        ax.set_xlabel("pos. [kbp]")
+                    ax.set_xlabel("")
                     ax.set_ylabel("")
                     ax.set_title(col_val)
             elif nrows > 1 and ncols == 1:
                 for row_val, ax in fg.axes_dict.items():
-                    ax.set_ylabel(row_val, rotation=0, ha="right")
-                    if pupsdf["rescale"].any():
-                        ax.set_xlabel("rescaled")
-                    else:
-                        ax.set_xlabel("pos. [kbp]")
+                    ax.set_ylabel(row_val, rotation=0, ha="right", va="center")
+                    ax.set_xlabel("")
             else:
                 plt.title("")
                 plt.ylabel("")
-                if pupsdf["rescale"].any():
-                    plt.xlabel("rescaled")
-                else:
-                    plt.xlabel("pos. [kbp]")
+                plt.xlabel("")
+
     else:
         fg.fig.subplots_adjust(wspace=0.05, hspace=0.05)
         fg.map(lambda color: plt.gca().set_xticks([]))
@@ -605,7 +775,7 @@ def make_heatmap_grid(
                 if row_val == row_order[-1]:
                     ax.set_xlabel(col_val)
                 if col_val == col_order[0]:
-                    ax.set_ylabel(row_val, rotation=0, ha="right")
+                    ax.set_ylabel(row_val, rotation=0, ha="right", va="center")
         else:
             if nrows == 1 and ncols > 1:
                 for col_val, ax in fg.axes_dict.items():
@@ -614,11 +784,64 @@ def make_heatmap_grid(
             elif nrows > 1 and ncols == 1:
                 for row_val, ax in fg.axes_dict.items():
                     ax.set_xlabel("")
-                    ax.set_ylabel(row_val, rotation=0, ha="right")
+                    ax.set_ylabel(row_val, rotation=0, ha="right", va="center")
             else:
                 plt.xlabel("")
                 plt.ylabel("")
                 plt.title("")
+
+    if colnames is not None:
+        if len(colnames) != ncols:
+            logging.info(f"{len(colnames)} colnames but {ncols} columns, ignoring")
+        else:
+            i = 0
+            if nrows > 1 and ncols > 1:
+                for (row_val, col_val), ax in fg.axes_dict.items():
+                    if not plot_ticks and row_val == row_order[-1]:
+                        ax.set_xlabel(colnames[i])
+                        i += 1
+                    elif plot_ticks and row_val == row_order[0]:
+                        ax.set_title(colnames[i])
+                        i += 1
+            else:
+                if nrows == 1 and ncols > 1:
+                    for col_val, ax in fg.axes_dict.items():
+                        if plot_ticks:
+                            ax.set_title(colnames[i])
+                        else:
+                            ax.set_xlabel(colnames[i])
+                        i += 1
+                elif nrows > 1 and ncols == 1:
+                    for row_val, ax in fg.axes_dict.items():
+                        if not plot_ticks and row_val == row_order[-1]:
+                            ax.set_xlabel(colnames[i])
+                            i += 1
+                        elif plot_ticks and row_val == row_order[0]:
+                            ax.set_title(colnames[i])
+                            i += 1
+                else:
+                    plt.title(colnames[i])
+
+    if rownames is not None:
+        if len(rownames) != nrows:
+            logging.info(f"{len(rownames)} rownames but {nrows} columns, ignoring")
+        else:
+            i = 0
+            if nrows > 1 and ncols > 1:
+                for (row_val, col_val), ax in fg.axes_dict.items():
+                    if col_val == col_order[0]:
+                        ax.set_ylabel(rownames[i], rotation=0, ha="right", va="center")
+                        i += 1
+            else:
+                if nrows == 1 and ncols > 1:
+                    for col_val, ax in fg.axes_dict.items():
+                        ax.set_ylabel(rownames[i], rotation=0, ha="right", va="center")
+                elif nrows > 1 and ncols == 1:
+                    for row_val, ax in fg.axes_dict.items():
+                        ax.set_ylabel(rownames[i], rotation=0, ha="right", va="center")
+                        i += 1
+                else:
+                    plt.ylabel(rownames[i], rotation=0, ha="right", va="center")
 
     plt.draw()
     ax_bottom = fg.axes[-1, -1]
@@ -627,11 +850,20 @@ def make_heatmap_grid(
     top = ax_top.get_position().y1
     height = top - bottom
     right = ax_top.get_position().x1
+    ax_left = fg.axes[-1, 0]
+    left = ax_left.get_position().x0
     cax = fg.fig.add_axes([right + 0.005, bottom, (1 - right - 0.005) / 5, height])
-    if sym:
+    if plot_ticks:
+        if pupsdf["rescale"].any():
+            string = "rescaled"
+        else:
+            string = "pos. [kb]"
+        fg.fig.text((right + left) / 2, bottom - 0.2 / nrows, s=string, ha="center")
+    if sym and scale == "log":
         ticks = [vmin, 1, vmax]
     else:
         ticks = [vmin, vmax]
+
     cb = plt.colorbar(
         cm.ScalarMappable(norm, cmap),
         ticks=ticks,
