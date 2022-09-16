@@ -12,7 +12,11 @@ import os
 import argparse
 import logging
 import numpy as np
-from collections import Iterable
+
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 import sys
 import pdb, traceback
 
@@ -385,7 +389,7 @@ def main():
 
     logging.basicConfig(format="%(message)s", level=getattr(logging, args.logLevel))
 
-    logging.info(args)
+    logging.debug(args)
 
     if args.seed is not None:
         np.random.seed(args.seed)

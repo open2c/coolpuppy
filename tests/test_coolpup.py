@@ -47,21 +47,21 @@ def test_bystrand_pileups_with_expected(request):
     # Test with ooe=True
     pu = PileUpper(clr, cc, expected=exp, view_df=regions, ooe=True)
     pup = pu.pileupsByStrandWithControl()
-    assert np.all(pup.sort_values("orientation")["n"] == [1, 3, 1, 1])
+    assert np.all(pup.sort_values("orientation")["n"] == [1, 3, 1, 1, 6])
     # Test with ooe=False
     pu = PileUpper(clr, cc, expected=exp, view_df=regions, ooe=False)
     pup = pu.pileupsByStrandWithControl()
-    assert np.all(pup.sort_values("orientation")["n"] == [1, 3, 1, 1])
+    assert np.all(pup.sort_values("orientation")["n"] == [1, 3, 1, 1, 6])
     # No regions provided without expected
     pu = PileUpper(clr, cc, expected=False, ooe=False)
     pup = pu.pileupsByStrandWithControl()
-    assert np.all(pup.sort_values("orientation")["n"] == [1, 3, 1, 1])
+    assert np.all(pup.sort_values("orientation")["n"] == [1, 3, 1, 1, 6])
     # Unbalanced
     pu = PileUpper(
         clr, cc, expected=False, ooe=False, clr_weight_name=None, coverage_norm=True
     )
     pup = pu.pileupsByStrandWithControl()
-    assert np.all(pup.sort_values("orientation")["n"] == [1, 3, 1, 1])
+    assert np.all(pup.sort_values("orientation")["n"] == [1, 3, 1, 1, 6])
 
 
 def test_bystrand_pileups_with_controls(request):
@@ -86,7 +86,7 @@ def test_bystrand_pileups_with_controls(request):
     )
     pu = PileUpper(clr, cc, expected=False, view_df=regions, control=True)
     pup = pu.pileupsByStrandWithControl()
-    assert np.all(pup.sort_values("orientation")["n"] == [1, 3, 1, 1])
+    assert np.all(pup.sort_values("orientation")["n"] == [1, 3, 1, 1, 6])
 
 
 def test_bystrand_bydistance_pileups_with_controls(request):
@@ -112,6 +112,5 @@ def test_bystrand_bydistance_pileups_with_controls(request):
     pu = PileUpper(clr, cc, expected=False, view_df=regions, control=True)
     pup = pu.pileupsByStrandByDistanceWithControl()
     assert np.all(
-        pup.sort_values(["orientation", "distance_band"])["n"] == [1, 2, 1, 1, 1]
+        pup.sort_values(["orientation", "distance_band"])["n"] == [1, 2, 1, 1, 1, 6]
     )
-
