@@ -142,7 +142,7 @@ def load_pileup_df(filename, quaich=False, skipstripes=False):
                 annotation["vertical_stripe"] = vertical_stripe
                 annotation["horizontal_stripe"] = horizontal_stripe
                 annotation["coordinates"] = coordinates
-            except:
+            except KeyError:
                 pass
     for key, val in metadata.items():
         annotation[key] = val
