@@ -87,7 +87,9 @@ def parse_args_plotpuppy():
         "--lineplot",
         default=False,
         action="store_true",
-        help="""Whether to plot the average lineplot above stripes""",
+        help="""Whether to plot the average lineplot above stripes. 
+                This only works for a single plot, i.e. without rows/columns
+                """,
     )
     parser.add_argument(
         "--out_sorted_bedpe",
@@ -306,13 +308,11 @@ def main():
 
     if args.cols:
         if args.col_order:
-            col_order = args.col_order
             pups[args.cols] = pups[args.cols].astype(str)
             pups = pups[pups[args.cols].isin(args.col_order)]
 
     if args.rows:
         if args.row_order:
-            row_order = args.row_order
             pups[args.rows] = pups[args.rows].astype(str)
             pups = pups[pups[args.rows].isin(args.row_order)]           
 
