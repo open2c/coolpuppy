@@ -100,7 +100,7 @@ def save_pileup_df(filename, df, metadata=None, mode="w", compression="lzf"):
     return
 
 
-def load_pileup_df(filename, quaich=False):
+def load_pileup_df(filename, quaich=False, skipstripes=False):
     """
     Loads a dataframe saved using `save_pileup_df`
 
@@ -130,19 +130,20 @@ def load_pileup_df(filename, quaich=False):
         vertical_stripe = []
         horizontal_stripe = []
         coordinates = []
-        try:
-            for i in range(len(data)):
-                vstripe = "vertical_stripe_" + str(i)
-                hstripe = "horizontal_stripe_" + str(i)
-                coords = "coordinates_" + str(i)
-                vertical_stripe.append(f[vstripe][:].toarray())
-                horizontal_stripe.append(f[hstripe][:].toarray())
-                coordinates.append(f[coords][:].astype("U13"))
-            annotation["vertical_stripe"] = vertical_stripe
-            annotation["horizontal_stripe"] = horizontal_stripe
-            annotation["coordinates"] = coordinates
-        except:
-            pass
+        if not skipstripes:
+            try:
+                for i in range(len(data)):
+                    vstripe = "vertical_stripe_" + str(i)
+                    hstripe = "horizontal_stripe_" + str(i)
+                    coords = "coordinates_" + str(i)
+                    vertical_stripe.append(f[vstripe][:].toarray())
+                    horizontal_stripe.append(f[hstripe][:].toarray())
+                    coordinates.append(f[coords][:].astype("U13"))
+                annotation["vertical_stripe"] = vertical_stripe
+                annotation["horizontal_stripe"] = horizontal_stripe
+                annotation["coordinates"] = coordinates
+            except KeyError:
+                pass
     for key, val in metadata.items():
         annotation[key] = val
     if quaich:
@@ -155,7 +156,7 @@ def load_pileup_df(filename, quaich=False):
     return annotation
 
 
-def load_pileup_df_list(files, quaich=False, nice_metadata=True):
+def load_pileup_df_list(files, quaich=False, nice_metadata=True, skipstripes=False):
     """
 
     Parameters
@@ -176,7 +177,7 @@ def load_pileup_df_list(files, quaich=False, nice_metadata=True):
         Combined dataframe with all pileups and annotations from all files.
 
     """
-    pups = pd.concat([load_pileup_df(path, quaich=quaich) for path in files])
+    pups = pd.concat([load_pileup_df(path, quaich=quaich, skipstripes=skipstripes) for path in files])
     if nice_metadata:
         pups["norm"] = np.where(
             pups["expected"], ["expected"] * pups.shape[0], ["shifts"] * pups.shape[0]
@@ -672,6 +673,7 @@ def divide_pups(pup1, pup2):
         "clr",
         "chroms",
         "minshift",
+        "expected_file",
         "maxshift",
         "mindist",
         "maxdist",
@@ -695,6 +697,7 @@ def divide_pups(pup1, pup2):
         ), f"Cannot divide these pups, {col} is different between them"
     div_pup["data"] = pup1["data"] / pup2["data"]
     div_pup["clrs"] = str(pup1["clr"]) + "/" + str(pup2["clr"])
+    div_pup["n"] =  pup1["n"] + pup2["n"]
     if set(["vertical_stripe", "horizontal_stripe"]).issubset(pup1.columns):
         if np.all(np.sort(pup1["coordinates"]) == np.sort(pup2["coordinates"])):
             div_pup["coordinates"] = pup1["coordinates"]
@@ -869,6 +872,7 @@ class CoordCreator:
             assert all(
                 [name in self.intervals.columns for name in ["chrom", "start", "end"]]
             )
+            self.intervals["chrom"] = self.intervals["chrom"].astype(str)
             self.intervals["center"] = (
                 self.intervals["start"] + self.intervals["end"]
             ) / 2
@@ -882,6 +886,7 @@ class CoordCreator:
                     for name in ["chrom1", "start1", "end1", "chrom2", "start2", "end2"]
                 ]
             )
+            self.intervals[["chrom1", "chrom2"]] = self.intervals[["chrom1", "chrom2"]].astype(str)
             self.intervals["center1"] = (
                 self.intervals["start1"] + self.intervals["end1"]
             ) / 2
@@ -934,6 +939,7 @@ class CoordCreator:
             self.final_chroms = natsorted(
                 list(set(self.chroms).intersection(set(self.basechroms)))
             )
+        
         if len(self.final_chroms) == 0:
             raise ValueError(
                 """No chromosomes are in common between the coordinate
@@ -1472,13 +1478,12 @@ class PileUpper:
         self.ignore_diags = ignore_diags
         self.store_stripes = store_stripes
         self.nproc = nproc
-
+        
         if view_df is None:
             # Generate viewframe from clr.chromsizes:
             self.view_df = common.make_cooler_view(clr)
         else:
             self.view_df = bioframe.make_viewframe(view_df, check_bounds=clr.chromsizes)
-
         if self.expected is not False:
             # subset expected if some regions not mentioned in view
             self.expected = self.expected[
@@ -1541,7 +1546,7 @@ class PileUpper:
             lo, hi = self.clr.extent(region)
             chroffset = self.clr.offset(region[0])
             self.view_df_extents[region_name] = lo - chroffset, hi - chroffset
-
+        
         self.chroms = natsorted(
             list(set(self.CC.final_chroms) & set(self.clr.chromnames))
         )
@@ -2356,7 +2361,7 @@ class PileUpper:
         normalized_pileups = pd.concat(
             [
                 normalized_pileups.drop(i).sort_values("distance_band"),
-                normalized_pileups.iloc[i, :].to_frame().transpose(),
+                normalized_pileups.iloc[i, :],
             ],
             ignore_index=True,
         ).reset_index(drop=True)
