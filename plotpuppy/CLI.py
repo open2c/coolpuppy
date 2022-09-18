@@ -167,14 +167,14 @@ def parse_args_plotpuppy():
         type=str,
         nargs="+",
         required=False,
-        help="""Names for columns, space separated""",
+        help="""Names to plot for columns, space separated.""",
     )
     parser.add_argument(
         "--rownames",
         type=str,
         nargs="+",
         required=False,
-        help="""Names for rows, space separated""",
+        help="""Names to plot for rows, space separated.""",
     )
     parser.add_argument(
         "--query",
@@ -310,11 +310,15 @@ def main():
         if args.col_order:
             pups[args.cols] = pups[args.cols].astype(str)
             pups = pups[pups[args.cols].isin(args.col_order)]
+        else:
+            args.col_order = pups[args.cols].unique()
 
     if args.rows:
         if args.row_order:
             pups[args.rows] = pups[args.rows].astype(str)
-            pups = pups[pups[args.rows].isin(args.row_order)]           
+            pups = pups[pups[args.rows].isin(args.row_order)]     
+        else:
+            args.row_order = pups[args.rows].unique()
 
     if args.stripe_sort == "None":
         args.stripe_sort = None
