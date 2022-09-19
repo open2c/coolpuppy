@@ -27,7 +27,7 @@ author = "Ilya M. Flyamer"
 # The full version, including alpha/beta/rc tags
 import re
 
-VERSIONFILE = "coolpuppy/_version.py"
+VERSIONFILE = "../../coolpuppy/_version.py"
 verstrline = open(VERSIONFILE, "rt").read()
 VSRE = r"^__version__ = ['\"]([^'\"]*)['\"]"
 mo = re.search(VSRE, verstrline, re.M)
