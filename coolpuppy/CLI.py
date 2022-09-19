@@ -244,7 +244,8 @@ def parse_args_coolpuppy():
         help="""Perform inter-chromosomal (trans) pileups""",
     )
     parser.add_argument(
-        "--by_chroms",
+        "--by-chrom",
+        "--by_chrom",
         action="store_true",
         default=False,
         required=False,
@@ -560,7 +561,7 @@ def main():
             outname += "_by-strand"
         if args.trans:
             outname += "_trans"
-        if args.by_chroms:
+        if args.by_chrom:
             outname += "_by-chroms"
         outname += ".clpy"
     else:
@@ -578,7 +579,7 @@ def main():
         pups = PU.pileupsByDistanceWithControl(
             nproc=nproc, distance_edges=distance_edges
         )
-    elif args.by_chroms:
+    elif args.by_chrom:
         pups = PU.pileupsWithControl(groupby=["chrom1", "chrom2"])
     else:
         pups = PU.pileupsWithControl()

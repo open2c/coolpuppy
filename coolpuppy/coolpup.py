@@ -1821,3 +1821,38 @@ class PileUpper:
             ignore_index=True,
         ).reset_index(drop=True)
         return normalized_pileups
+
+
+def pileup(
+    clr,
+    features,
+    features_format="auto",
+    view_df=None,
+    flank=100000,
+    minshift=10**5,
+    maxshift=10**6,
+    nshifts=10,
+    expected_df=None,
+    expected_value_col="balanced.avg",
+    ooe=True,
+    mindist="auto",
+    maxdist=None,
+    ignore_diags=2,
+    subset=0,
+    by_windows=False,
+    by_strand=False,
+    by_distance=False,
+    by_chrom=False,
+    groupby=False,
+    flip_negative_strand=False,
+    local=False,
+    coverage_norm=False,
+    trans=False,
+    store_stripes=False,
+    control=False,
+    clr_weight_name="weight",
+    rescale_flank=None,
+    nproc=1,
+    seed=None,
+):
+    pass
