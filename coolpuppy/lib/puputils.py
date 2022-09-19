@@ -42,8 +42,8 @@ def sum_pups(pup1, pup2, extra_funcs={}):
     Assumes n=1 if not present, and calculates num if not present
     If store_stripes is set to False, stripes and coordinates will be empty
 
-    extra_funcs allows to give arbitrary functions to accumulate additio to accumulate
-    extra information from the two pups.
+    extra_funcs allows to give arbitrary functions to accumulate extra information
+    from the two pups.
     """
     pup1["data"] = np.nan_to_num(pup1["data"])
     pup2["data"] = np.nan_to_num(pup2["data"])
