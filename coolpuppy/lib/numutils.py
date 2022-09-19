@@ -160,7 +160,7 @@ def get_insulation_strength(amap, ignore_central=0, ignore_diags=2):
 
 
 def get_score(pup, center=3, ignore_central=3):
-    """Calculate reasonable sclre for any kind of pileup
+    """Calculate a reasonable score for any kind of pileup
     For non-local (off-diagonal) pileups, calculates average signal in the central
     pixels (based on 'center').
     For local non-rescaled pileups calculates insulation strength, and ignores the
