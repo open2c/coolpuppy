@@ -5,13 +5,10 @@ Created on Mon Mar 23 14:05:06 2020
 
 @author: Ilya Flyamer
 """
-from coolpuppy.coolpup import (
-    norm_cis,
-    load_pileup_df,
-    load_pileup_df_list,
-    get_score,
-    divide_pups,
-)
+from coolpuppy.lib import numutils
+from coolpuppy.lib import puptools
+from coolpuppy.lib import io
+
 from plotpuppy.plotpup import make_heatmap_grid, make_heatmap_stripes
 from coolpuppy._version import __version__
 
@@ -278,17 +275,20 @@ def main():
         sys.excepthook = _excepthook
     mpl.rcParams["svg.fonttype"] = "none"
     mpl.rcParams["pdf.fonttype"] = 42
-    
+
     if args.divide_pups:
         if len(args.input_pups) != 2:
             raise ValueError("Need exactly two input pups when using --divide_pups")
         else:
-            pup1 = load_pileup_df(args.input_pups[0])
-            pup2 = load_pileup_df(args.input_pups[1])
-            pups = divide_pups(pup1, pup2)
+            pup1 = io.load_pileup_df(args.input_pups[0])
+            pup2 = io.load_pileup_df(args.input_pups[1])
+            pups = puptools.divide_pups(pup1, pup2)
     else:
-        pups = load_pileup_df_list(
-            args.input_pups, quaich=args.quaich, nice_metadata=True, skipstripes=not args.stripe
+        pups = io.load_pileup_df_list(
+            args.input_pups,
+            quaich=args.quaich,
+            nice_metadata=True,
+            skipstripes=not args.stripe,
         )
 
     if args.query is not None:
@@ -296,11 +296,14 @@ def main():
             pups = pups.query(q)
 
     if args.norm_corners > 0:
-        pups["data"] = pups["data"].apply(norm_cis, i=int(args.norm_corners))
+        pups["data"] = pups["data"].apply(numutils.norm_cis, i=int(args.norm_corners))
 
     if not args.no_score:
         pups["score"] = pups.apply(
-            get_score, center=args.center, ignore_central=args.ignore_central, axis=1
+            numutils.get_score,
+            center=args.center,
+            ignore_central=args.ignore_central,
+            axis=1,
         )
         score = "score"
     else:
@@ -316,7 +319,7 @@ def main():
     if args.rows:
         if args.row_order:
             pups[args.rows] = pups[args.rows].astype(str)
-            pups = pups[pups[args.rows].isin(args.row_order)]     
+            pups = pups[pups[args.rows].isin(args.row_order)]
         else:
             args.row_order = pups[args.rows].unique()
 
@@ -335,7 +338,7 @@ def main():
             height = 1
     else:
         height = args.height
-
+    print(pups.columns)
     if args.stripe:
         fg = make_heatmap_stripes(
             pups,

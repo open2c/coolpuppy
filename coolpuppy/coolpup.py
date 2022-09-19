@@ -8,448 +8,14 @@ from multiprocessing import Pool
 from functools import partial, reduce
 import logging
 from natsort import natsorted
-from scipy import sparse
 import cooler
-from cooltools import numutils
+from cooltools import numutils as ctutils
 from cooltools.lib import common, checks
 from cooltools.api import snipping, coverage
-import yaml
-import io
 from more_itertools import collapse
-import h5sparse
 import os
-import re
-
-
-def save_pileup_df(filename, df, metadata=None, mode="w", compression="lzf"):
-    """
-    Saves a dataframe with metadata into a binary HDF5 file`
-
-    Parameters
-    ----------
-    filename : str
-        File to save to.
-    df : pd.DataFrame
-        DataFrame to save into binary hdf5 file.
-    metadata : dict, optional
-        Dictionary with meatadata.
-    mode : str, optional
-        Mode for the first time access to the output file: 'w' to overwrite if file
-        exists, or 'a' to fail if output file already exists
-    compression : str, optional
-        Compression to use for saving, e.g. 'gzip'. Defaults to 'lzf'
-
-    Returns
-    -------
-    None.
-
-    Notes
-    -----
-    Replaces `None` in metadata values with `False`, since HDF5 doesn't support `None`
-
-    """
-    if metadata is None:
-        metadata = {}
-    df[
-        df.columns[
-            ~df.columns.isin(
-                ["data", "vertical_stripe", "horizontal_stripe", "coordinates"]
-            )
-        ]
-    ].to_hdf(filename, "annotation", mode=mode)
-
-    with h5sparse.File(filename, "a") as f:
-        width = df["data"].iloc[0].shape[0]
-        height = width * df["data"].shape[0]
-        ds = f.create_dataset(
-            "data",
-            compression=compression,
-            chunks=(width, width),
-            shape=(height, width),
-        )
-        for i, arr in df["data"].reset_index(drop=True).items():
-            ds[i * width : (i + 1) * width, :] = arr
-        if df["store_stripes"].any():
-            for i, arr in df["vertical_stripe"].reset_index(drop=True).items():
-                f.create_dataset(
-                    "vertical_stripe_" + str(i),
-                    compression=compression,
-                    shape=(len(arr), width),
-                    data=sparse.csr_matrix(arr),
-                )
-            for i, arr in df["horizontal_stripe"].reset_index(drop=True).items():
-                f.create_dataset(
-                    "horizontal_stripe_" + str(i),
-                    compression=compression,
-                    shape=(len(arr), width),
-                    data=sparse.csr_matrix(arr),
-                )
-            for i, arr in df["coordinates"].reset_index(drop=True).items():
-                f.create_dataset(
-                    "coordinates_" + str(i),
-                    compression=compression,
-                    shape=(len(arr), 6),
-                    data=arr.astype(object),
-                )
-        group = f.create_group("attrs")
-        if metadata is not None:
-            for key, val in metadata.items():
-                if val is None:
-                    val = False
-                group.attrs[key] = val
-    return
-
-
-def load_pileup_df(filename, quaich=False, skipstripes=False):
-    """
-    Loads a dataframe saved using `save_pileup_df`
-
-    Parameters
-    ----------
-    filename : str
-        File to load from.
-    quaich : bool, optional
-        Whether to assume standard quaich file naming to extract sample name and bedname.
-        The default is False.
-
-    Returns
-    -------
-    annotation : pd.DataFrame
-        Pileups are in the "data" column, all metadata in other columns
-
-    """
-    with h5sparse.File(filename, "r", libver="latest") as f:
-        metadata = dict(zip(f["attrs"].attrs.keys(), f["attrs"].attrs.values()))
-        dstore = f["data"]
-        data = []
-        for chunk in dstore.iter_chunks():
-            chunk = dstore[chunk]
-            data.append(chunk)
-        annotation = pd.read_hdf(filename, "annotation")
-        annotation["data"] = data
-        vertical_stripe = []
-        horizontal_stripe = []
-        coordinates = []
-        if not skipstripes:
-            try:
-                for i in range(len(data)):
-                    vstripe = "vertical_stripe_" + str(i)
-                    hstripe = "horizontal_stripe_" + str(i)
-                    coords = "coordinates_" + str(i)
-                    vertical_stripe.append(f[vstripe][:].toarray())
-                    horizontal_stripe.append(f[hstripe][:].toarray())
-                    coordinates.append(f[coords][:].astype("U13"))
-                annotation["vertical_stripe"] = vertical_stripe
-                annotation["horizontal_stripe"] = horizontal_stripe
-                annotation["coordinates"] = coordinates
-            except KeyError:
-                pass
-    for key, val in metadata.items():
-        annotation[key] = val
-    if quaich:
-        basename = os.path.basename(filename)
-        sample, bedname = re.search(
-            "^(.*)-(?:[0-9]+)_over_(.*)_(?:[0-9]+-shifts|expected).*\.clpy", basename
-        ).groups()
-        annotation["sample"] = sample
-        annotation["bedname"] = bedname
-    return annotation
-
-
-def load_pileup_df_list(files, quaich=False, nice_metadata=True, skipstripes=False):
-    """
-
-    Parameters
-    ----------
-    files : iterable
-        Files to read pileups from.
-    quaich : bool, optional
-        Whether to assume standard quaich file naming to extract sample name and bedname.
-        The default is False.
-    nice_metadata : bool, optional
-        Whether to add nicer metadata for direct plotting. The default is True.
-        Adds a "norm" column ("expected", "shifts" or "none").
-
-
-    Returns
-    -------
-    pups : pd.DataFrame
-        Combined dataframe with all pileups and annotations from all files.
-
-    """
-    pups = pd.concat([load_pileup_df(path, quaich=quaich, skipstripes=skipstripes) for path in files])
-    if nice_metadata:
-        pups["norm"] = np.where(
-            pups["expected"], ["expected"] * pups.shape[0], ["shifts"] * pups.shape[0]
-        ).astype(str)
-        pups["norm"][
-            np.logical_not(np.logical_or(pups["nshifts"] > 0, pups["expected"]))
-        ] = "none"
-    return pups.reset_index(drop=False)
-
-
-def save_array_with_header(array, header, filename):
-    """Save a numpy array with a YAML header generated from a dictionary
-
-    Parameters
-    ----------
-    array : np.array
-        Array to save.
-    header : dict
-        Dictionaty to save into the header.
-    filename : string
-        Name of file to save array and metadata into.
-
-    """
-    header = yaml.dump(header).strip()
-    np.savetxt(filename, array, header=header)
-
-
-def load_array_with_header(filename):
-    """Load array from files generated using `save_array_with_header`.
-    They are simple txt files with an optional header in the first lines, commented
-    using "# ". If uncommented, the header is in YAML.
-
-    Parameters
-    ----------
-    filename : string
-        File to load from.
-
-    Returns
-    -------
-    data : dict
-        Dictionary with information from the header. Access the associated data in an
-        array using data['data'].
-
-    """
-    with open(filename) as f:
-        read_data = f.read()
-
-    lines = read_data.split("\n")
-    header = "\n".join([line[2:] for line in lines if line.startswith("# ")])
-    if len(header) > 0:
-        metadata = yaml.load(header, Loader=yaml.FullLoader)
-    else:
-        metadata = {}
-    data = "\n".join([line for line in lines if not line.startswith("# ")])
-    with io.StringIO(data) as f:
-        metadata["data"] = np.loadtxt(f)
-    return metadata
-
-
-def corner_cv(amap, i=4):
-    """Get coefficient of variation for upper left and lower right corners of a pileup
-    to estimate how noisy it is
-
-    Parameters
-    ----------
-    amap : 2D array
-        Pileup.
-    i : int, optional
-        How many bins to use from each upper left and lower right corner: final corner
-        shape is i^2.
-        The default is 4.
-
-    Returns
-    -------
-    CV : float
-        Coefficient of variation for the corner pixels.
-
-    """
-    corners = np.concatenate((amap[0:i, 0:i], amap[-i:, -i:]))
-    corners = corners[np.isfinite(corners)]
-    return np.std(corners) / np.mean(corners)
-
-
-def norm_cis(amap, i=3):
-    """Normalize the pileup by mean of pixels from upper left and lower right corners
-
-    Parameters
-    ----------
-    amap : 2D array
-        Pileup.
-    i : int, optional
-        How many bins to use from each upper left and lower right corner: final corner
-        shape is i^2. 0 will not normalize.
-        The default is 3.
-
-    Returns
-    -------
-    amap : 2D array
-        Normalized pileup.
-
-    """
-    if i > 0:
-        return amap / np.nanmean((amap[0:i, 0:i] + amap[-i:, -i:])) * 2
-    else:
-        return amap
-
-
-def get_enrichment(amap, n):
-    """Get values from the center of a pileup for a square with side *n*
-
-    Parameters
-    ----------
-    amap : 2D array
-        Pileup.
-    n : int
-        Side of the central square to use.
-
-    Returns
-    -------
-    enrichment : float
-        Mean of the pixels in the central square.
-
-    """
-    c = amap.shape[0] // 2
-    return np.nanmean(amap[c - n // 2 : c + n // 2 + 1, c - n // 2 : c + n // 2 + 1])
-
-
-def get_local_enrichment(amap, flank=1):
-    """Get values for a square from the central part of a pileup, ignoring padding
-
-    Parameters
-    ----------
-    amap : 2D array
-        Pileup.
-    flank : int
-        Relative padding used, i.e. if 1 the central third is used, if 2 the central
-        fifth is used.
-        The default is 1.
-
-    Returns
-    -------
-    enrichment : float
-        Mean of the pixels in the central square.
-
-    """
-    c = amap.shape[0] / (flank * 2 + 1)
-    assert int(c) == c
-    c = int(c)
-    return np.nanmean(amap[c:-c, c:-c])
-
-
-def get_domain_score(amap, flank=1):
-    """Divide sum of values in a square from the central part of a matrix by the upper
-    and right rectangles corresponding to interactions of the central region with
-    its surroundings.
-
-    Parameters
-    ----------
-    amap : 2D array
-        Pileup.
-    flank : int
-        Relative padding used, i.e. if 1 the central third is used, if 2 the central
-        fifth is used.
-        The default is 1.
-
-    Returns
-    -------
-    score : float
-        Domain score.
-
-    """
-    c = amap.shape[0] / (flank * 2 + 1)
-    assert int(c) == c
-    c = int(c)
-    central = np.nansum(amap[c:-c, c:-c])
-    top = np.nansum(amap[:c, c:-c])
-    right = np.nansum(amap[c:-c, -c:])
-    return central / (top + right) * 2
-
-
-def get_insulation_strength(amap, ignore_central=0, ignore_diags=2):
-    """Divide values in upper left and lower right corners over upper right and lower
-    left, ignoring the central bins.
-
-    Parameters
-    ----------
-    amap : 2D array
-        Pileup.
-    ignore_central : int, optional
-        How many central bins to ignore. Has to be odd or 0. The default is 0.
-
-    Returns
-    -------
-    float
-        Insulation strength.
-
-    """
-    for d in range(ignore_diags):
-        amap = numutils.fill_diag(amap, np.nan, d)
-        if d != 0:
-            amap = numutils.fill_diag(amap, np.nan, -d)
-    if ignore_central != 0 and ignore_central % 2 != 1:
-        raise ValueError(f"ignore_central has to be odd (or 0), got {ignore_central}")
-    i = (amap.shape[0] - ignore_central) // 2
-    intra = np.nanmean(np.concatenate([amap[:i, :i].ravel(), amap[-i:, -i:].ravel()]))
-    inter = np.nanmean(np.concatenate([amap[:i, -i:].ravel(), amap[-i:, :i].ravel()]))
-    return intra / inter
-
-
-def get_score(pup, center=3, ignore_central=3):
-    """Calculate reasonable sclre for any kind of pileup
-    For non-local (off-diagonal) pileups, calculates average signal in the central
-    pixels (based on 'center').
-    For local non-rescaled pileups calculates insulation strength, and ignores the
-    central bins (based on 'ignore_central')
-    For local rescaled pileups calculates enrichment in the central rescaled area
-    relative to the two neighouring areas on the sides.
-
-    Parameters
-    ----------
-    pup : pd.Series or dict
-        Series or dict with pileup in 'data' and annotations in other keys.
-        Will correctly calculate enrichment score with annotations in 'local' (book),
-        'rescale' (bool) and 'rescale_flank' (float)
-    enrichment : int, optional
-        Passed to 'get_enrichment' to calculate the average strength of central pixels.
-        The default is 3.
-    ignore_central : int, optional
-        How many central bins to ignore for calculation of insulation in local pileups.
-        The default is 3.
-
-    Returns
-    -------
-    float
-        Score.
-
-    """
-    if not pup["local"]:
-        return get_enrichment(pup["data"], center)
-    else:
-        if pup["rescale"]:
-            return get_domain_score(pup["data"], pup["rescale_flank"])
-        else:
-            return get_insulation_strength(pup["data"], ignore_central)
-
-
-def prepare_single(item):
-    """Generate enrichment and corner CV, reformat into a list
-
-    Parameters
-    ----------
-    item : tuple
-        Key, (n, pileup).
-
-    Returns
-    -------
-    list
-        Concatenated list of key, n, enrichment1, enrichment3, cv3, cv5.
-
-    """
-    key, (n, amap) = item
-    enr1 = get_enrichment(amap, 1)
-    enr3 = get_enrichment(amap, 3)
-    cv3 = corner_cv(amap, 3)
-    cv5 = corner_cv(amap, 5)
-    return list(key) + [n, enr1, enr3, cv3, cv5]
-
-
-def copy_array_halves(x):
-    cntr = int(np.floor(x.shape[1] / 2))
-    x[:, : (cntr + 1)] = np.fliplr(x[:, cntr:])
-    return x
+from .lib import numutils
+from .lib.puptools import _add_snip, group_by_region, norm_coverage, sum_pups
 
 
 def bin_distance_intervals(intervals, band_edges="default"):
@@ -478,54 +44,21 @@ def bin_distance_intervals(intervals, band_edges="default"):
     return intervals
 
 
-def bin_distance(snip, band_edges="default"):
-    """
-
-
-    Parameters
-    ----------
-    snip : pd.Series
-        Series containing any annotations. Has to have ['distance']
-    band_edges : list or array-like, or "default", optional
-        Edges of distance bands used to assign the distance band.
-        Default is np.append([0], 50000 * 2 ** np.arange(30))
-
-    Returns
-    -------
-    snip : pd.Series
-        The same snip with added ['distance_band'] annotation.
-
-    """
-    if band_edges == "default":
-        band_edges = np.append([0], 50000 * 2 ** np.arange(30))
-    i = np.searchsorted(band_edges, snip["distance"])
-    snip["distance_band"] = tuple(band_edges[i - 1 : i + 1])
-    return snip
-
-
-def group_by_region(snip):
-    snip1 = snip.copy()
-    snip1["group"] = tuple([snip1["chrom1"], snip1["start1"], snip1["end1"]])
-    snip2 = snip.copy()
-    snip2["group"] = tuple([snip2["chrom2"], snip2["start2"], snip2["end2"]])
-    yield from (snip1, snip2)
-
-
 def assign_groups(intervals, groupby=[]):
-    """
-
+    """Assign groups to rows based on a list of columns
 
     Parameters
     ----------
-    intervals : TYPE
-        DESCRIPTION.
-    groupby : TYPE, optional
-        DESCRIPTION. The default is [].
+    intervals : pd.DataFrame
+        Dataframe containing intervals with any annotations.
+    groupby : list, optional
+        List of columns to use to assign a group. The default is [].
 
     Returns
     -------
-    intervals : TYPE
-        DESCRIPTION.
+    intervals : pd.DataFrame
+        Adds a "group" column with the annotation based on `groupby`. If groupby is
+        empty, assigns "all" to all rows.
 
     """
     if not groupby:
@@ -573,167 +106,6 @@ def expand2D(intervals, flank, resolution, rescale_flank=None):
             intervals, scale=2 * rescale_flank + 1, cols=["chrom2", "start2", "end2"]
         )[["start2", "end2"]]
     return intervals
-
-
-def combine_rows(row1, row2, normalize_order=True):
-    d = row2.center - row1.center
-    if d < 0 and normalize_order:
-        row1, row2 = row2, row1
-        d = -d
-    # row1.index = [i+'1' for i in row1.index]
-    # row2.index = [i+'2' for i in row2.index]
-    double_row = pd.Series(
-        index=[i + "1" for i in row1.index]
-        + [i + "2" for i in row2.index]
-        + ["distance"],
-        data=np.concatenate([row1.values, row2.values, [d]]),
-    )
-    # double_row['distance'] = d
-    return double_row
-
-
-def accumulate_values(dict1, dict2, key):
-    assert key in dict2, f"{key} not in dict2"
-    if key in dict1:
-        dict1[key] = list(collapse([dict1[key], dict2[key]]))
-    else:
-        dict1[key] = [dict2[key]]
-    return dict1
-
-
-def _add_snip(outdict, key, snip, extra_funcs=None):
-    if key not in outdict:
-        outdict[key] = {key: snip[key] for key in ["data", "cov_start", "cov_end"]}
-        outdict[key]["coordinates"] = [snip["coordinates"]]
-        outdict[key]["horizontal_stripe"] = [snip["horizontal_stripe"]]
-        outdict[key]["vertical_stripe"] = [snip["vertical_stripe"]]
-        outdict[key]["num"] = np.isfinite(snip["data"]).astype(int)
-        outdict[key]["n"] = 1
-    else:
-        outdict[key]["data"] = np.nansum([outdict[key]["data"], snip["data"]], axis=0)
-        outdict[key]["num"] += np.isfinite(snip["data"]).astype(int)
-        outdict[key]["cov_start"] = np.nansum(
-            [outdict[key]["cov_start"], snip["cov_start"]], axis=0
-        )
-        outdict[key]["cov_end"] = np.nansum(
-            [outdict[key]["cov_end"], snip["cov_end"]], axis=0
-        )
-        outdict[key]["n"] += 1
-        outdict[key]["horizontal_stripe"] = outdict[key]["horizontal_stripe"] + [
-            snip["horizontal_stripe"]
-        ]
-        outdict[key]["vertical_stripe"] = outdict[key]["vertical_stripe"] + [
-            snip["vertical_stripe"]
-        ]
-        outdict[key]["coordinates"] = outdict[key]["coordinates"] + [
-            snip["coordinates"]
-        ]
-    if extra_funcs is not None:
-        for key2, func in extra_funcs.items():
-            outdict[key] = func(outdict[key], snip)
-
-
-def sum_pups(pup1, pup2, extra_funcs={}):
-    """
-    Preserves data, stripes, cov_start, cov_end, n, num and coordinates
-    Assumes n=1 if not present, and calculates num if not present
-    If store_stripes is set to False, stripes and coordinates will be empty
-
-    extra_funcs allows to give arbitrary functions to accumulate additio to accumulate
-    extra information from the two pups.
-    """
-    pup1["data"] = np.nan_to_num(pup1["data"])
-    pup2["data"] = np.nan_to_num(pup2["data"])
-    pup = {
-        "data": pup1["data"] + pup2["data"],
-        "cov_start": pup1["cov_start"] + pup2["cov_start"],
-        "cov_end": pup1["cov_end"] + pup2["cov_end"],
-        "n": pup1.get("n", 1) + pup2.get("n", 1),
-        "num": pup1.get("num", np.isfinite(pup1["data"]).astype(int))
-        + pup2.get("num", np.isfinite(pup2["data"]).astype(int)),
-        "horizontal_stripe": pup1["horizontal_stripe"] + pup2["horizontal_stripe"],
-        "vertical_stripe": pup1["vertical_stripe"] + pup2["vertical_stripe"],
-        "coordinates": pup1["coordinates"] + pup2["coordinates"],
-    }
-    if extra_funcs:
-        for key, func in extra_funcs.items():
-            pup = func(pup1, pup2)
-    return pd.Series(pup)
-
-
-def divide_pups(pup1, pup2):
-    """
-    Divide two pups and get the resulting pup. Requires that the pups have identical shapes, resolutions, flanks, etc. If pups contain stripes, these will only be divided if stripes have identical coordinates.
-    """
-    drop_columns = [
-        "control_n",
-        "control_num",
-        "n",
-        "num",
-        "clr",
-        "chroms",
-        "minshift",
-        "expected_file",
-        "maxshift",
-        "mindist",
-        "maxdist",
-        "subset",
-        "seed",
-        "data",
-        "horizontal_stripe",
-        "vertical_stripe",
-        "cool_path",
-        "features",
-        "outname",
-        "coordinates",
-    ]
-    pup1 = pup1.reset_index(drop=True)
-    pup2 = pup2.reset_index(drop=True)
-    drop_columns = list(set(drop_columns) & set(pup1.columns))
-    div_pup = pup1.drop(columns=drop_columns)
-    for col in div_pup.columns:
-        assert np.all(
-            np.sort(pup1[col]) == np.sort(pup2[col])
-        ), f"Cannot divide these pups, {col} is different between them"
-    div_pup["data"] = pup1["data"] / pup2["data"]
-    div_pup["clrs"] = str(pup1["clr"]) + "/" + str(pup2["clr"])
-    div_pup["n"] =  pup1["n"] + pup2["n"]
-    if set(["vertical_stripe", "horizontal_stripe"]).issubset(pup1.columns):
-        if np.all(np.sort(pup1["coordinates"]) == np.sort(pup2["coordinates"])):
-            div_pup["coordinates"] = pup1["coordinates"]
-            for stripe in ["vertical_stripe", "horizontal_stripe"]:
-                div_pup[stripe] = pup1[stripe] / pup2[stripe]
-                div_pup[stripe] = div_pup[stripe].apply(
-                    lambda x: np.where(np.isin(x, [np.inf, np.nan]), 0, x)
-                )
-        else:
-            logging.info("Stripes cannot be divided, coordinates differ between pups")
-    return div_pup
-
-
-def norm_coverage(snip):
-    """Normalize a pileup by coverage arrays
-
-    Parameters
-    ----------
-    loop : 2D array
-        Pileup.
-    cov_start : 1D array
-        Accumulated coverage of the left side of the pileup.
-    cov_end : 1D array
-        Accumulated coverage of the bottom side of the pileup.
-
-    Returns
-    -------
-    loop : 2D array
-        Normalized pileup.
-
-    """
-    coverage = np.outer(snip["cov_start"], snip["cov_end"])
-    coverage = coverage / np.nanmean(coverage)
-    snip["data"] /= coverage
-    snip["data"][np.isnan(snip["data"])] = 0
-    return snip
 
 
 class CoordCreator:
@@ -886,7 +258,9 @@ class CoordCreator:
                     for name in ["chrom1", "start1", "end1", "chrom2", "start2", "end2"]
                 ]
             )
-            self.intervals[["chrom1", "chrom2"]] = self.intervals[["chrom1", "chrom2"]].astype(str)
+            self.intervals[["chrom1", "chrom2"]] = self.intervals[
+                ["chrom1", "chrom2"]
+            ].astype(str)
             self.intervals["center1"] = (
                 self.intervals["start1"] + self.intervals["end1"]
             ) / 2
@@ -939,7 +313,7 @@ class CoordCreator:
             self.final_chroms = natsorted(
                 list(set(self.chroms).intersection(set(self.basechroms)))
             )
-        
+
         if len(self.final_chroms) == 0:
             raise ValueError(
                 """No chromosomes are in common between the coordinate
@@ -1478,7 +852,7 @@ class PileUpper:
         self.ignore_diags = ignore_diags
         self.store_stripes = store_stripes
         self.nproc = nproc
-        
+
         if view_df is None:
             # Generate viewframe from clr.chromsizes:
             self.view_df = common.make_cooler_view(clr)
@@ -1546,7 +920,7 @@ class PileUpper:
             lo, hi = self.clr.extent(region)
             chroffset = self.clr.offset(region[0])
             self.view_df_extents[region_name] = lo - chroffset, hi - chroffset
-        
+
         self.chroms = natsorted(
             list(set(self.CC.final_chroms) & set(self.clr.chromnames))
         )
@@ -1730,7 +1104,7 @@ class PileUpper:
 
         ar = np.arange(max_right1 - min_left1, dtype=np.int32)
 
-        diag_indicator = numutils.LazyToeplitz(-ar, ar)
+        diag_indicator = ctutils.LazyToeplitz(-ar, ar)
 
         for snip in intervals:
             snip["stBin1"], snip["endBin1"], snip["stBin2"], snip["endBin2"] = (
@@ -1847,17 +1221,17 @@ class PileUpper:
                     )
             nans = np.isnan(snip["data"]) * 1
             snip["data"] = np.nan_to_num(snip["data"])
-            snip["data"] = numutils.zoom_array(
+            snip["data"] = ctutils.zoom_array(
                 snip["data"], (self.rescale_size, self.rescale_size)
             )
-            nanzoom = numutils.zoom_array(nans, (self.rescale_size, self.rescale_size))
+            nanzoom = ctutils.zoom_array(nans, (self.rescale_size, self.rescale_size))
             snip["data"][np.floor(nanzoom).astype(bool)] = np.nan
             snip["data"] = snip["data"] * (1 / np.isfinite(nanzoom))
         if self.coverage_norm:
-            snip["cov_start"] = numutils.zoom_array(
+            snip["cov_start"] = ctutils.zoom_array(
                 snip["cov_start"], (self.rescale_size,)
             )
-            snip["cov_end"] = numutils.zoom_array(snip["cov_end"], (self.rescale_size,))
+            snip["cov_end"] = ctutils.zoom_array(snip["cov_end"], (self.rescale_size,))
         return snip
 
     def accumulate_stream(self, snip_stream, postprocess_func=None, extra_funcs=None):
@@ -1874,7 +1248,7 @@ class PileUpper:
             Any additional postprocessing of each snip needed, in one function.
             Can be used to modify the data in un-standard way, or create groups when
             it can't be done before snipping, or to assign each snippet to multiple
-            groups. Example: `group_by_region`.
+            groups. Example: `lib.puputils.group_by_region`.
         extra_funcs : dict, optional
             Any additional functions to be applied every time a snip is added to a
             pileup or two pileups are summed up - see `_add_snip` and `sum_pups`.
@@ -1934,7 +1308,7 @@ class PileUpper:
             Good example is the `bin_distance_intervals` function above.
         postprocess_func : function, optional
             Additional function to apply to each snippet before grouping.
-            Good example is the `bin_distance` function above, but using
+            Good example is the `lib.puputils.bin_distance` function, but using
             bin_distance_intervals as modify_2Dintervals_func is much faster.
         extra_sum_funcs : dict, optional
             Any additional functions to be applied every time a snip is added to a
@@ -2009,7 +1383,7 @@ class PileUpper:
             earlier stage it can be vectorized and much more efficient.
         postprocess_func : function, optional
             Additional function to apply to each snippet before grouping.
-            Good example is the `bin_distance` function above.
+            Good example is the `lib.puputils.bin_distance` function.
         extra_sum_funcs : dict, optional
             Any additional functions to be applied every time a snip is added to a
             pileup or two pileups are summed up - see `_add_snip` and `sum_pups`.
@@ -2141,10 +1515,10 @@ class PileUpper:
             if self.local:
                 normalized_roi["vertical_stripe"] = normalized_roi[
                     "vertical_stripe"
-                ].apply(lambda x: copy_array_halves(x))
+                ].apply(lambda x: numutils.copy_array_halves(x))
                 normalized_roi["horizontal_stripe"] = normalized_roi[
                     "horizontal_stripe"
-                ].apply(lambda x: copy_array_halves(x))
+                ].apply(lambda x: numutils.copy_array_halves(x))
 
         if self.local:
             with warnings.catch_warnings():
