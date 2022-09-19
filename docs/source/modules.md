@@ -42,6 +42,7 @@ functions directly in Python code to perform pileups.
    :undoc-members:
    :show-inheritance:
 ```
+
 ## plotpuppy.plotpup module
 
 ```{eval-rst}
