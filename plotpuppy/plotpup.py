@@ -218,7 +218,17 @@ def add_stripe_lineplot(
     ax2.spines["right"].set_visible(False)
     ax2.spines["top"].set_visible(False)
     plt.xlim(-(flank + (resolution / 2)) / 1000, (flank + (resolution / 2)) / 1000)
-    plt.yticks([np.round(min(mean), 2), np.round(max(mean), 2)])
+    if plot_ticks:
+        ax2.tick_params(
+            axis="both",
+            which="major",
+            labelsize=font_scale * (4.94 + height),
+            width=1 + (height / 2),
+            length=1 + height,
+        )
+        plt.yticks([np.round(min(mean), 2), np.round(max(mean), 2)])
+    else:
+        plt.yticks([], [])
     plt.xticks([], [])
     if colnames is not None:
         plt.title(colnames[0])
@@ -236,6 +246,8 @@ def add_stripe_lineplot(
         )
         if not rescale.any():
             plt.xticks(ticks_pixels.tolist(), ticks_kbp.tolist())
+            ticks_n = np.floor(np.linspace(0, data.values[0].shape[0], 5)).astype(int)
+            plt.yticks(ticks_n, np.append("", np.negative(ticks_n)[1:]))
     else:
         plt.xticks([], [])
         plt.yticks([], [])
@@ -610,7 +622,7 @@ def make_heatmap_stripes(
             string = "rescaled"
         else:
             string = "pos. [kb]"
-        fg.fig.text((right + left) / 2, bottom - (0.2 / nrows), s=string, ha="center")
+        fg.fig.text((right + left) / 2, bottom - (0.3 / nrows), s=string, ha="center")
     if sym and scale == "log":
         ticks = [vmin, 1, vmax]
     else:
@@ -672,7 +684,7 @@ def make_heatmap_grid(
     else:
         ncols = 1
 
-    if rows == "separation" and col_order is None:
+    if rows == "separation" and row_order is None:
         row_order = sort_separation(pupsdf["separation"])
         nrows = len(row_order)
     elif rows is not None and row_order is None:
