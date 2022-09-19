@@ -13,7 +13,7 @@ Use `coolpup.py` command to perform pileups, and `plotpup.py` to visualize them.
    :prog: coolpup.py
 ```
 
-## coolpup.py command
+## dividepups.py command
 
 ```{eval-rst}
 .. argparse::
