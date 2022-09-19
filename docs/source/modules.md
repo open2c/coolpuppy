@@ -16,6 +16,32 @@ functions directly in Python code to perform pileups.
    :show-inheritance:
 ```
 
+## coolpuppy.lib.io module
+
+```{eval-rst}
+.. automodule:: coolpuppy.lib.io
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+## coolpuppy.lib.numutils module
+
+```{eval-rst}
+.. automodule:: coolpuppy.lib.numutils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+## coolpuppy.lib.puputils module
+
+```{eval-rst}
+.. automodule:: coolpuppy.lib.puputils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
 ## plotpuppy.plotpup module
 
 ```{eval-rst}
