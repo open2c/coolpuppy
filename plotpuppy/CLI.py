@@ -26,11 +26,6 @@ from natsort import natsorted
 import sys
 import pdb, traceback
 
-
-def sort_separation(sep_string_series, sep="Mb"):
-    return sorted(set(sep_string_series.dropna()), key=lambda x: float(x.split(sep)[0]))
-
-
 def parse_args_plotpuppy():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
@@ -147,17 +142,15 @@ def parse_args_plotpuppy():
     )
     parser.add_argument(
         "--col_order",
-        type=str,
-        nargs="+",
+        type=lambda s: re.split(" |, ", s),
         required=False,
-        help="""Order of columns to use, space separated""",
+        help="""Order of columns to use, space separated inside quotes""",
     )
     parser.add_argument(
         "--row_order",
-        type=str,
-        nargs="+",
+        type=lambda s: re.split(" |, ", s),
         required=False,
-        help="""Order of rows to use, space separated""",
+        help="""Order of rows to use, space separated inside quotes""",
     )
     parser.add_argument(
         "--colnames",
@@ -313,16 +306,16 @@ def main():
         if args.col_order:
             pups[args.cols] = pups[args.cols].astype(str)
             pups = pups[pups[args.cols].isin(args.col_order)]
-        else:
+        elif args.cols != "separation":
             args.col_order = pups[args.cols].unique()
 
     if args.rows:
         if args.row_order:
             pups[args.rows] = pups[args.rows].astype(str)
-            pups = pups[pups[args.rows].isin(args.row_order)]
-        else:
+            pups = pups[pups[args.rows].isin(args.row_order)]     
+        elif args.rows != "separation":
             args.row_order = pups[args.rows].unique()
-
+    
     if args.stripe_sort == "None":
         args.stripe_sort = None
 
