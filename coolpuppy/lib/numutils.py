@@ -3,7 +3,7 @@ import numpy as np
 from cooltools import numutils as ctutils
 
 
-def copy_array_halves(x):
+def _copy_array_halves(x):
     cntr = int(np.floor(x.shape[1] / 2))
     x[:, : (cntr + 1)] = np.fliplr(x[:, cntr:])
     return x

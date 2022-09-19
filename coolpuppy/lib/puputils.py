@@ -190,8 +190,10 @@ def _combine_rows(row1, row2, normalize_order=True):
     return double_row
 
 
-def _accumulate_values(dict1, dict2, key):
-    """Deprecated, unused"""
+def accumulate_values(dict1, dict2, key):
+    """
+    Useful as an extra_sum_func
+    """
     assert key in dict2, f"{key} not in dict2"
     if key in dict1:
         dict1[key] = list(collapse([dict1[key], dict2[key]]))

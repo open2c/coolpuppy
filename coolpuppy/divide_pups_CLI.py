@@ -1,15 +1,19 @@
 # -*- coding: utf-8 -*-
-from coolpuppy.coolpup import divide_pups, load_pileup_df, save_pileup_df
+from .lib.io import load_pileup_df, save_pileup_df
+from .lib.puputils import divide_pups
 
-from coolpuppy._version import __version__
+from ._version import __version__
 import argparse
 import logging
+
 
 def parse_args_divide_pups():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("input_pups", type=str, nargs="+", help="""Two pileups to divide""")
+    parser.add_argument(
+        "input_pups", type=str, nargs="+", help="""Two pileups to divide"""
+    )
     parser.add_argument("-v", "--version", action="version", version=__version__)
 
     # Output
@@ -25,6 +29,7 @@ def parse_args_divide_pups():
     )
     return parser
 
+
 def main():
     parser = parse_args_divide_pups()
     args = parser.parse_args()
@@ -37,11 +42,11 @@ def main():
         pup1 = load_pileup_df(args.input_pups[0])
         pup2 = load_pileup_df(args.input_pups[1])
         pups = divide_pups(pup1, pup2)
-        
+
     if args.outname == "auto":
         outname = f"{str(args.input_pups[0])}_over_{str(args.input_pups[1])}.clpy"
     else:
         outname = args.outname
-            
+
     save_pileup_df(outname, pups)
     logging.info(f"Saved output to {outname}")

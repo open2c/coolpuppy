@@ -15,7 +15,7 @@ from cooltools.api import snipping, coverage
 from more_itertools import collapse
 import os
 from .lib import numutils
-from .lib.puptools import _add_snip, group_by_region, norm_coverage, sum_pups
+from .lib.puputils import _add_snip, group_by_region, norm_coverage, sum_pups
 
 
 def bin_distance_intervals(intervals, band_edges="default"):
@@ -1515,10 +1515,10 @@ class PileUpper:
             if self.local:
                 normalized_roi["vertical_stripe"] = normalized_roi[
                     "vertical_stripe"
-                ].apply(lambda x: numutils.copy_array_halves(x))
+                ].apply(lambda x: numutils._copy_array_halves(x))
                 normalized_roi["horizontal_stripe"] = normalized_roi[
                     "horizontal_stripe"
-                ].apply(lambda x: numutils.copy_array_halves(x))
+                ].apply(lambda x: numutils._copy_array_halves(x))
 
         if self.local:
             with warnings.catch_warnings():

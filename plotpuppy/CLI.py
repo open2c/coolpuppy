@@ -6,7 +6,7 @@ Created on Mon Mar 23 14:05:06 2020
 @author: Ilya Flyamer
 """
 from coolpuppy.lib import numutils
-from coolpuppy.lib import puptools
+from coolpuppy.lib import puputils
 from coolpuppy.lib import io
 
 from plotpuppy.plotpup import make_heatmap_grid, make_heatmap_stripes
@@ -276,7 +276,7 @@ def main():
         else:
             pup1 = io.load_pileup_df(args.input_pups[0])
             pup2 = io.load_pileup_df(args.input_pups[1])
-            pups = puptools.divide_pups(pup1, pup2)
+            pups = puputils.divide_pups(pup1, pup2)
     else:
         pups = io.load_pileup_df_list(
             args.input_pups,
