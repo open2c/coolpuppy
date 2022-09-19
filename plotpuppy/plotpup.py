@@ -724,7 +724,6 @@ def make_heatmap_grid(
         **kwargs,
     )
     norm = norm(vmin, vmax)
-    print(pupsdf["flank"])
     max_coordinates = [
         pupsdf.loc[pd.to_numeric(pupsdf["flank"]).idxmax(), "flank"],
         pupsdf.loc[pd.to_numeric(pupsdf["flank"]).idxmax(), "resolution"],

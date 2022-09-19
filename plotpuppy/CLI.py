@@ -26,6 +26,7 @@ from natsort import natsorted
 import sys
 import pdb, traceback
 
+
 def parse_args_plotpuppy():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
@@ -312,10 +313,10 @@ def main():
     if args.rows:
         if args.row_order:
             pups[args.rows] = pups[args.rows].astype(str)
-            pups = pups[pups[args.rows].isin(args.row_order)]     
+            pups = pups[pups[args.rows].isin(args.row_order)]
         elif args.rows != "separation":
             args.row_order = pups[args.rows].unique()
-    
+
     if args.stripe_sort == "None":
         args.stripe_sort = None
 
@@ -331,7 +332,6 @@ def main():
             height = 1
     else:
         height = args.height
-    print(pups.columns)
     if args.stripe:
         fg = make_heatmap_stripes(
             pups,
