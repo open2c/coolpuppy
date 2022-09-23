@@ -401,7 +401,7 @@ def main():
 
     clr = cooler.Cooler(args.cool_path)
 
-    coolname = os.path.splitext(os.path.basename(clr.filename))[0]
+    coolname = os.path.basename(clr.filename)
     if args.features != "-":
         bedname, ext = os.path.splitext(os.path.basename(args.features))
         features = args.features
