@@ -591,6 +591,7 @@ def main():
             headerdict["expected_file"] = headerdict["expected"][0]
             headerdict["expected_col"] = headerdict["expected"][1]
             headerdict["expected"] = True
+    headerdict["cooler"] = coolname
     headerdict["resolution"] = int(clr.binsize)
     save_pileup_df(outname, pups, headerdict)
     logging.info(f"Saved output to {outname}")

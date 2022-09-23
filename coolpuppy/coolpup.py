@@ -1,19 +1,28 @@
 # -*- coding: utf-8 -*-
-import numpy as np
-import warnings
-import pandas as pd
-import bioframe
-import itertools
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
+    import warnings
+
+import os
 from multiprocessing import Pool
 from functools import partial, reduce
 import logging
+import itertools
+
 from natsort import natsorted
+from more_itertools import collapse
+
+import numpy as np
+import pandas as pd
+import bioframe
+
 import cooler
 from cooltools import numutils as ctutils
 from cooltools.lib import common, checks
 from cooltools.api import snipping, coverage
-from more_itertools import collapse
-import os
+
 from .lib import numutils
 from .lib.puputils import _add_snip, group_by_region, norm_coverage, sum_pups
 
@@ -1826,7 +1835,7 @@ class PileUpper:
 def pileup(
     clr,
     features,
-    features_format="auto",
+    features_format="bed",
     view_df=None,
     flank=100000,
     minshift=10**5,
@@ -1839,7 +1848,7 @@ def pileup(
     maxdist=None,
     ignore_diags=2,
     subset=0,
-    by_windows=False,
+    by_window=False,
     by_strand=False,
     by_distance=False,
     by_chrom=False,
@@ -1851,8 +1860,167 @@ def pileup(
     store_stripes=False,
     control=False,
     clr_weight_name="weight",
-    rescale_flank=None,
+    rescale=False,
+    rescale_flank=1,
+    rescale_size=99,
     nproc=1,
     seed=None,
 ):
-    pass
+    if by_distance is not None:
+        if len(by_distance) > 0:
+            try:
+                distance_edges = [int(item) for item in by_distance]
+            except:
+                raise ValueError("Distance edges must be integers.")
+            by_distance = True
+        else:
+            distance_edges = "default"
+            by_distance = True
+    else:
+        by_distance = False
+
+    if seed is not None:
+        np.random.seed(seed)
+
+    if nproc == 0:
+        nproc = -1
+    else:
+        nproc = nproc
+
+
+    if view_df is None:
+        # full chromosome case
+        view_df = common.make_cooler_view(clr)
+    else:
+        # verify view is compatible with cooler
+        try:
+            _ = checks.is_compatible_viewframe(
+                view_df,
+                clr,
+                check_sorting=True,
+                raise_errors=True,
+            )
+        except Exception as e:
+            raise ValueError("view_df is not a valid viewframe or incompatible") from e
+    if nshifts > 0:
+        control = True
+    else:
+        control = False
+
+    if expected is None:
+        expected = False
+        expected_value_col = None
+
+    else:
+        if trans:
+            try:
+                _ = checks.is_valid_expected(
+                    expected,
+                    "trans",
+                    view_df,
+                    verify_cooler=clr,
+                    expected_value_cols=[
+                        expected_value_col,
+                    ],
+                    raise_errors=True,
+                )
+            except Exception as e:
+                raise ValueError("provided expected is not valid") from e
+        else:
+            try:
+                _ = checks.is_valid_expected(
+                    expected,
+                    "cis",
+                    view_df,
+                    verify_cooler=clr,
+                    expected_value_cols=[
+                        expected_value_col,
+                    ],
+                    raise_errors=True,
+                )
+            except Exception as e:
+                raise ValueError("provided expected is not valid") from e
+
+    if mindist is None:
+        mindist = "auto"
+    else:
+        mindist = mindist
+
+    if maxdist is None:
+        maxdist = np.inf
+    else:
+        maxdist = maxdist
+
+    if rescale and rescale_size % 2 == 0:
+        raise ValueError("Please provide an odd rescale_size")
+
+    chroms = list(view_df["chrom"].unique())
+
+    if by_window:
+        if features_format != "bed":
+            raise ValueError("Can't make by-window pileups without making combinations")
+        if local:
+            raise ValueError("Can't make local by-window pileups")
+
+    CC = CoordCreator(
+        features=features,
+        resolution=clr.binsize,
+        features_format=features_format,
+        flank=flank,
+        rescale_flank=rescale_flank,
+        chroms=chroms,
+        minshift=minshift,
+        maxshift=maxshift,
+        nshifts=nshifts,
+        mindist=mindist,
+        maxdist=maxdist,
+        local=local,
+        subset=subset,
+        seed=seed,
+        trans=trans,
+    )
+
+    PU = PileUpper(
+        clr=clr,
+        CC=CC,
+        view_df=view_df,
+        clr_weight_name=clr_weight_name,
+        expected=expected,
+        ooe=ooe,
+        control=control,
+        coverage_norm=coverage_norm,
+        rescale=rescale,
+        rescale_size=rescale_size,
+        flip_negative_strand=flip_negative_strand,
+        ignore_diags=ignore_diags,
+        store_stripes=store_stripes,
+        nproc=nproc,
+    )
+
+    if by_window:
+        pups = PU.pileupsByWindowWithControl()
+    elif by_strand and by_distance:
+        pups = PU.pileupsByStrandByDistanceWithControl(
+            nproc=nproc, distance_edges=distance_edges
+        )
+    elif by_strand:
+        pups = PU.pileupsByStrandWithControl()
+    elif by_distance:
+        pups = PU.pileupsByDistanceWithControl(
+            nproc=nproc, distance_edges=distance_edges
+        )
+    elif by_chrom:
+        pups = PU.pileupsWithControl(groupby=["chrom1", "chrom2"])
+    else:
+        pups = PU.pileupsWithControl()
+
+    # Collect annotation
+    headerdict = locals()
+
+    if expected:
+        headerdict["expected"] = True
+    
+    coolname = os.path.splitext(os.path.basename(clr.filename))[0]
+    headerdict['cooler'] = coolname
+    headerdict["resolution"] = int(clr.binsize)
+    return pups, headerdict
