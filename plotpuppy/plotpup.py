@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from coolpuppy.lib import numutils
+from coolpuppy.lib import numutils, puputils
 
 import numpy as np
 import pandas as pd
@@ -746,7 +746,7 @@ def make_heatmap_grid(
 
     if score:
         pupsdf["score"] = pupsdf.apply(
-            numutils.get_score, center=center, ignore_central=ignore_central, axis=1
+            puputils.get_score, center=center, ignore_central=ignore_central, axis=1
         )
         fg.map(add_score, "score", height=height, font_scale=font_scale)
 
