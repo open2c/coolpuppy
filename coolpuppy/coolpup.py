@@ -3,13 +3,14 @@ try:
     from collections.abc import Iterable
 except ImportError:
     from collections import Iterable
-    import warnings
+import warnings
 
 import os
 from multiprocessing import Pool
 from functools import partial, reduce
 import logging
 import itertools
+from tokenize import group
 
 from natsort import natsorted
 from more_itertools import collapse
@@ -867,7 +868,7 @@ class PileUpper:
             self.view_df = common.make_cooler_view(clr)
         else:
             self.view_df = bioframe.make_viewframe(view_df, check_bounds=clr.chromsizes)
-        if self.expected is not False:
+        if self.expected is not None and self.expected is not False:
             # subset expected if some regions not mentioned in view
             self.expected = self.expected[
                 (self.expected["region1"].isin(self.view_df["name"]))
@@ -988,10 +989,6 @@ class PileUpper:
                     + str(self.rescale_size)
                     + " pixels"
                 )
-
-        else:
-            if self.rescale_flank is not None:
-                raise ValueError("Cannot set rescale_flank with rescale=False")
 
         self.empty_outmap = self.make_outmap()
 
@@ -1837,47 +1834,54 @@ def pileup(
     features,
     features_format="bed",
     view_df=None,
+    expected_df=None,
+    expected_value_col="balanced.avg",
+    clr_weight_name="weight",
     flank=100000,
     minshift=10**5,
     maxshift=10**6,
-    nshifts=10,
-    expected_df=None,
-    expected_value_col="balanced.avg",
+    nshifts=0,
     ooe=True,
     mindist="auto",
     maxdist=None,
-    ignore_diags=2,
+    min_diag=2,
     subset=0,
     by_window=False,
     by_strand=False,
     by_distance=False,
     by_chrom=False,
-    groupby=False,
+    groupby=[],
     flip_negative_strand=False,
     local=False,
     coverage_norm=False,
     trans=False,
-    store_stripes=False,
-    control=False,
-    clr_weight_name="weight",
     rescale=False,
     rescale_flank=1,
     rescale_size=99,
+    store_stripes=False,
     nproc=1,
     seed=None,
 ):
-    if by_distance is not None:
-        if len(by_distance) > 0:
-            try:
-                distance_edges = [int(item) for item in by_distance]
-            except:
-                raise ValueError("Distance edges must be integers.")
-            by_distance = True
-        else:
+    if by_distance:
+        if by_distance is True or by_distance == "default":
             distance_edges = "default"
             by_distance = True
+        elif len(by_distance) > 0:
+            distance_edges = by_distance
+            by_distance = True
+        else:
+            raise ValueError(
+                "Invalid by_distance value, should be either 'default' or a list of integers"
+            )
+        if local:
+            raise ValueError(
+                "Can't do local pileups by distance, please specify only one of those arguments"
+            )
     else:
         by_distance = False
+
+    if not rescale:
+        rescale_flank = None
 
     if seed is not None:
         np.random.seed(seed)
@@ -1907,7 +1911,8 @@ def pileup(
         control = False
 
     if expected_df is None:
-        expected = False
+        expected = None
+        expected_df = None
         expected_value_col = None
     else:
         expected = True
@@ -1991,7 +1996,7 @@ def pileup(
         rescale=rescale,
         rescale_size=rescale_size,
         flip_negative_strand=flip_negative_strand,
-        ignore_diags=ignore_diags,
+        ignore_diags=min_diag,
         store_stripes=store_stripes,
         nproc=nproc,
     )
@@ -2000,18 +2005,18 @@ def pileup(
         pups = PU.pileupsByWindowWithControl()
     elif by_strand and by_distance:
         pups = PU.pileupsByStrandByDistanceWithControl(
-            nproc=nproc, distance_edges=distance_edges
+            nproc=nproc, distance_edges=distance_edges, groupby=groupby
         )
     elif by_strand:
-        pups = PU.pileupsByStrandWithControl()
+        pups = PU.pileupsByStrandWithControl(groupby=groupby)
     elif by_distance:
         pups = PU.pileupsByDistanceWithControl(
-            nproc=nproc, distance_edges=distance_edges
+            nproc=nproc, distance_edges=distance_edges, groupby=groupby
         )
     elif by_chrom:
-        pups = PU.pileupsWithControl(groupby=["chrom1", "chrom2"])
+        pups = PU.pileupsWithControl(groupby=["chrom1", "chrom2"] + groupby)
     else:
-        pups = PU.pileupsWithControl()
+        pups = PU.pileupsWithControl(groupby=groupby)
 
     # Collect annotation
     headerdict = locals()

@@ -294,7 +294,7 @@ def main():
 
     if not args.no_score:
         pups["score"] = pups.apply(
-            numutils.get_score,
+            puputils.get_score,
             center=args.center,
             ignore_central=args.ignore_central,
             axis=1,

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from .coolpup import CoordCreator, PileUpper
+from .coolpup import pileup
 from .lib.io import save_pileup_df
 from .lib.util import validate_csv
 
@@ -196,8 +196,8 @@ def parse_args_coolpuppy():
         required=False,
         help="""Perform by-distance pile-ups.
                 Create a separate pile-up for each distance band. If empty, will use default 
-                (0,50000,100000,200000,...) edges. Specify edges using comma-separated values, 
-                e.g. 1000000,10000000,100000000,1000000000""",
+                (0,50000,100000,200000,...) edges. Specify edges using multiple argument
+                values, e.g. `--by_distance 1000000 2000000` """,
     )
     parser.add_argument(
         "--flip_negative_strand",
@@ -372,22 +372,20 @@ def main():
             pdb.pm()
 
         sys.excepthook = _excepthook
-
     if args.by_distance is not None:
         if len(args.by_distance) > 0:
-            args.by_distance = args.by_distance[0]
             try:
-                _ = [int(item) for item in args.by_distance.split(",")]
+                distance_edges = [int(item) for item in args.by_distance]
             except:
                 raise ValueError(
                     "Distance edges must be integers. Separate edges with commas and no spaces."
                 )
-            distance_edges = [int(item) for item in args.by_distance.split(",")]
         else:
             distance_edges = "default"
             args.by_distance = True
     else:
         args.by_distance = False
+        distance_edges = False
 
     logging.basicConfig(format="%(message)s", level=getattr(logging, args.logLevel))
 
@@ -413,9 +411,11 @@ def main():
             schema = args.features_format
         if schema == "bed":
             schema = "bed12"
+            features_format = "bed"
             dtype = {"chrom": str}
         else:
             dtype = {"chrom1": str, "chrom2": str}
+            features_format = "bedpe"
         features = bioframe.read_table(
             features, schema=schema, index_col=False, dtype=dtype
         )
@@ -427,6 +427,9 @@ def main():
         schema = args.features_format
         if schema == "bed":
             schema = "bed12"
+            features_format = "bed"
+        else:
+            features_format = "bedpe"
         bedname = "stdin"
         features = bioframe.read_table(sys.stdin, schema=schema, index_col=False)
 
@@ -437,15 +440,9 @@ def main():
         # Read view_df dataframe, and verify against cooler
         view_df = io.read_viewframe_from_file(args.view, clr, check_sorting=True)
 
-    if args.nshifts > 0:
-        control = True
-    else:
-        control = False
-
     if args.expected is None:
-        expected = False
+        expected = None
         expected_value_col = None
-
     else:
         expected_path, expected_value_col = args.expected
         expected_value_cols = [
@@ -467,6 +464,7 @@ def main():
                 verify_view=view_df,
                 verify_cooler=clr,
             )
+        args.nshifts = 0
 
     if args.mindist is None:
         mindist = "auto"
@@ -502,39 +500,38 @@ def main():
         if args.local:
             raise ValueError("Can't make local by-window pileups")
 
-    CC = CoordCreator(
+    pups, _ = pileup(
+        clr=clr,
         features=features,
-        resolution=clr.binsize,
-        features_format=args.features_format,
+        features_format=features_format,
+        view_df=view_df,
+        expected_df=expected,
+        expected_value_col=expected_value_col,
+        clr_weight_name=args.clr_weight_name,
         flank=args.flank,
-        rescale_flank=rescale_flank,
-        chroms=fchroms,
         minshift=args.minshift,
         maxshift=args.maxshift,
         nshifts=args.nshifts,
+        ooe=args.ooe,
         mindist=mindist,
         maxdist=maxdist,
-        local=args.local,
+        min_diag=args.ignore_diags,
         subset=args.subset,
-        seed=args.seed,
-        trans=args.trans,
-    )
-
-    PU = PileUpper(
-        clr=clr,
-        CC=CC,
-        view_df=view_df,
-        clr_weight_name=args.clr_weight_name,
-        expected=expected,
-        ooe=args.ooe,
-        control=control,
-        coverage_norm=args.coverage_norm,
-        rescale=args.rescale,
-        rescale_size=args.rescale_size,
+        by_window=args.by_window,
+        by_strand=args.by_strand,
+        by_distance=distance_edges,
+        by_chrom=False,
+        groupby=[],
         flip_negative_strand=args.flip_negative_strand,
-        ignore_diags=args.ignore_diags,
+        local=args.local,
+        coverage_norm=args.coverage_norm,
+        trans=args.trans,
+        rescale=args.rescale,
+        rescale_flank=rescale_flank,
+        rescale_size=args.rescale_size,
         store_stripes=args.store_stripes,
         nproc=nproc,
+        seed=args.seed,
     )
 
     if args.outname == "auto":
@@ -567,22 +564,6 @@ def main():
     else:
         outname = args.outname
 
-    if args.by_window:
-        pups = PU.pileupsByWindowWithControl()
-    elif args.by_strand and args.by_distance:
-        pups = PU.pileupsByStrandByDistanceWithControl(
-            nproc=nproc, distance_edges=distance_edges
-        )
-    elif args.by_strand:
-        pups = PU.pileupsByStrandWithControl()
-    elif args.by_distance:
-        pups = PU.pileupsByDistanceWithControl(
-            nproc=nproc, distance_edges=distance_edges
-        )
-    elif args.by_chrom:
-        pups = PU.pileupsWithControl(groupby=["chrom1", "chrom2"])
-    else:
-        pups = PU.pileupsWithControl()
     headerdict = vars(args)
     if "expected" in headerdict:
         if not isinstance(headerdict["expected"], str) and isinstance(
