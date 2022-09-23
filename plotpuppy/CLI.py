@@ -174,7 +174,9 @@ def parse_args_plotpuppy():
         type=str,
         required=False,
         action="append",
-        help="""Pandas query top select pups to plot from concatenated input files""",
+        help="""Pandas query to select pups to plot from concatenated input files.
+                Multiple query arguments can be used. Usage example:
+                --query "orientation == '+-' | orientation == '-+'" """,
     )
     parser.add_argument(
         "--norm_corners",
@@ -227,6 +229,7 @@ def parse_args_plotpuppy():
         "--height",
         type=float,
         required=False,
+        default=1,
         help="""Height of the plot""",
     )
     parser.add_argument(
@@ -321,14 +324,6 @@ def main():
     else:
         symmetric = True
 
-    if args.height is None:
-        if args.stripe:
-            height = 2
-        else:
-            height = 1
-    else:
-        height = args.height
-
     if args.stripe:
         fg = make_heatmap_stripes(
             pups,
@@ -341,7 +336,7 @@ def main():
             sym=symmetric,
             cmap=args.cmap,
             scale=args.scale,
-            height=height,
+            height=args.height,
             stripe=args.stripe,
             stripe_sort=args.stripe_sort,
             out_sorted_bedpe=args.out_sorted_bedpe,
@@ -365,7 +360,7 @@ def main():
             sym=symmetric,
             cmap=args.cmap,
             scale=args.scale,
-            height=height,
+            height=args.height,
             font=args.font,
             font_scale=args.font_scale,
             plot_ticks=args.plot_ticks,
