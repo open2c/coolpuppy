@@ -1887,7 +1887,6 @@ def pileup(
     else:
         nproc = nproc
 
-
     if view_df is None:
         # full chromosome case
         view_df = common.make_cooler_view(clr)
@@ -1907,15 +1906,15 @@ def pileup(
     else:
         control = False
 
-    if expected is None:
+    if expected_df is None:
         expected = False
         expected_value_col = None
-
     else:
+        expected = True
         if trans:
             try:
                 _ = checks.is_valid_expected(
-                    expected,
+                    expected_df,
                     "trans",
                     view_df,
                     verify_cooler=clr,
@@ -1929,7 +1928,7 @@ def pileup(
         else:
             try:
                 _ = checks.is_valid_expected(
-                    expected,
+                    expected_df,
                     "cis",
                     view_df,
                     verify_cooler=clr,
@@ -1985,7 +1984,7 @@ def pileup(
         CC=CC,
         view_df=view_df,
         clr_weight_name=clr_weight_name,
-        expected=expected,
+        expected=expected_df,
         ooe=ooe,
         control=control,
         coverage_norm=coverage_norm,
@@ -2017,10 +2016,9 @@ def pileup(
     # Collect annotation
     headerdict = locals()
 
-    if expected:
-        headerdict["expected"] = True
-    
+    headerdict["expected"] = expected
+    headerdict.pop("expected_df")
     coolname = os.path.splitext(os.path.basename(clr.filename))[0]
-    headerdict['cooler'] = coolname
+    headerdict["cooler"] = coolname
     headerdict["resolution"] = int(clr.binsize)
     return pups, headerdict
