@@ -3,6 +3,8 @@ import pandas as pd
 from more_itertools import collapse
 import logging
 
+from .numutils import get_enrichment, get_domain_score, get_insulation_strength
+
 
 def _add_snip(outdict, key, snip, extra_funcs=None):
     if key not in outdict:
@@ -34,6 +36,43 @@ def _add_snip(outdict, key, snip, extra_funcs=None):
     if extra_funcs is not None:
         for key2, func in extra_funcs.items():
             outdict[key] = func(outdict[key], snip)
+
+
+def get_score(pup, center=3, ignore_central=3):
+    """Calculate a reasonable score for any kind of pileup
+    For non-local (off-diagonal) pileups, calculates average signal in the central
+    pixels (based on 'center').
+    For local non-rescaled pileups calculates insulation strength, and ignores the
+    central bins (based on 'ignore_central')
+    For local rescaled pileups calculates enrichment in the central rescaled area
+    relative to the two neighouring areas on the sides.
+
+    Parameters
+    ----------
+    pup : pd.Series or dict
+        Series or dict with pileup in 'data' and annotations in other keys.
+        Will correctly calculate enrichment score with annotations in 'local' (book),
+        'rescale' (bool) and 'rescale_flank' (float)
+    enrichment : int, optional
+        Passed to 'get_enrichment' to calculate the average strength of central pixels.
+        The default is 3.
+    ignore_central : int, optional
+        How many central bins to ignore for calculation of insulation in local pileups.
+        The default is 3.
+
+    Returns
+    -------
+    float
+        Score.
+
+    """
+    if not pup["local"]:
+        return get_enrichment(pup["data"], center)
+    else:
+        if pup["rescale"]:
+            return get_domain_score(pup["data"], pup["rescale_flank"])
+        else:
+            return get_insulation_strength(pup["data"], ignore_central)
 
 
 def sum_pups(pup1, pup2, extra_funcs={}):
