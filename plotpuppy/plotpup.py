@@ -1,20 +1,21 @@
 # -*- coding: utf-8 -*-
+from coolpuppy.lib import numutils, puputils
 
 import numpy as np
-from coolpuppy import coolpup
-import matplotlib.pyplot as plt
 import pandas as pd
 
-# from mpl_toolkits.axes_grid1 import ImageGrid
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as grd
 from matplotlib.colors import LogNorm, Normalize
 from matplotlib import ticker
 from matplotlib import cm
 import seaborn as sns
+
 from cooltools.lib import plotting
-import random
+
 import logging
 import warnings
-import matplotlib.gridspec as grd
+
 
 warnings.filterwarnings(action="ignore", message=".*tight_layout.*")
 warnings.filterwarnings(action="ignore", message=".*Tight layout.*")
@@ -282,7 +283,6 @@ def sort_separation(sep_string_series, sep="Mb"):
     )
 
 
-
 def make_heatmap_stripes(
     pupsdf,
     cols=None,
@@ -465,7 +465,7 @@ def make_heatmap_stripes(
     max_coordinates = [
         pupsdf.loc[pd.to_numeric(pupsdf["flank"]).idxmax(), "flank"],
         pupsdf.loc[pd.to_numeric(pupsdf["flank"]).idxmax(), "resolution"],
-        max(pupsdf.loc[pupsdf.drop(columns="index").iloc[:,1] != "all", "n"]),
+        max(pupsdf.loc[pupsdf.drop(columns="index").iloc[:, 1] != "all", "n"]),
     ]
 
     if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
@@ -679,7 +679,7 @@ def make_heatmap_grid(
     sns.set(font=font, font_scale=font_scale, style="ticks")
     if norm_corners:
         pupsdf["data"] = pupsdf.apply(
-            lambda x: coolpup.norm_cis(x["data"], norm_corners), axis=1
+            lambda x: numutils.norm_cis(x["data"], norm_corners), axis=1
         )
     if cols == "separation" and col_order is None:
         col_order = sort_separation(pupsdf["separation"])
@@ -762,7 +762,7 @@ def make_heatmap_grid(
 
     if score:
         pupsdf["score"] = pupsdf.apply(
-            coolpup.get_score, center=center, ignore_central=ignore_central, axis=1
+            puputils.get_score, center=center, ignore_central=ignore_central, axis=1
         )
         fg.map(add_score, "score", height=height, font_scale=font_scale)
 

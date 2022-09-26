@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-from coolpuppy.coolpup import CoordCreator, PileUpper, save_pileup_df
+from .coolpup import CoordCreator, PileUpper
+from .lib.io import save_pileup_df
+from .lib.util import validate_csv
 
 # from coolpuppy import *
 from coolpuppy._version import __version__
 from cooltools.lib import common, io
-from .util import validate_csv
 import cooler
 import pandas as pd
 import bioframe
