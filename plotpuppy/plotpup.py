@@ -227,7 +227,7 @@ def add_stripe_lineplot(
             width=1 + (height / 2),
             length=1 + height,
         )
-        plt.yticks([np.round(min(mean), 2), np.round(max(mean), 2)])
+        plt.yticks([np.round(min(mean), 4), np.round(max(mean), 4)])
     else:
         plt.yticks([], [])
     plt.xticks([], [])
@@ -336,8 +336,16 @@ def make_heatmap_stripes(
         nrows = 1
 
     if cols is None and rows is None:
-        nrows, ncols = auto_rows_cols(pupsdf.shape[0])
-
+        if pupsdf.shape[0] > 1:
+            if "orientation" in pupsdf.columns:
+                rows = "orientation"
+                row_order = list(set(pupsdf[rows].dropna()))
+                nrows = len(row_order)
+            if "separation" in pupsdf.columns:
+                cols = "separation"
+                col_order = sort_separation(pupsdf["separation"])
+                ncols = len(col_order)
+                
     vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym, scale=scale)
 
     if scale == "log":
@@ -695,7 +703,15 @@ def make_heatmap_grid(
     else:
         nrows = 1
     if cols is None and rows is None:
-        nrows, ncols = auto_rows_cols(pupsdf.shape[0])
+        if pupsdf.shape[0] > 1:
+            if "orientation" in pupsdf.columns:
+                rows = "orientation"
+                row_order = list(set(pupsdf[rows].dropna()))
+                nrows = len(row_order)
+            if "separation" in pupsdf.columns:
+                cols = "separation"
+                col_order = sort_separation(pupsdf["separation"])
+                ncols = len(col_order)            
 
     vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym, scale=scale)
 
