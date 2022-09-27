@@ -27,6 +27,8 @@ from cooltools.api import snipping, coverage
 from .lib import numutils
 from .lib.puputils import _add_snip, group_by_region, norm_coverage, sum_pups
 
+logger = logging.getLogger("coolpuppy")
+
 
 def bin_distance_intervals(intervals, band_edges="default"):
     """
@@ -567,10 +569,11 @@ class CoordCreator:
         groupby=[],
         modify_2Dintervals_func=None,
     ):
+
         if intervals is None:
             intervals = self.intervals
         if not len(intervals) >= 1:
-            logging.debug("Empty selection")
+            logger.debug("Empty selection")
             yield None
 
         intervals_left = filter_func1(intervals)
@@ -725,6 +728,7 @@ class CoordCreator:
         groupby=[],
         modify_2Dintervals_func=None,
     ):
+
         if intervals is None:
             intervals = self.intervals
         intervals = filter_func1(intervals)
@@ -752,7 +756,7 @@ class CoordCreator:
             ]
         )
         if not len(intervals) >= 1:
-            logging.debug("Empty selection")
+            logger.debug("Empty selection")
             yield None
         for interval in intervals.to_dict(orient="records"):
             yield interval
@@ -980,7 +984,7 @@ class PileUpper:
             elif self.rescale_size % 2 == 0:
                 raise ValueError("Please provide an odd rescale_size")
             else:
-                logging.info(
+                logger.info(
                     "Rescaling with rescale_flank = "
                     + str(self.rescale_flank)
                     + " to "
@@ -1047,7 +1051,7 @@ class PileUpper:
             Sparse csr matrix for the corresponding region.
 
         """
-        logging.debug("Loading data")
+        logger.debug("Loading data")
 
         assert isinstance(region1, str)
         region1 = self.view_df.loc[region1]
@@ -1071,10 +1075,10 @@ class PileUpper:
         try:
             row1 = next(intervals)
         except StopIteration:
-            # logging.info(f"Nothing to sum up between regions {region1} & {region2}")
+            # logger.info(f"Nothing to sum up between regions {region1} & {region2}")
             return
         if row1 is None:
-            # logging.info(f"Nothing to sum up between region {region1} & {region2}")
+            # logger.info(f"Nothing to sum up between region {region1} & {region2}")
             return
 
         intervals = itertools.chain([row1], intervals)
@@ -1360,7 +1364,7 @@ class PileUpper:
             extra_funcs=extra_sum_funcs,
         )
         if final["ROI"]["all"]["n"] > 0:
-            logging.info(f"{region1, region2}: {final['ROI']['all']['n']}")
+            logger.info(f"{region1, region2}: {final['ROI']['all']['n']}")
 
         return final
 
@@ -1404,6 +1408,7 @@ class PileUpper:
             data.
 
         """
+
         if nproc is None:
             nproc = self.nproc
         if len(self.chroms) == 0:
@@ -1431,6 +1436,9 @@ class PileUpper:
             extra_sum_funcs=extra_sum_funcs,
         )
         if nproc > 1:
+            from multiprocessing_logging import install_mp_handler
+
+            install_mp_handler()
             with Pool(nproc) as p:
                 pileups = list(p.starmap(f, zip(regions1, regions2)))
         else:
@@ -1551,7 +1559,7 @@ class PileUpper:
                 normalized_roi[key] = roi[key].values
                 if self.control:
                     normalized_roi[f"control_{key}"] = ctrl[key]
-        logging.info(f"Total number of piled up windows: {int(n)}")
+        logger.info(f"Total number of piled up windows: {int(n)}")
 
         # Store attributes
         exclude_attributes = [

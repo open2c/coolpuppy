@@ -7,12 +7,12 @@ from .lib.util import validate_csv
 from coolpuppy._version import __version__
 from cooltools.lib import common, io
 import cooler
-import pandas as pd
+import numpy as np
 import bioframe
 import os
 import argparse
 import logging
-import numpy as np
+from multiprocessing_logging import install_mp_handler
 
 try:
     from collections.abc import Iterable
@@ -387,9 +387,11 @@ def main():
         args.by_distance = False
         distance_edges = False
 
-    logging.basicConfig(format="%(message)s", level=getattr(logging, args.logLevel))
+    logger = logging.getLogger("coolpuppy")
+    logger.setLevel(getattr(logging, args.logLevel))
+    install_mp_handler()
 
-    logging.debug(args)
+    logger.debug(args)
 
     if args.seed is not None:
         np.random.seed(args.seed)
@@ -575,4 +577,4 @@ def main():
     headerdict["cooler"] = coolname
     headerdict["resolution"] = int(clr.binsize)
     save_pileup_df(outname, pups, headerdict)
-    logging.info(f"Saved output to {outname}")
+    logger.info(f"Saved output to {outname}")
