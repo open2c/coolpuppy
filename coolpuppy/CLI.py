@@ -12,7 +12,7 @@ import bioframe
 import os
 import argparse
 import logging
-from multiprocessing_logging import install_mp_handler
+from multiprocessing_logging import install_mp_handler, uninstall_mp_handler
 
 try:
     from collections.abc import Iterable
@@ -20,8 +20,6 @@ except ImportError:
     from collections import Iterable
 import sys
 import pdb, traceback
-
-# from ._version.py import __version__
 
 
 def parse_args_coolpuppy():
@@ -577,4 +575,5 @@ def main():
     headerdict["cooler"] = coolname
     headerdict["resolution"] = int(clr.binsize)
     save_pileup_df(outname, pups, headerdict)
+    uninstall_mp_handler()
     logger.info(f"Saved output to {outname}")
