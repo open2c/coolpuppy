@@ -34,6 +34,7 @@ else:
         "natsort",
         "tables",
         "h5sparse",
+        "multiprocessing_logging",
     ]
 
 setup(
