@@ -1870,6 +1870,139 @@ def pileup(
     nproc=1,
     seed=None,
 ):
+    """Create pileups
+
+    Parameters
+    ----------
+    clr : cool
+        Cool file with Hi-C data.
+    features : DataFrame
+        A bed- or bedpe-style file with coordinates.
+    features_format : str, optional
+        Format of the features. Options:
+            bed: chrom, start, end
+            bedpe: chrom1, start1, end1, chrom2, start2, end2
+            auto (default): determined from the columns in the DataFrame
+    view_df : DataFrame
+        A dataframe with region coordinates used in expected (see bioframe
+        documentation for details). Can be ommited if no expected is provided, or
+        expected is for whole chromosomes.
+    expected_df : DataFrame, optional
+        If using expected, pandas DataFrame with by-distance expected.
+        The default is False.
+    expected_value_col : str, optional
+        Which column in the expected_df contains values to use for normalization
+    clr_weight_name : bool or str, optional
+        Whether to use balanced data, and which column to use as weights.
+        The default is "weight". Provide False to use raw data.
+    flank : int, optional
+        Padding around the central bin, in bp. For example, with 5000 bp resolution
+        and 100000 flank, final pileup is 205000×205000 bp.
+        The default is 100000.
+    minshift : int, optional
+        Minimal shift applied when generating random controls, in bp.
+        The default is 10 ** 5.
+    maxshift : int, optional
+        Maximal shift applied when generating random controls, in bp.
+        The default is 10 ** 6.
+    nshifts : int, optional
+        How many shifts to generate per region of interest. Does not take chromosome
+        boundaries into account
+        The default is 10.
+    ooe : bool, optional
+        Whether to normalize each snip by expected value. If False, all snips are
+        accumulated, all expected values are accumulated, and then the former
+        divided by the latter - like with randomly shifted controls. Only has effect
+        when expected is provided.
+        Default is True.
+    mindist : int, optional
+        Shortest interactions to consider. Uses midpoints of regions of interest.
+        "auto" selects it to avoid the two shortest diagonals of the matrix, i.e.
+        2 * flank + 2 * resolution
+        The default is "auto".
+    maxdist : int, optional
+        Longest interactions to consider.
+        The default is None.
+    min_diag : int, optional
+        How many diagonals to ignore to avoid short-distance artefacts.
+        The default is 2.
+    subset : int, optional
+        What subset of the coordinate files to use. 0 or negative to use all.
+        The default is 0.
+    by_window : bool, optional
+        Whether to create a separate pileup for each feature by accumulating all of its
+        interactions with other features. Produces as many pileups, as there are
+        features.
+        The default is False.
+    by_strand : bool, optional
+        Whether to create a separate pileup for each combination of "strand1", "strand2"
+        in features. If features_format=='bed', first creates pairwise combinations of
+        features, and the original features need to have a column "strand". If
+        features_format=='bedpe', they need to have "strand1" and "strand2" columns.
+        The default is False.
+    by_distance : bool or list, optional
+        Whether to create a separate pileup for different distance separations. If
+        features_format=='bed', internally creates pairwise combinations of features.
+        If True, splits all separations using edges defined like this:
+            band_edges = np.append([0], 50000 * 2 ** np.arange(30))
+        Alternatively, a list of integer values can be given with custom distance edges.
+        The default is False.
+    by_chrom : bool, optional
+        Whether to create a separate pileup for each combination of "chrom1", "chrom2"
+        in features. If features_format=='bed', first creates pairwise combinations of
+        of features. Unless trans==True, chrom1 is equal to chrom2.
+        The default is False.
+    groupby: list of str, optional
+        Additional columns of features to use for groupby. If feature_format=='bed',
+        each columns should be specified twice with suffixes "1" and "2", i.e. if
+        features have a columns "group", specify ["group1", "group2"].
+        The default is [].
+    flip_negative_strand : bool, optional
+        Flip snippets so the positive strand always points to bottom-right.
+        Requires strands to be annotated for each feature (or two strands for
+        bedpe format features)
+    local : bool, optional
+        Whether to generate local coordinates, i.e. on-diagonal.
+        The default is False.
+    coverage_norm : bool or str, optional
+        Whether to normalize final the final pileup by accumulated coverage as an
+        alternative to balancing. Useful for single-cell Hi-C data. Can be either
+        boolean, or string: "cis" or "total" to use "cis_raw_cov" or "tot_raw_cov"
+        columns in the cooler bin table, respectively. If True, will attempt to use
+        "tot_raw_cov" if available, otherwise will compute and store coverage in the
+        cooler with default column names, and use "tot_raw_cov". Alternatively, if
+        a different string is provided, will attempt to use a column with the that
+        name in the cooler bin table, and will raise a ValueError if it does not exist.
+        Only allowed when clr_weight_name is False.
+        The default is False.
+    trans : bool, optional
+        Whether to generate inter-chromosomal (trans) pileups.
+        The default is False
+    rescale : bool, optional
+        Whether to rescale the pileups.
+        The default is False
+    rescale_flank : float, optional
+        Fraction of ROI size added on each end when extracting snippets, if rescale.
+        The default is None. If specified, overrides flank.
+    rescale_size : int, optional
+        Final shape of rescaled pileups. E.g. if 99, pileups will be squares of
+        99×99 pixels.
+        The default is 99.
+    store_stripes: bool, optional
+        Whether to store horizontal and vertical stripes and coordinates in the output
+        The default is False
+    nproc : int, optional
+        Number of processes to use. The default is 1.
+    seed : int, optional
+        Seed for np.random to make it reproducible.
+        The default is None.
+
+    Returns
+    -------
+    (pileup_df, annotations) - tuple where the first element is the pandas DataFrame
+    containing the pileups and their grouping information, if any, and the second
+    element is a dict with their shared annotations.
+    """
     if by_distance:
         if by_distance is True or by_distance == "default":
             distance_edges = "default"
