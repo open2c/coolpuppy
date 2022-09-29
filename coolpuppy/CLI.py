@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from .coolpup import CoordCreator, PileUpper
+from .coolpup import pileup
 from .lib.io import save_pileup_df
 from .lib.util import validate_csv
 
@@ -7,12 +7,12 @@ from .lib.util import validate_csv
 from coolpuppy._version import __version__
 from cooltools.lib import common, io
 import cooler
-import pandas as pd
+import numpy as np
 import bioframe
 import os
 import argparse
 import logging
-import numpy as np
+from multiprocessing_logging import install_mp_handler, uninstall_mp_handler
 
 try:
     from collections.abc import Iterable
@@ -20,8 +20,6 @@ except ImportError:
     from collections import Iterable
 import sys
 import pdb, traceback
-
-# from ._version.py import __version__
 
 
 def parse_args_coolpuppy():
@@ -196,8 +194,8 @@ def parse_args_coolpuppy():
         required=False,
         help="""Perform by-distance pile-ups.
                 Create a separate pile-up for each distance band. If empty, will use default 
-                (0,50000,100000,200000,...) edges. Specify edges using comma-separated values, 
-                e.g. 1000000,10000000,100000000,1000000000""",
+                (0,50000,100000,200000,...) edges. Specify edges using multiple argument
+                values, e.g. `--by_distance 1000000 2000000` """,
     )
     parser.add_argument(
         "--flip_negative_strand",
@@ -244,7 +242,8 @@ def parse_args_coolpuppy():
         help="""Perform inter-chromosomal (trans) pileups""",
     )
     parser.add_argument(
-        "--by_chroms",
+        "--by-chrom",
+        "--by_chrom",
         action="store_true",
         default=False,
         required=False,
@@ -371,26 +370,26 @@ def main():
             pdb.pm()
 
         sys.excepthook = _excepthook
-
     if args.by_distance is not None:
         if len(args.by_distance) > 0:
-            args.by_distance = args.by_distance[0]
             try:
-                _ = [int(item) for item in args.by_distance.split(",")]
+                distance_edges = [int(item) for item in args.by_distance]
             except:
                 raise ValueError(
-                    "Distance edges must be integers. Separate edges with commas and no spaces."
+                    "Distance edges must be integers. Separate edges with spaces."
                 )
-            distance_edges = [int(item) for item in args.by_distance.split(",")]
         else:
             distance_edges = "default"
             args.by_distance = True
     else:
         args.by_distance = False
+        distance_edges = False
 
-    logging.basicConfig(format="%(message)s", level=getattr(logging, args.logLevel))
+    logger = logging.getLogger("coolpuppy")
+    logger.setLevel(getattr(logging, args.logLevel))
+    install_mp_handler()
 
-    logging.debug(args)
+    logger.debug(args)
 
     if args.seed is not None:
         np.random.seed(args.seed)
@@ -402,7 +401,7 @@ def main():
 
     clr = cooler.Cooler(args.cool_path)
 
-    coolname = os.path.splitext(os.path.basename(clr.filename))[0]
+    coolname = os.path.basename(clr.filename)
     if args.features != "-":
         bedname, ext = os.path.splitext(os.path.basename(args.features))
         features = args.features
@@ -412,9 +411,11 @@ def main():
             schema = args.features_format
         if schema == "bed":
             schema = "bed12"
+            features_format = "bed"
             dtype = {"chrom": str}
         else:
             dtype = {"chrom1": str, "chrom2": str}
+            features_format = "bedpe"
         features = bioframe.read_table(
             features, schema=schema, index_col=False, dtype=dtype
         )
@@ -426,6 +427,9 @@ def main():
         schema = args.features_format
         if schema == "bed":
             schema = "bed12"
+            features_format = "bed"
+        else:
+            features_format = "bedpe"
         bedname = "stdin"
         features = bioframe.read_table(sys.stdin, schema=schema, index_col=False)
 
@@ -436,15 +440,9 @@ def main():
         # Read view_df dataframe, and verify against cooler
         view_df = io.read_viewframe_from_file(args.view, clr, check_sorting=True)
 
-    if args.nshifts > 0:
-        control = True
-    else:
-        control = False
-
     if args.expected is None:
-        expected = False
+        expected = None
         expected_value_col = None
-
     else:
         expected_path, expected_value_col = args.expected
         expected_value_cols = [
@@ -466,6 +464,7 @@ def main():
                 verify_view=view_df,
                 verify_cooler=clr,
             )
+        args.nshifts = 0
 
     if args.mindist is None:
         mindist = "auto"
@@ -501,39 +500,38 @@ def main():
         if args.local:
             raise ValueError("Can't make local by-window pileups")
 
-    CC = CoordCreator(
+    pups, _ = pileup(
+        clr=clr,
         features=features,
-        resolution=clr.binsize,
-        features_format=args.features_format,
+        features_format=features_format,
+        view_df=view_df,
+        expected_df=expected,
+        expected_value_col=expected_value_col,
+        clr_weight_name=args.clr_weight_name,
         flank=args.flank,
-        rescale_flank=rescale_flank,
-        chroms=fchroms,
         minshift=args.minshift,
         maxshift=args.maxshift,
         nshifts=args.nshifts,
+        ooe=args.ooe,
         mindist=mindist,
         maxdist=maxdist,
-        local=args.local,
+        min_diag=args.ignore_diags,
         subset=args.subset,
-        seed=args.seed,
-        trans=args.trans,
-    )
-
-    PU = PileUpper(
-        clr=clr,
-        CC=CC,
-        view_df=view_df,
-        clr_weight_name=args.clr_weight_name,
-        expected=expected,
-        ooe=args.ooe,
-        control=control,
-        coverage_norm=args.coverage_norm,
-        rescale=args.rescale,
-        rescale_size=args.rescale_size,
+        by_window=args.by_window,
+        by_strand=args.by_strand,
+        by_distance=distance_edges,
+        by_chrom=False,
+        groupby=[],
         flip_negative_strand=args.flip_negative_strand,
-        ignore_diags=args.ignore_diags,
+        local=args.local,
+        coverage_norm=args.coverage_norm,
+        trans=args.trans,
+        rescale=args.rescale,
+        rescale_flank=rescale_flank,
+        rescale_size=args.rescale_size,
         store_stripes=args.store_stripes,
         nproc=nproc,
+        seed=args.seed,
     )
 
     if args.outname == "auto":
@@ -560,28 +558,12 @@ def main():
             outname += "_by-strand"
         if args.trans:
             outname += "_trans"
-        if args.by_chroms:
+        if args.by_chrom:
             outname += "_by-chroms"
         outname += ".clpy"
     else:
         outname = args.outname
 
-    if args.by_window:
-        pups = PU.pileupsByWindowWithControl()
-    elif args.by_strand and args.by_distance:
-        pups = PU.pileupsByStrandByDistanceWithControl(
-            nproc=nproc, distance_edges=distance_edges
-        )
-    elif args.by_strand:
-        pups = PU.pileupsByStrandWithControl()
-    elif args.by_distance:
-        pups = PU.pileupsByDistanceWithControl(
-            nproc=nproc, distance_edges=distance_edges
-        )
-    elif args.by_chroms:
-        pups = PU.pileupsWithControl(groupby=["chrom1", "chrom2"])
-    else:
-        pups = PU.pileupsWithControl()
     headerdict = vars(args)
     if "expected" in headerdict:
         if not isinstance(headerdict["expected"], str) and isinstance(
@@ -590,6 +572,8 @@ def main():
             headerdict["expected_file"] = headerdict["expected"][0]
             headerdict["expected_col"] = headerdict["expected"][1]
             headerdict["expected"] = True
+    headerdict["cooler"] = coolname
     headerdict["resolution"] = int(clr.binsize)
     save_pileup_df(outname, pups, headerdict)
-    logging.info(f"Saved output to {outname}")
+    uninstall_mp_handler()
+    logger.info(f"Saved output to {outname}")

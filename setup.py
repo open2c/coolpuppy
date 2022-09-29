@@ -33,7 +33,8 @@ else:
         "seaborn",
         "natsort",
         "tables",
-	"h5sparse",
+        "h5sparse",
+        "multiprocessing_logging",
     ]
 
 setup(

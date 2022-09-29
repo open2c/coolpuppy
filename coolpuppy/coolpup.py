@@ -1,21 +1,33 @@
 # -*- coding: utf-8 -*-
-import numpy as np
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 import warnings
-import pandas as pd
-import bioframe
-import itertools
+
+import os
 from multiprocessing import Pool
 from functools import partial, reduce
 import logging
+import itertools
+from tokenize import group
+
 from natsort import natsorted
+from more_itertools import collapse
+
+import numpy as np
+import pandas as pd
+import bioframe
+
 import cooler
 from cooltools import numutils as ctutils
 from cooltools.lib import common, checks
 from cooltools.api import snipping, coverage
-from more_itertools import collapse
-import os
+
 from .lib import numutils
 from .lib.puputils import _add_snip, group_by_region, norm_coverage, sum_pups
+
+logger = logging.getLogger("coolpuppy")
 
 
 def bin_distance_intervals(intervals, band_edges="default"):
@@ -557,10 +569,11 @@ class CoordCreator:
         groupby=[],
         modify_2Dintervals_func=None,
     ):
+
         if intervals is None:
             intervals = self.intervals
         if not len(intervals) >= 1:
-            logging.debug("Empty selection")
+            logger.debug("Empty selection")
             yield None
 
         intervals_left = filter_func1(intervals)
@@ -715,6 +728,7 @@ class CoordCreator:
         groupby=[],
         modify_2Dintervals_func=None,
     ):
+
         if intervals is None:
             intervals = self.intervals
         intervals = filter_func1(intervals)
@@ -742,7 +756,7 @@ class CoordCreator:
             ]
         )
         if not len(intervals) >= 1:
-            logging.debug("Empty selection")
+            logger.debug("Empty selection")
             yield None
         for interval in intervals.to_dict(orient="records"):
             yield interval
@@ -858,7 +872,7 @@ class PileUpper:
             self.view_df = common.make_cooler_view(clr)
         else:
             self.view_df = bioframe.make_viewframe(view_df, check_bounds=clr.chromsizes)
-        if self.expected is not False:
+        if self.expected is not None and self.expected is not False:
             # subset expected if some regions not mentioned in view
             self.expected = self.expected[
                 (self.expected["region1"].isin(self.view_df["name"]))
@@ -970,7 +984,7 @@ class PileUpper:
             elif self.rescale_size % 2 == 0:
                 raise ValueError("Please provide an odd rescale_size")
             else:
-                logging.info(
+                logger.info(
                     "Rescaling with rescale_flank = "
                     + str(self.rescale_flank)
                     + " to "
@@ -979,10 +993,6 @@ class PileUpper:
                     + str(self.rescale_size)
                     + " pixels"
                 )
-
-        else:
-            if self.rescale_flank is not None:
-                raise ValueError("Cannot set rescale_flank with rescale=False")
 
         self.empty_outmap = self.make_outmap()
 
@@ -1041,7 +1051,7 @@ class PileUpper:
             Sparse csr matrix for the corresponding region.
 
         """
-        logging.debug("Loading data")
+        logger.debug("Loading data")
 
         assert isinstance(region1, str)
         region1 = self.view_df.loc[region1]
@@ -1065,10 +1075,10 @@ class PileUpper:
         try:
             row1 = next(intervals)
         except StopIteration:
-            # logging.info(f"Nothing to sum up between regions {region1} & {region2}")
+            # logger.info(f"Nothing to sum up between regions {region1} & {region2}")
             return
         if row1 is None:
-            # logging.info(f"Nothing to sum up between region {region1} & {region2}")
+            # logger.info(f"Nothing to sum up between region {region1} & {region2}")
             return
 
         intervals = itertools.chain([row1], intervals)
@@ -1354,7 +1364,7 @@ class PileUpper:
             extra_funcs=extra_sum_funcs,
         )
         if final["ROI"]["all"]["n"] > 0:
-            logging.info(f"{region1, region2}: {final['ROI']['all']['n']}")
+            logger.info(f"{region1, region2}: {final['ROI']['all']['n']}")
 
         return final
 
@@ -1398,6 +1408,7 @@ class PileUpper:
             data.
 
         """
+
         if nproc is None:
             nproc = self.nproc
         if len(self.chroms) == 0:
@@ -1425,6 +1436,9 @@ class PileUpper:
             extra_sum_funcs=extra_sum_funcs,
         )
         if nproc > 1:
+            from multiprocessing_logging import install_mp_handler
+
+            install_mp_handler()
             with Pool(nproc) as p:
                 pileups = list(p.starmap(f, zip(regions1, regions2)))
         else:
@@ -1545,7 +1559,7 @@ class PileUpper:
                 normalized_roi[key] = roi[key].values
                 if self.control:
                     normalized_roi[f"control_{key}"] = ctrl[key]
-        logging.info(f"Total number of piled up windows: {int(n)}")
+        logger.info(f"Total number of piled up windows: {int(n)}")
 
         # Store attributes
         exclude_attributes = [
@@ -1821,3 +1835,336 @@ class PileUpper:
             ignore_index=True,
         ).reset_index(drop=True)
         return normalized_pileups
+
+
+def pileup(
+    clr,
+    features,
+    features_format="bed",
+    view_df=None,
+    expected_df=None,
+    expected_value_col="balanced.avg",
+    clr_weight_name="weight",
+    flank=100000,
+    minshift=10**5,
+    maxshift=10**6,
+    nshifts=0,
+    ooe=True,
+    mindist="auto",
+    maxdist=None,
+    min_diag=2,
+    subset=0,
+    by_window=False,
+    by_strand=False,
+    by_distance=False,
+    by_chrom=False,
+    groupby=[],
+    flip_negative_strand=False,
+    local=False,
+    coverage_norm=False,
+    trans=False,
+    rescale=False,
+    rescale_flank=1,
+    rescale_size=99,
+    store_stripes=False,
+    nproc=1,
+    seed=None,
+):
+    """Create pileups
+
+    Parameters
+    ----------
+    clr : cool
+        Cool file with Hi-C data.
+    features : DataFrame
+        A bed- or bedpe-style file with coordinates.
+    features_format : str, optional
+        Format of the features. Options:
+            bed: chrom, start, end
+            bedpe: chrom1, start1, end1, chrom2, start2, end2
+            auto (default): determined from the columns in the DataFrame
+    view_df : DataFrame
+        A dataframe with region coordinates used in expected (see bioframe
+        documentation for details). Can be ommited if no expected is provided, or
+        expected is for whole chromosomes.
+    expected_df : DataFrame, optional
+        If using expected, pandas DataFrame with by-distance expected.
+        The default is False.
+    expected_value_col : str, optional
+        Which column in the expected_df contains values to use for normalization
+    clr_weight_name : bool or str, optional
+        Whether to use balanced data, and which column to use as weights.
+        The default is "weight". Provide False to use raw data.
+    flank : int, optional
+        Padding around the central bin, in bp. For example, with 5000 bp resolution
+        and 100000 flank, final pileup is 205000×205000 bp.
+        The default is 100000.
+    minshift : int, optional
+        Minimal shift applied when generating random controls, in bp.
+        The default is 10 ** 5.
+    maxshift : int, optional
+        Maximal shift applied when generating random controls, in bp.
+        The default is 10 ** 6.
+    nshifts : int, optional
+        How many shifts to generate per region of interest. Does not take chromosome
+        boundaries into account
+        The default is 10.
+    ooe : bool, optional
+        Whether to normalize each snip by expected value. If False, all snips are
+        accumulated, all expected values are accumulated, and then the former
+        divided by the latter - like with randomly shifted controls. Only has effect
+        when expected is provided.
+        Default is True.
+    mindist : int, optional
+        Shortest interactions to consider. Uses midpoints of regions of interest.
+        "auto" selects it to avoid the two shortest diagonals of the matrix, i.e.
+        2 * flank + 2 * resolution
+        The default is "auto".
+    maxdist : int, optional
+        Longest interactions to consider.
+        The default is None.
+    min_diag : int, optional
+        How many diagonals to ignore to avoid short-distance artefacts.
+        The default is 2.
+    subset : int, optional
+        What subset of the coordinate files to use. 0 or negative to use all.
+        The default is 0.
+    by_window : bool, optional
+        Whether to create a separate pileup for each feature by accumulating all of its
+        interactions with other features. Produces as many pileups, as there are
+        features.
+        The default is False.
+    by_strand : bool, optional
+        Whether to create a separate pileup for each combination of "strand1", "strand2"
+        in features. If features_format=='bed', first creates pairwise combinations of
+        features, and the original features need to have a column "strand". If
+        features_format=='bedpe', they need to have "strand1" and "strand2" columns.
+        The default is False.
+    by_distance : bool or list, optional
+        Whether to create a separate pileup for different distance separations. If
+        features_format=='bed', internally creates pairwise combinations of features.
+        If True, splits all separations using edges defined like this:
+            band_edges = np.append([0], 50000 * 2 ** np.arange(30))
+        Alternatively, a list of integer values can be given with custom distance edges.
+        The default is False.
+    by_chrom : bool, optional
+        Whether to create a separate pileup for each combination of "chrom1", "chrom2"
+        in features. If features_format=='bed', first creates pairwise combinations of
+        of features. Unless trans==True, chrom1 is equal to chrom2.
+        The default is False.
+    groupby: list of str, optional
+        Additional columns of features to use for groupby. If feature_format=='bed',
+        each columns should be specified twice with suffixes "1" and "2", i.e. if
+        features have a columns "group", specify ["group1", "group2"].
+        The default is [].
+    flip_negative_strand : bool, optional
+        Flip snippets so the positive strand always points to bottom-right.
+        Requires strands to be annotated for each feature (or two strands for
+        bedpe format features)
+    local : bool, optional
+        Whether to generate local coordinates, i.e. on-diagonal.
+        The default is False.
+    coverage_norm : bool or str, optional
+        Whether to normalize final the final pileup by accumulated coverage as an
+        alternative to balancing. Useful for single-cell Hi-C data. Can be either
+        boolean, or string: "cis" or "total" to use "cis_raw_cov" or "tot_raw_cov"
+        columns in the cooler bin table, respectively. If True, will attempt to use
+        "tot_raw_cov" if available, otherwise will compute and store coverage in the
+        cooler with default column names, and use "tot_raw_cov". Alternatively, if
+        a different string is provided, will attempt to use a column with the that
+        name in the cooler bin table, and will raise a ValueError if it does not exist.
+        Only allowed when clr_weight_name is False.
+        The default is False.
+    trans : bool, optional
+        Whether to generate inter-chromosomal (trans) pileups.
+        The default is False
+    rescale : bool, optional
+        Whether to rescale the pileups.
+        The default is False
+    rescale_flank : float, optional
+        Fraction of ROI size added on each end when extracting snippets, if rescale.
+        The default is None. If specified, overrides flank.
+    rescale_size : int, optional
+        Final shape of rescaled pileups. E.g. if 99, pileups will be squares of
+        99×99 pixels.
+        The default is 99.
+    store_stripes: bool, optional
+        Whether to store horizontal and vertical stripes and coordinates in the output
+        The default is False
+    nproc : int, optional
+        Number of processes to use. The default is 1.
+    seed : int, optional
+        Seed for np.random to make it reproducible.
+        The default is None.
+
+    Returns
+    -------
+    (pileup_df, annotations) - tuple where the first element is the pandas DataFrame
+    containing the pileups and their grouping information, if any, and the second
+    element is a dict with their shared annotations.
+    """
+    if by_distance:
+        if by_distance is True or by_distance == "default":
+            distance_edges = "default"
+            by_distance = True
+        elif len(by_distance) > 0:
+            distance_edges = by_distance
+            by_distance = True
+        else:
+            raise ValueError(
+                "Invalid by_distance value, should be either 'default' or a list of integers"
+            )
+        if local:
+            raise ValueError(
+                "Can't do local pileups by distance, please specify only one of those arguments"
+            )
+    else:
+        by_distance = False
+
+    if not rescale:
+        rescale_flank = None
+
+    if seed is not None:
+        np.random.seed(seed)
+
+    if nproc == 0:
+        nproc = -1
+    else:
+        nproc = nproc
+
+    if view_df is None:
+        # full chromosome case
+        view_df = common.make_cooler_view(clr)
+    else:
+        # verify view is compatible with cooler
+        try:
+            _ = checks.is_compatible_viewframe(
+                view_df,
+                clr,
+                check_sorting=True,
+                raise_errors=True,
+            )
+        except Exception as e:
+            raise ValueError("view_df is not a valid viewframe or incompatible") from e
+    if nshifts > 0:
+        control = True
+    else:
+        control = False
+
+    if expected_df is None:
+        expected = None
+        expected_df = None
+        expected_value_col = None
+    else:
+        expected = True
+        if trans:
+            try:
+                _ = checks.is_valid_expected(
+                    expected_df,
+                    "trans",
+                    view_df,
+                    verify_cooler=clr,
+                    expected_value_cols=[
+                        expected_value_col,
+                    ],
+                    raise_errors=True,
+                )
+            except Exception as e:
+                raise ValueError("provided expected is not valid") from e
+        else:
+            try:
+                _ = checks.is_valid_expected(
+                    expected_df,
+                    "cis",
+                    view_df,
+                    verify_cooler=clr,
+                    expected_value_cols=[
+                        expected_value_col,
+                    ],
+                    raise_errors=True,
+                )
+            except Exception as e:
+                raise ValueError("provided expected is not valid") from e
+
+    if mindist is None:
+        mindist = "auto"
+    else:
+        mindist = mindist
+
+    if maxdist is None:
+        maxdist = np.inf
+    else:
+        maxdist = maxdist
+
+    if rescale and rescale_size % 2 == 0:
+        raise ValueError("Please provide an odd rescale_size")
+
+    chroms = list(view_df["chrom"].unique())
+
+    if by_window:
+        if features_format != "bed":
+            raise ValueError("Can't make by-window pileups without making combinations")
+        if local:
+            raise ValueError("Can't make local by-window pileups")
+
+    CC = CoordCreator(
+        features=features,
+        resolution=clr.binsize,
+        features_format=features_format,
+        flank=flank,
+        rescale_flank=rescale_flank,
+        chroms=chroms,
+        minshift=minshift,
+        maxshift=maxshift,
+        nshifts=nshifts,
+        mindist=mindist,
+        maxdist=maxdist,
+        local=local,
+        subset=subset,
+        seed=seed,
+        trans=trans,
+    )
+
+    PU = PileUpper(
+        clr=clr,
+        CC=CC,
+        view_df=view_df,
+        clr_weight_name=clr_weight_name,
+        expected=expected_df,
+        ooe=ooe,
+        control=control,
+        coverage_norm=coverage_norm,
+        rescale=rescale,
+        rescale_size=rescale_size,
+        flip_negative_strand=flip_negative_strand,
+        ignore_diags=min_diag,
+        store_stripes=store_stripes,
+        nproc=nproc,
+    )
+
+    if by_window:
+        pups = PU.pileupsByWindowWithControl()
+    elif by_strand and by_distance:
+        pups = PU.pileupsByStrandByDistanceWithControl(
+            nproc=nproc, distance_edges=distance_edges, groupby=groupby
+        )
+    elif by_strand:
+        pups = PU.pileupsByStrandWithControl(groupby=groupby)
+    elif by_distance:
+        pups = PU.pileupsByDistanceWithControl(
+            nproc=nproc, distance_edges=distance_edges, groupby=groupby
+        )
+    elif by_chrom:
+        pups = PU.pileupsWithControl(groupby=["chrom1", "chrom2"] + groupby)
+    else:
+        pups = PU.pileupsWithControl(groupby=groupby)
+
+    # Collect annotation
+    headerdict = locals()
+
+    headerdict["expected"] = expected
+    headerdict.pop("expected_df")
+    coolname = os.path.splitext(os.path.basename(clr.filename))[0]
+    headerdict["cooler"] = coolname
+    headerdict["resolution"] = int(clr.binsize)
+    return pups, headerdict
