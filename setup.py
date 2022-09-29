@@ -40,11 +40,11 @@ else:
 setup(
     name="coolpuppy",
     version=verstr,
-    packages=["coolpuppy", "plotpuppy"],
+    packages=["coolpuppy"],
     entry_points={
         "console_scripts": [
             "coolpup.py = coolpuppy.CLI:main",
-            "plotpup.py = plotpuppy.CLI:main",
+            "plotpup.py = coolpuppy.plotpuppy_CLI:main",
             "dividepups.py = coolpuppy.divide_pups_CLI:main",
         ]
     },

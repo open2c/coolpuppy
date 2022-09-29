@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from more_itertools import collapse
 import logging
+logger = logging.getLogger("coolpuppy")
 
 from .numutils import get_enrichment, get_domain_score, get_insulation_strength
 
@@ -67,11 +68,14 @@ def get_score(pup, center=3, ignore_central=3):
 
     """
     if not pup["local"]:
+        logger.debug(f"Calculating enrichment for the central {center} pixels")
         return get_enrichment(pup["data"], center)
     else:
         if pup["rescale"]:
+            logger.debug(f"Calculating domain enrichment for the central rescaled domain versus surrounding")
             return get_domain_score(pup["data"], pup["rescale_flank"])
         else:
+            logger.debug(f"Calculating insulation score, i.e., upper left and lower right corners over upper right and lower left corners")
             return get_insulation_strength(pup["data"], ignore_central)
 
 

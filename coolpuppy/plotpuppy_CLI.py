@@ -9,7 +9,7 @@ from coolpuppy.lib import numutils
 from coolpuppy.lib import puputils
 from coolpuppy.lib import io
 
-from plotpuppy.plotpup import plot, plot_stripes
+from coolpuppy.plotpup import plot, plot_stripes
 from coolpuppy._version import __version__
 
 import matplotlib
