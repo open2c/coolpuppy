@@ -16,6 +16,7 @@ from cooltools.lib import plotting
 import logging
 import warnings
 
+logger = logging.getLogger("coolpuppy")
 
 warnings.filterwarnings(action="ignore", message=".*tight_layout.*")
 warnings.filterwarnings(action="ignore", message=".*Tight layout.*")
@@ -69,7 +70,7 @@ def get_min_max(pups, vmin=None, vmax=None, sym=True, scale="log"):
     """
     if vmin is not None and vmax is not None:
         if sym:
-            logging.info(
+            logger.info(
                 "Can't set both vmin and vmax and get symmetrical scale. Plotting non-symmetrical"
             )
         return vmin, vmax
@@ -90,7 +91,7 @@ def get_min_max(pups, vmin=None, vmax=None, sym=True, scale="log"):
     if sym:
 
         if scale == "linear":
-            logging.info(
+            logger.info(
                 "Can't use symmetrical scale with linear. Plotting non-symmetrical"
             )
             pass
@@ -282,7 +283,7 @@ def sort_separation(sep_string_series, sep="Mb"):
     )
 
 
-def make_heatmap_stripes(
+def plot_stripes(
     pupsdf,
     cols=None,
     rows=None,
@@ -344,6 +345,8 @@ def make_heatmap_stripes(
                 cols = "separation"
                 col_order = sort_separation(pupsdf["separation"])
                 ncols = len(col_order)
+                
+    logger.debug(f"Plotting stripe stackups with {ncols} columns and {nrows} rows")
                 
     vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym, scale=scale)
 
@@ -484,6 +487,7 @@ def make_heatmap_stripes(
                 font_scale=font_scale,
                 colnames=colnames,
             )
+            logger.debug(f"Plotting lineplot on top of stripes")
         else:
             fg.map(
                 add_heatmap,
@@ -502,7 +506,7 @@ def make_heatmap_stripes(
                 max_coordinates=max_coordinates,
             )
             if lineplot:
-                logging.info(
+                logger.info(
                     "Can only do lineplot for single conditions (no rows/columns). Doing normal stripe plot instead."
                 )
     else:
@@ -562,7 +566,7 @@ def make_heatmap_stripes(
 
     if colnames is not None:
         if len(colnames) != ncols:
-            logging.info(f"{len(colnames)} colnames but {ncols} columns, ignoring")
+            logger.info(f"{len(colnames)} colnames but {ncols} columns, ignoring")
         else:
             i = 0
             if nrows > 1 and ncols > 1:
@@ -595,7 +599,7 @@ def make_heatmap_stripes(
 
     if rownames is not None:
         if len(rownames) != nrows:
-            logging.info(f"{len(rownames)} rownames but {nrows} columns, ignoring")
+            logger.info(f"{len(rownames)} rownames but {nrows} columns, ignoring")
         else:
             i = 0
             if nrows > 1 and ncols > 1:
@@ -647,7 +651,7 @@ def make_heatmap_stripes(
     return fg
 
 
-def make_heatmap_grid(
+def plot(
     pupsdf,
     cols=None,
     rows=None,
@@ -713,7 +717,9 @@ def make_heatmap_grid(
             if "separation" in pupsdf.columns:
                 cols = "separation"
                 col_order = sort_separation(pupsdf["separation"])
-                ncols = len(col_order)            
+                ncols = len(col_order)     
+                
+    logger.debug(f"Plotting pileup with {ncols} columns and {nrows} rows")
 
     vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym, scale=scale)
 
@@ -822,7 +828,7 @@ def make_heatmap_grid(
 
     if colnames is not None:
         if len(colnames) != ncols:
-            logging.info(f"{len(colnames)} colnames but {ncols} columns, ignoring")
+            logger.info(f"{len(colnames)} colnames but {ncols} columns, ignoring")
         else:
             i = 0
             if nrows > 1 and ncols > 1:
@@ -854,7 +860,7 @@ def make_heatmap_grid(
 
     if rownames is not None:
         if len(rownames) != nrows:
-            logging.info(f"{len(rownames)} rownames but {nrows} columns, ignoring")
+            logger.info(f"{len(rownames)} rownames but {nrows} columns, ignoring")
         else:
             i = 0
             if nrows > 1 and ncols > 1:
