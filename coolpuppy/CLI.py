@@ -500,7 +500,7 @@ def main():
         if args.local:
             raise ValueError("Can't make local by-window pileups")
 
-    pups, _ = pileup(
+    pups = pileup(
         clr=clr,
         features=features,
         features_format=features_format,
@@ -564,16 +564,10 @@ def main():
     else:
         outname = args.outname
 
-    headerdict = vars(args)
-    if "expected" in headerdict:
-        if not isinstance(headerdict["expected"], str) and isinstance(
-            headerdict["expected"], Iterable
-        ):
-            headerdict["expected_file"] = headerdict["expected"][0]
-            headerdict["expected_col"] = headerdict["expected"][1]
-            headerdict["expected"] = True
-    headerdict["cooler"] = coolname
-    headerdict["resolution"] = int(clr.binsize)
-    save_pileup_df(outname, pups, headerdict)
+    if args.expected:
+        pups["expected_file"] = expected_path
+    if args.view:
+        pups["view_file"] = args.view
+    save_pileup_df(outname, pups)
     uninstall_mp_handler()
     logger.info(f"Saved output to {outname}")

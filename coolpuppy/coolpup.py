@@ -2144,27 +2144,46 @@ def pileup(
 
     if by_window:
         pups = PU.pileupsByWindowWithControl()
+        pups["by_window"] = True
+        pups["by_strand"] = False
+        pups["by_distance"] = False
+        pups["by_chrom"] = False
     elif by_strand and by_distance:
         pups = PU.pileupsByStrandByDistanceWithControl(
             nproc=nproc, distance_edges=distance_edges, groupby=groupby
         )
+        pups["by_window"] = False
+        pups["by_strand"] = True
+        pups["by_distance"] = True
+        pups["by_chrom"] = False
     elif by_strand:
         pups = PU.pileupsByStrandWithControl(groupby=groupby)
+        pups["by_window"] = False
+        pups["by_strand"] = True
+        pups["by_distance"] = False
+        pups["by_chrom"] = False
     elif by_distance:
         pups = PU.pileupsByDistanceWithControl(
             nproc=nproc, distance_edges=distance_edges, groupby=groupby
         )
+        pups["by_window"] = False
+        pups["by_strand"] = False
+        pups["by_distance"] = True
+        pups["by_chrom"] = False
     elif by_chrom:
         pups = PU.pileupsWithControl(groupby=["chrom1", "chrom2"] + groupby)
+        pups["by_window"] = False
+        pups["by_strand"] = False
+        pups["by_distance"] = False
+        pups["by_chrom"] = True
     else:
         pups = PU.pileupsWithControl(groupby=groupby)
-
-    # Collect annotation
-    headerdict = locals()
-
-    headerdict["expected"] = expected
-    headerdict.pop("expected_df")
+        pups["by_window"] = False
+        pups["by_strand"] = False
+        pups["by_distance"] = False
+        pups["by_chrom"] = False
+    pups["groupby"] = [groupby] * pups.shape[0]
+    pups["expected"] = pups["expected"].fillna(False)
     coolname = os.path.splitext(os.path.basename(clr.filename))[0]
-    headerdict["cooler"] = coolname
-    headerdict["resolution"] = int(clr.binsize)
-    return pups, headerdict
+    pups["cooler"] = coolname
+    return pups

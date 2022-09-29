@@ -24,10 +24,9 @@ else:
     INSTALL_REQUIRES = [
         "Cython",
         "cooler",
-        "natsort",
         "numpy>=1.16.5",
         "scipy",
-        "cooltools>=0.5.0",
+        "cooltools>=0.5.0,<=5.1",
         "pyyaml",
         "more_itertools",
         "seaborn",
