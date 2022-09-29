@@ -633,7 +633,7 @@ def plot_stripes(
         else:
             string = "pos. [kb]"
         fg.fig.text((right + left) / 2, 
-                    (0.1-(0.25/height/nrows)), 
+                    (0.05+(0.01*nrows)-(0.25/height/nrows)), 
                     s=string, 
                     ha="center", 
                     fontsize=font_scale * 2 * (4.94 + height))

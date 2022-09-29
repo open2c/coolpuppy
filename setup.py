@@ -26,7 +26,7 @@ else:
         "cooler",
         "numpy>=1.16.5",
         "scipy",
-        "cooltools>=0.5.0,<=5.1",
+        "cooltools>=0.5.0,<=0.5.1",
         "pyyaml",
         "more_itertools",
         "seaborn",
