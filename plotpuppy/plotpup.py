@@ -268,7 +268,6 @@ def add_score(score, height=1, color=None, font_scale=1):
             x=0.05,
             ha="left",
             va="top",
-            # size="x-small",
             size=font_scale * (4.94 + height),
             transform=ax.transAxes,
         )
@@ -620,17 +619,20 @@ def make_heatmap_stripes(
     bottom = ax_bottom.get_position().y0
     ax_top = fg.axes[0, -1]
     top = ax_top.get_position().y1
-    height = top - bottom
     right = ax_top.get_position().x1
     ax_left = fg.axes[-1, 0]
     left = ax_left.get_position().x0
-    cax = fg.fig.add_axes([right + 0.01, bottom, (1 - right - 0.01) / 5, height])
+    cax = fg.fig.add_axes([right + 0.01, bottom, (1 - right - 0.01) / 5, top - bottom])
     if plot_ticks:
         if pupsdf["rescale"].any():
             string = "rescaled"
         else:
             string = "pos. [kb]"
-        fg.fig.text((right + left) / 2, bottom - (0.3 / nrows), s=string, ha="center")
+        fg.fig.text((right + left) / 2, 
+                    (0.1-(0.25/height/nrows)), 
+                    s=string, 
+                    ha="center", 
+                    fontsize=font_scale * 2 * (4.94 + height))
     if sym and scale == "log":
         ticks = [vmin, 1, vmax]
     else:
@@ -876,17 +878,20 @@ def make_heatmap_grid(
     bottom = ax_bottom.get_position().y0
     ax_top = fg.axes[0, -1]
     top = ax_top.get_position().y1
-    height = top - bottom
     right = ax_top.get_position().x1
     ax_left = fg.axes[-1, 0]
     left = ax_left.get_position().x0
-    cax = fg.fig.add_axes([right + 0.005, bottom, (1 - right - 0.005) / 5, height])
+    cax = fg.fig.add_axes([right + 0.005, bottom, (1 - right - 0.005) / 5, top - bottom])
     if plot_ticks:
         if pupsdf["rescale"].any():
             string = "rescaled"
         else:
             string = "pos. [kb]"
-        fg.fig.text((right + left) / 2, bottom - (0.3 / nrows), s=string, ha="center")
+        fg.fig.text((right + left) / 2, 
+                    (0.1-(0.25/height/nrows)), 
+                    s=string, 
+                    ha="center", 
+                    fontsize=font_scale * 2 * (4.94 + height))
     if sym and scale == "log":
         ticks = [vmin, 1, vmax]
     else:
