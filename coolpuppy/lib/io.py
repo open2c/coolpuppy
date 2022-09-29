@@ -167,15 +167,15 @@ def load_pileup_df_list(files, quaich=False, nice_metadata=True, skipstripes=Fal
     """
     pups = pd.concat(
         [load_pileup_df(path, quaich=quaich, skipstripes=skipstripes) for path in files]
-    )
+    ).reset_index(drop=True)
     if nice_metadata:
         pups["norm"] = np.where(
             pups["expected"], ["expected"] * pups.shape[0], ["shifts"] * pups.shape[0]
         ).astype(str)
-        pups["norm"][
-            np.logical_not(np.logical_or(pups["nshifts"] > 0, pups["expected"]))
+        pups.loc[
+            np.logical_not(np.logical_or(pups["nshifts"] > 0, pups["expected"])), "norm"
         ] = "none"
-    return pups.reset_index(drop=False)
+    return pups
 
 
 def save_array_with_header(array, header, filename):
