@@ -1955,7 +1955,7 @@ def pileup(
     groupby: list of str, optional
         Additional columns of features to use for groupby. If feature_format=='bed',
         each columns should be specified twice with suffixes "1" and "2", i.e. if
-        features have a columns "group", specify ["group1", "group2"].
+        features have a column "group", specify ["group1", "group2"].
         The default is [].
     flip_negative_strand : bool, optional
         Flip snippets so the positive strand always points to bottom-right.
