@@ -1999,9 +1999,8 @@ def pileup(
 
     Returns
     -------
-    (pileup_df, annotations) - tuple where the first element is the pandas DataFrame
-    containing the pileups and their grouping information, if any, and the second
-    element is a dict with their shared annotations.
+    pileup_df - pandas DataFrame containing the pileups and their grouping information,
+    if any, all possible annotations from the arguments of this function.
     """
     if by_distance:
         if by_distance is True or by_distance == "default":
