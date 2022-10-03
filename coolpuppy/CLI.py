@@ -6,8 +6,10 @@ from .lib.util import validate_csv
 # from coolpuppy import *
 from coolpuppy._version import __version__
 from cooltools.lib import common, io
+from cooltools.cli.util import sniff_for_header
 import cooler
 import numpy as np
+import pandas as pd
 import bioframe
 import os
 import argparse
@@ -140,23 +142,6 @@ def parse_args_coolpuppy():
         help="""How many diagonals to ignore""",
     )
     parser.add_argument(
-        "--excl_chrs",
-        "--excl-chrs",
-        default="chrY,chrM",
-        type=str,
-        required=False,
-        help="""Exclude these chromosomes from analysis""",
-    )
-    parser.add_argument(
-        "--incl_chrs",
-        "--incl-chrs",
-        default="all",
-        type=str,
-        required=False,
-        help="""Include these chromosomes; default is all.
-                ``--excl_chrs`` overrides this""",
-    )
-    parser.add_argument(
         "--subset",
         default=0,
         type=int,
@@ -196,6 +181,15 @@ def parse_args_coolpuppy():
                 Create a separate pile-up for each distance band. If empty, will use default 
                 (0,50000,100000,200000,...) edges. Specify edges using multiple argument
                 values, e.g. `--by_distance 1000000 2000000` """,
+    )
+    parser.add_argument(
+        "--groupby",
+        nargs="*",
+        required=False,
+        help="""Additional columns of features to use for groupby, space separated. 
+                If feature_format=='bed', each columns should be specified twice with suffixes 
+                '1' and '2', i.e. if features have a column 'group', specify 'group1 group2'.,
+                e.g. --groupby chrom1 chrom2""",
     )
     parser.add_argument(
         "--flip_negative_strand",
@@ -239,22 +233,15 @@ def parse_args_coolpuppy():
         action="store_true",
         default=False,
         required=False,
-        help="""Perform inter-chromosomal (trans) pileups""",
-    )
-    parser.add_argument(
-        "--by-chrom",
-        "--by_chrom",
-        action="store_true",
-        default=False,
-        required=False,
-        help="""Perform by-chromosome pileups for trans interactions""",
+        help="""Perform inter-chromosomal (trans) pileups. 
+                This ignores all contacts in cis.""",
     )
     parser.add_argument(
         "--store_stripes",
         action="store_true",
         default=False,
         required=False,
-        help="""Store horizontal, vertical, and corner stripes in pileup output""",
+        help="""Store horizontal and vertical stripes in pileup output""",
     )
 
     # Rescaling
@@ -288,6 +275,7 @@ def parse_args_coolpuppy():
                 i.e. it will be size×size. Due to technical limitation in the current
                 implementation, has to be an odd number""",
     )
+    # Balancing
     parser.add_argument(
         "--clr_weight_name",
         "--weight_name",
@@ -302,7 +290,20 @@ def parse_args_coolpuppy():
                 Provide empty argument to calculate pileups on raw data
                 (no masking bad pixels).""",
     )
-
+    # Output
+    parser.add_argument(
+        "-o",
+        "--outname",
+        "--output",
+        default="auto",
+        type=str,
+        required=False,
+        help="""Name of the output file.
+                If not set, file is saved in the current directory and the name is
+                generated automatically to include important information and avoid
+                overwriting files generated with different settings.""",
+    )
+    # Technicalities
     parser.add_argument(
         "-p",
         "--nproc",
@@ -318,19 +319,6 @@ def parse_args_coolpuppy():
                 Set to 0 to use all available cores.
                 """,
     )
-    # Output
-    parser.add_argument(
-        "-o",
-        "--outname",
-        default="auto",
-        type=str,
-        required=False,
-        help="""Name of the output file.
-                If not set, file is saved in the current directory and the name is
-                generated automatically to include important information and avoid
-                overwriting files generated with different settings.""",
-    )
-    # Technicalities
     parser.add_argument(
         "--seed",
         default=None,
@@ -405,6 +393,7 @@ def main():
     if args.features != "-":
         bedname, ext = os.path.splitext(os.path.basename(args.features))
         features = args.features
+        buf, names = sniff_for_header(features)
         if args.features_format == "auto":
             schema = ext[1:]
         else:
@@ -416,9 +405,14 @@ def main():
         else:
             dtype = {"chrom1": str, "chrom2": str}
             features_format = "bedpe"
-        features = bioframe.read_table(
-            features, schema=schema, index_col=False, dtype=dtype
-        )
+        if names is not None:
+            features = pd.read_table(
+                buf, header="infer",
+            )
+        else:
+            features = bioframe.read_table(
+                features, schema=schema, index_col=False, dtype=dtype
+            )
     else:
         if args.features_format == "auto":
             raise ValueError(
@@ -431,8 +425,20 @@ def main():
         else:
             features_format = "bedpe"
         bedname = "stdin"
-        features = bioframe.read_table(sys.stdin, schema=schema, index_col=False)
-
+        tmp_file = open("./stdin.tmp", "w")
+        for line in sys.stdin:
+            line.rstrip()
+            tmp_file.write(line)
+        tmp_file.close()
+        buf, names = sniff_for_header("./stdin.tmp")
+        if names is not None:
+            features = pd.read_table(
+                buf, header="infer",
+            )
+        else:
+            features = bioframe.read_table("./stdin.tmp", schema=schema, index_col=False)
+        os.remove("./stdin.tmp")
+        
     if args.view is None:
         # full chromosome case
         view_df = common.make_cooler_view(clr)
@@ -476,23 +482,12 @@ def main():
     else:
         maxdist = args.maxdist
 
-    if args.incl_chrs == "all":
-        incl_chrs = np.array(clr.chromnames).astype(str)
-    else:
-        incl_chrs = args.incl_chrs.split(",")
-
     if args.rescale and args.rescale_size % 2 == 0:
         raise ValueError("Please provide an odd rescale_size")
     if not args.rescale:
         rescale_flank = None
     else:
         rescale_flank = args.rescale_flank
-
-    chroms = np.array(clr.chromnames).astype(str)
-    fchroms = []
-    for chrom in chroms:
-        if chrom not in args.excl_chrs.split(",") and chrom in incl_chrs:
-            fchroms.append(chrom)
 
     if args.by_window:
         if schema != "bed12":
@@ -520,8 +515,7 @@ def main():
         by_window=args.by_window,
         by_strand=args.by_strand,
         by_distance=distance_edges,
-        by_chrom=False,
-        groupby=[],
+        groupby=[] if args.groupby is None else args.groupby,
         flip_negative_strand=args.flip_negative_strand,
         local=args.local,
         coverage_norm=args.coverage_norm,
@@ -558,8 +552,8 @@ def main():
             outname += "_by-strand"
         if args.trans:
             outname += "_trans"
-        if args.by_chrom:
-            outname += "_by-chroms"
+        if args.groupby:
+            outname += f"_by-{'_'.join(args.groupby)}"
         outname += ".clpy"
     else:
         outname = args.outname

@@ -255,7 +255,7 @@ class CoordCreator:
         if self.kind == "bed":
             assert all(
                 [name in self.intervals.columns for name in ["chrom", "start", "end"]]
-            )
+            ), "Column names must include chrom, start, and end"
             self.intervals["chrom"] = self.intervals["chrom"].astype(str)
             self.intervals["center"] = (
                 self.intervals["start"] + self.intervals["end"]
@@ -269,7 +269,7 @@ class CoordCreator:
                     name in self.intervals.columns
                     for name in ["chrom1", "start1", "end1", "chrom2", "start2", "end2"]
                 ]
-            )
+            ), "Column names must include chrom1, start1, end1, chrom2, start2, and end2"
             self.intervals[["chrom1", "chrom2"]] = self.intervals[
                 ["chrom1", "chrom2"]
             ].astype(str)
@@ -1857,7 +1857,6 @@ def pileup(
     by_window=False,
     by_strand=False,
     by_distance=False,
-    by_chrom=False,
     groupby=[],
     flip_negative_strand=False,
     local=False,
@@ -1947,15 +1946,10 @@ def pileup(
             band_edges = np.append([0], 50000 * 2 ** np.arange(30))
         Alternatively, a list of integer values can be given with custom distance edges.
         The default is False.
-    by_chrom : bool, optional
-        Whether to create a separate pileup for each combination of "chrom1", "chrom2"
-        in features. If features_format=='bed', first creates pairwise combinations of
-        of features. Unless trans==True, chrom1 is equal to chrom2.
-        The default is False.
     groupby: list of str, optional
         Additional columns of features to use for groupby. If feature_format=='bed',
         each columns should be specified twice with suffixes "1" and "2", i.e. if
-        features have a columns "group", specify ["group1", "group2"].
+        features have a column "group", specify ["group1", "group2"].
         The default is [].
     flip_negative_strand : bool, optional
         Flip snippets so the positive strand always points to bottom-right.
@@ -2147,7 +2141,6 @@ def pileup(
         pups["by_window"] = True
         pups["by_strand"] = False
         pups["by_distance"] = False
-        pups["by_chrom"] = False
     elif by_strand and by_distance:
         pups = PU.pileupsByStrandByDistanceWithControl(
             nproc=nproc, distance_edges=distance_edges, groupby=groupby
@@ -2155,13 +2148,11 @@ def pileup(
         pups["by_window"] = False
         pups["by_strand"] = True
         pups["by_distance"] = True
-        pups["by_chrom"] = False
     elif by_strand:
         pups = PU.pileupsByStrandWithControl(groupby=groupby)
         pups["by_window"] = False
         pups["by_strand"] = True
         pups["by_distance"] = False
-        pups["by_chrom"] = False
     elif by_distance:
         pups = PU.pileupsByDistanceWithControl(
             nproc=nproc, distance_edges=distance_edges, groupby=groupby
@@ -2169,19 +2160,11 @@ def pileup(
         pups["by_window"] = False
         pups["by_strand"] = False
         pups["by_distance"] = True
-        pups["by_chrom"] = False
-    elif by_chrom:
-        pups = PU.pileupsWithControl(groupby=["chrom1", "chrom2"] + groupby)
-        pups["by_window"] = False
-        pups["by_strand"] = False
-        pups["by_distance"] = False
-        pups["by_chrom"] = True
     else:
         pups = PU.pileupsWithControl(groupby=groupby)
         pups["by_window"] = False
         pups["by_strand"] = False
         pups["by_distance"] = False
-        pups["by_chrom"] = False
     pups["groupby"] = [groupby] * pups.shape[0]
     pups["expected"] = pups["expected"].fillna(False)
     coolname = os.path.splitext(os.path.basename(clr.filename))[0]

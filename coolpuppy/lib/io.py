@@ -7,7 +7,10 @@ import re
 import os
 import yaml
 import io
+import logging
+from coolpuppy._version import __version__
 
+logger = logging.getLogger("coolpuppy")
 
 def save_pileup_df(filename, df, metadata=None, mode="w", compression="lzf"):
     """
@@ -85,6 +88,7 @@ def save_pileup_df(filename, df, metadata=None, mode="w", compression="lzf"):
                 if val is None:
                     val = False
                 group.attrs[key] = val
+        group.attrs["version"] = __version__                    
     return
 
 
@@ -133,7 +137,10 @@ def load_pileup_df(filename, quaich=False, skipstripes=False):
             except KeyError:
                 pass
     for key, val in metadata.items():
-        annotation[key] = val
+        if key != "version":
+            annotation[key] = val
+        elif val != __version__:
+                logger.debug(f"pileup generated with v{val}. Current version is v{__version__}")
     if quaich:
         basename = os.path.basename(filename)
         sample, bedname = re.search(
