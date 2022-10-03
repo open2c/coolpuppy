@@ -272,12 +272,12 @@ def parse_args_plotpuppy():
 def main():
     parser = parse_args_plotpuppy()
     args = parser.parse_args()
-    
+
     logger = logging.getLogger("coolpuppy")
     logger.setLevel(getattr(logging, args.logLevel))
 
     logger.debug(args)
-    
+
     if args.post_mortem:
 
         def _excepthook(exc_type, value, tb):

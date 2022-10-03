@@ -345,9 +345,9 @@ def plot_stripes(
                 cols = "separation"
                 col_order = sort_separation(pupsdf["separation"])
                 ncols = len(col_order)
-                
+
     logger.debug(f"Plotting stripe stackups with {ncols} columns and {nrows} rows")
-                
+
     vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym, scale=scale)
 
     if scale == "log":
@@ -632,11 +632,13 @@ def plot_stripes(
             string = "rescaled"
         else:
             string = "pos. [kb]"
-        fg.fig.text((right + left) / 2, 
-                    (0.05+(0.01*nrows)-(0.25/height/nrows)), 
-                    s=string, 
-                    ha="center", 
-                    fontsize=font_scale * 2 * (4.94 + height))
+        fg.fig.text(
+            (right + left) / 2,
+            (0.05 + (0.01 * nrows) - (0.25 / height / nrows)),
+            s=string,
+            ha="center",
+            fontsize=font_scale * 2 * (4.94 + height),
+        )
     if sym and scale == "log":
         ticks = [vmin, 1, vmax]
     else:
@@ -717,8 +719,8 @@ def plot(
             if "separation" in pupsdf.columns:
                 cols = "separation"
                 col_order = sort_separation(pupsdf["separation"])
-                ncols = len(col_order)     
-                
+                ncols = len(col_order)
+
     logger.debug(f"Plotting pileup with {ncols} columns and {nrows} rows")
 
     vmin, vmax = get_min_max(pupsdf["data"].values, vmin, vmax, sym=sym, scale=scale)
@@ -887,17 +889,21 @@ def plot(
     right = ax_top.get_position().x1
     ax_left = fg.axes[-1, 0]
     left = ax_left.get_position().x0
-    cax = fg.fig.add_axes([right + 0.005, bottom, (1 - right - 0.005) / 5, top - bottom])
+    cax = fg.fig.add_axes(
+        [right + 0.005, bottom, (1 - right - 0.005) / 5, top - bottom]
+    )
     if plot_ticks:
         if pupsdf["rescale"].any():
             string = "rescaled"
         else:
             string = "pos. [kb]"
-        fg.fig.text((right + left) / 2, 
-                    (0.1-(0.25/height/nrows)), 
-                    s=string, 
-                    ha="center", 
-                    fontsize=font_scale * 2 * (4.94 + height))
+        fg.fig.text(
+            (right + left) / 2,
+            (0.1 - (0.25 / height / nrows)),
+            s=string,
+            ha="center",
+            fontsize=font_scale * 2 * (4.94 + height),
+        )
     if sym and scale == "log":
         ticks = [vmin, 1, vmax]
     else:
