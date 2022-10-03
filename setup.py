@@ -26,7 +26,7 @@ else:
         "cooler",
         "numpy>=1.16.5",
         "scipy",
-        "cooltools>=0.5.0,<=5.1",
+        "cooltools>=0.5.0,<=0.5.1",
         "pyyaml",
         "more_itertools",
         "seaborn",
@@ -39,11 +39,11 @@ else:
 setup(
     name="coolpuppy",
     version=verstr,
-    packages=["coolpuppy", "plotpuppy"],
+    packages=["coolpuppy"],
     entry_points={
         "console_scripts": [
             "coolpup.py = coolpuppy.CLI:main",
-            "plotpup.py = plotpuppy.CLI:main",
+            "plotpup.py = coolpuppy.plotpuppy_CLI:main",
             "dividepups.py = coolpuppy.divide_pups_CLI:main",
         ]
     },

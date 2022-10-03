@@ -9,7 +9,7 @@ from coolpuppy.lib import numutils
 from coolpuppy.lib import puputils
 from coolpuppy.lib import io
 
-from plotpuppy.plotpup import make_heatmap_grid, make_heatmap_stripes
+from coolpuppy.plotpup import plot, plot_stripes
 from coolpuppy._version import __version__
 
 import matplotlib
@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import re
 import argparse
+import logging
 
 from natsort import natsorted
 
@@ -240,10 +241,19 @@ def parse_args_plotpuppy():
     parser.add_argument(
         "--output",
         "-o",
+        "--outname",
         type=str,
         required=False,
         default="pup.pdf",
         help="""Where to save the plot""",
+    )
+    parser.add_argument(
+        "-l",
+        "--log",
+        dest="logLevel",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        default="INFO",
+        help="Set the logging level",
     )
     parser.add_argument(
         "--post_mortem",
@@ -262,6 +272,12 @@ def parse_args_plotpuppy():
 def main():
     parser = parse_args_plotpuppy()
     args = parser.parse_args()
+
+    logger = logging.getLogger("coolpuppy")
+    logger.setLevel(getattr(logging, args.logLevel))
+
+    logger.debug(args)
+
     if args.post_mortem:
 
         def _excepthook(exc_type, value, tb):
@@ -329,7 +345,7 @@ def main():
         symmetric = True
 
     if args.stripe:
-        fg = make_heatmap_stripes(
+        fg = plot_stripes(
             pups,
             cols=args.cols,
             rows=args.rows,
@@ -352,7 +368,7 @@ def main():
             lineplot=args.lineplot,
         )
     else:
-        fg = make_heatmap_grid(
+        fg = plot(
             pups,
             cols=args.cols,
             rows=args.rows,
@@ -373,3 +389,4 @@ def main():
         )
 
     plt.savefig(args.output, bbox_inches="tight", dpi=args.dpi)
+    logger.info(f"Saved output to {args.output}")
