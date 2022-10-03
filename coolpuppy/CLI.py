@@ -5,8 +5,8 @@ from .lib.util import validate_csv
 
 # from coolpuppy import *
 from coolpuppy._version import __version__
+from coolpuppy.lib.io import sniff_for_header
 from cooltools.lib import common, io
-from cooltools.cli.util import sniff_for_header
 import cooler
 import numpy as np
 import pandas as pd
@@ -406,10 +406,7 @@ def main():
             dtype = {"chrom1": str, "chrom2": str}
             features_format = "bedpe"
         if names is not None:
-            features = pd.read_table(
-                buf,
-                header="infer",
-            )
+            features = pd.read_table(buf)
         else:
             features = bioframe.read_table(
                 features, schema=schema, index_col=False, dtype=dtype
@@ -426,22 +423,11 @@ def main():
         else:
             features_format = "bedpe"
         bedname = "stdin"
-        tmp_file = open("./stdin.tmp", "w")
-        for line in sys.stdin:
-            line.rstrip()
-            tmp_file.write(line)
-        tmp_file.close()
-        buf, names = sniff_for_header("./stdin.tmp")
+        buf, names = sniff_for_header(sys.stdin)
         if names is not None:
-            features = pd.read_table(
-                buf,
-                header="infer",
-            )
+            features = pd.read_table(buf)
         else:
-            features = bioframe.read_table(
-                "./stdin.tmp", schema=schema, index_col=False
-            )
-        os.remove("./stdin.tmp")
+            features = bioframe.read_table(buf, schema=schema, index_col=False)
 
     if args.view is None:
         # full chromosome case

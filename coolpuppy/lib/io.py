@@ -7,6 +7,7 @@ import re
 import os
 import yaml
 import io
+import csv
 import logging
 from coolpuppy._version import __version__
 
@@ -235,3 +236,31 @@ def load_array_with_header(filename):
     with io.StringIO(data) as f:
         metadata["data"] = np.loadtxt(f)
     return metadata
+
+
+def sniff_for_header(file, sep="\t", comment="#"):
+    """
+    Warning: reads the entire file into a StringIO buffer!
+    """
+    if file is str:
+        with open(file, "r") as f:
+            buf = io.StringIO(f.read())
+    else:
+        buf = io.StringIO(file.read())
+
+    sample_lines = []
+    for line in buf:
+        if not line.startswith(comment):
+            sample_lines.append(line)
+            break
+    for _ in range(10):
+        sample_lines.append(buf.readline())
+    buf.seek(0)
+
+    has_header = csv.Sniffer().has_header("\n".join(sample_lines))
+    if has_header:
+        names = sample_lines[0].strip().split(sep)
+    else:
+        names = None
+
+    return buf, names
