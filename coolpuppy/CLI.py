@@ -407,7 +407,8 @@ def main():
             features_format = "bedpe"
         if names is not None:
             features = pd.read_table(
-                buf, header="infer",
+                buf,
+                header="infer",
             )
         else:
             features = bioframe.read_table(
@@ -433,12 +434,15 @@ def main():
         buf, names = sniff_for_header("./stdin.tmp")
         if names is not None:
             features = pd.read_table(
-                buf, header="infer",
+                buf,
+                header="infer",
             )
         else:
-            features = bioframe.read_table("./stdin.tmp", schema=schema, index_col=False)
+            features = bioframe.read_table(
+                "./stdin.tmp", schema=schema, index_col=False
+            )
         os.remove("./stdin.tmp")
-        
+
     if args.view is None:
         # full chromosome case
         view_df = common.make_cooler_view(clr)
