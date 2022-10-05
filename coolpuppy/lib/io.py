@@ -242,7 +242,7 @@ def sniff_for_header(file, sep="\t", comment="#"):
     """
     Warning: reads the entire file into a StringIO buffer!
     """
-    if type(file) is str:
+    if isinstance(file, str):
         with open(file, "r") as f:
             buf = io.StringIO(f.read())
     else:
