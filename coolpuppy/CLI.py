@@ -552,6 +552,7 @@ def main():
         pups["expected_file"] = expected_path
     if args.view:
         pups["view_file"] = args.view
+    pups["features"] = args.features
     save_pileup_df(outname, pups)
     uninstall_mp_handler()
     logger.info(f"Saved output to {outname}")
