@@ -14,4 +14,3 @@ natsort
 m2r2
 h5sparse
 multiprocessing_logging
-gzip

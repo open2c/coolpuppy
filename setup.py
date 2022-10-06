@@ -34,7 +34,6 @@ else:
         "tables",
         "h5sparse",
         "multiprocessing_logging",
-        "gzip",
     ]
 
 setup(
