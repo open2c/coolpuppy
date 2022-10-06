@@ -7,6 +7,7 @@ import re
 import os
 import yaml
 import io
+import gzip
 import csv
 import logging
 from coolpuppy._version import __version__
@@ -238,13 +239,22 @@ def load_array_with_header(filename):
     return metadata
 
 
+def is_gz_file(filepath):
+    with open(filepath, 'rb') as test_f:
+        return test_f.read(2) == b'\x1f\x8b'
+
+
 def sniff_for_header(file, sep="\t", comment="#"):
     """
     Warning: reads the entire file into a StringIO buffer!
     """
     if isinstance(file, str):
-        with open(file, "r") as f:
-            buf = io.StringIO(f.read())
+        if is_gz_file(file):
+            with gzip.open(file, "rt") as f:
+                buf = io.StringIO(f.read())
+        else:
+            with open(file, "r") as f:
+                buf = io.StringIO(f.read())
     else:
         buf = io.StringIO(file.read())
 

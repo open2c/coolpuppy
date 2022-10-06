@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 from .coolpup import pileup
-from .lib.io import save_pileup_df
+from .lib.io import save_pileup_df, sniff_for_header
 from .lib.util import validate_csv
 
 # from coolpuppy import *
 from coolpuppy._version import __version__
-from coolpuppy.lib.io import sniff_for_header
 from cooltools.lib import common, io
 import cooler
 import numpy as np
