@@ -26,7 +26,7 @@ Use `coolpup.py` command to perform pileups, and `plotpup.py` to visualize them.
 
 ```{eval-rst}
 .. argparse::
-   :module: plotpuppy.CLI
+   :module: coolpuppy.plotpuppy_CLI
    :func: parse_args_plotpuppy
    :prog: plotpup.py
 ```

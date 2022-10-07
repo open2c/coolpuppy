@@ -81,6 +81,7 @@ MOCK_MODULES = [
     "scipy",
     "scipy.linalg",
     "seaborn",
+    "multiprocessing_logging",
 ]
 
 for mod_name in MOCK_MODULES:
