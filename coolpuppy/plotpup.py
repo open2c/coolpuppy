@@ -249,7 +249,7 @@ def add_stripe_lineplot(
         if not rescale.any():
             plt.xticks(ticks_pixels.tolist(), ticks_kbp.tolist())
             ticks_n = np.floor(np.linspace(0, data.values[0].shape[0], 5)).astype(int)
-            plt.yticks(ticks_n, np.append("", np.negative(ticks_n)[1:]))
+            plt.yticks(ticks_n, np.append("", -np.negative(ticks_n)[1:]))
     else:
         plt.xticks([], [])
         plt.yticks([], [])
