@@ -22,8 +22,6 @@ import re
 import argparse
 import logging
 
-from natsort import natsorted
-
 import sys
 import pdb, traceback
 
@@ -131,10 +129,16 @@ def parse_args_plotpuppy():
     #             If 0, automatically make the figure as square as possible""",
     # )
     parser.add_argument(
-        "--cols", type=str, required=False, help="""Which value to map as columns""",
+        "--cols",
+        type=str,
+        required=False,
+        help="""Which value to map as columns""",
     )
     parser.add_argument(
-        "--rows", type=str, required=False, help="""Which value to map as rows""",
+        "--rows",
+        type=str,
+        required=False,
+        help="""Which value to map as rows""",
     )
     parser.add_argument(
         "--col_order",
