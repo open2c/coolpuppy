@@ -43,10 +43,10 @@ functions directly in Python code to perform pileups.
    :show-inheritance:
 ```
 
-## plotpuppy.plotpup module
+## coolpuppy.plotpup module
 
 ```{eval-rst}
-.. automodule:: plotpuppy.plotpup
+.. automodule:: coolpuppy.plotpup
    :members:
    :undoc-members:
    :show-inheritance:
