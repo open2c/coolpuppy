@@ -130,8 +130,8 @@ class CoordCreator:
         flank=100000,
         rescale_flank=None,
         chroms="all",
-        minshift=10**5,
-        maxshift=10**6,
+        minshift=10 ** 5,
+        maxshift=10 ** 6,
         nshifts=10,
         mindist="auto",
         maxdist=None,
@@ -363,13 +363,7 @@ class CoordCreator:
                 sign2 = np.random.choice([-1, 1], control_intervals.shape[0])
                 shift2 = shift2 * sign2
                 control_intervals[["exp_start1", "exp_end1", "center1"]] = (
-                    control_intervals[
-                        [
-                            "exp_start1",
-                            "exp_end1",
-                            "center1",
-                        ]
-                    ]
+                    control_intervals[["exp_start1", "exp_end1", "center1",]]
                     + shift[:, np.newaxis]
                 )
                 control_intervals[["exp_start2", "exp_end2", "center2"]] = (
@@ -747,13 +741,7 @@ class CoordCreator:
         intervals = assign_groups(intervals, groupby)
         intervals = intervals.reindex(
             columns=list(intervals.columns)
-            + [
-                "data",
-                "cov_start",
-                "cov_end",
-                "horizontal_stripe",
-                "vertical_stripe",
-            ]
+            + ["data", "cov_start", "cov_end", "horizontal_stripe", "vertical_stripe",]
         )
         if not len(intervals) >= 1:
             logger.debug("Empty selection")
@@ -891,9 +879,7 @@ class PileUpper:
                         "trans",
                         self.view_df,
                         verify_cooler=clr,
-                        expected_value_cols=[
-                            self.expected_value_col,
-                        ],
+                        expected_value_cols=[self.expected_value_col,],
                         raise_errors=True,
                     )
                 except Exception as e:
@@ -911,9 +897,7 @@ class PileUpper:
                         "cis",
                         self.view_df,
                         verify_cooler=clr,
-                        expected_value_cols=[
-                            self.expected_value_col,
-                        ],
+                        expected_value_cols=[self.expected_value_col,],
                         raise_errors=True,
                     )
                 except Exception as e:
@@ -1015,9 +999,7 @@ class PileUpper:
         ].item()
         return exp_value
 
-    def make_outmap(
-        self,
-    ):
+    def make_outmap(self,):
         """Generate zero-filled array of the right shape
 
         Returns
@@ -1287,9 +1269,7 @@ class PileUpper:
         if self.control or (self.expected and not self.ooe):
             if "all" not in outdict["control"]:
                 outdict["control"]["all"] = reduce(
-                    sum_func,
-                    outdict["control"].values(),
-                    self.empty_pup,
+                    sum_func, outdict["control"].values(), self.empty_pup,
                 )
         return outdict
 
@@ -1614,8 +1594,7 @@ class PileUpper:
         if nproc is None:
             nproc = self.nproc
         normalized_pileups = self.pileupsWithControl(
-            nproc=nproc,
-            groupby=["strand1", "strand2"] + groupby,
+            nproc=nproc, groupby=["strand1", "strand2"] + groupby,
         )
         normalized_pileups.insert(
             0,
@@ -1627,8 +1606,7 @@ class PileUpper:
         return normalized_pileups
 
     def pileupsByWindowWithControl(
-        self,
-        nproc=None,
+        self, nproc=None,
     ):
         """Perform by-window (i.e. for each region) pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl
@@ -1846,8 +1824,8 @@ def pileup(
     expected_value_col="balanced.avg",
     clr_weight_name="weight",
     flank=100000,
-    minshift=10**5,
-    maxshift=10**6,
+    minshift=10 ** 5,
+    maxshift=10 ** 6,
     nshifts=0,
     ooe=True,
     mindist="auto",
@@ -2032,10 +2010,7 @@ def pileup(
         # verify view is compatible with cooler
         try:
             _ = checks.is_compatible_viewframe(
-                view_df,
-                clr,
-                check_sorting=True,
-                raise_errors=True,
+                view_df, clr, check_sorting=True, raise_errors=True,
             )
         except Exception as e:
             raise ValueError("view_df is not a valid viewframe or incompatible") from e
@@ -2057,9 +2032,7 @@ def pileup(
                     "trans",
                     view_df,
                     verify_cooler=clr,
-                    expected_value_cols=[
-                        expected_value_col,
-                    ],
+                    expected_value_cols=[expected_value_col,],
                     raise_errors=True,
                 )
             except Exception as e:
@@ -2071,9 +2044,7 @@ def pileup(
                     "cis",
                     view_df,
                     verify_cooler=clr,
-                    expected_value_cols=[
-                        expected_value_col,
-                    ],
+                    expected_value_cols=[expected_value_col,],
                     raise_errors=True,
                 )
             except Exception as e:

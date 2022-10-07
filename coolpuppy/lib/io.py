@@ -240,8 +240,8 @@ def load_array_with_header(filename):
 
 
 def is_gz_file(filepath):
-    with open(filepath, 'rb') as test_f:
-        return test_f.read(2) == b'\x1f\x8b'
+    with open(filepath, "rb") as test_f:
+        return test_f.read(2) == b"\x1f\x8b"
 
 
 def sniff_for_header(file, sep="\t", comment="#"):
