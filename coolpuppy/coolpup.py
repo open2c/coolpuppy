@@ -1431,11 +1431,12 @@ class PileUpper:
             extra_sum_funcs=extra_sum_funcs,
         )
         if nproc > 1:
-            from multiprocessing_logging import install_mp_handler
+            from multiprocessing_logging import install_mp_handler, uninstall_mp_handler
 
             install_mp_handler()
             with Pool(nproc) as p:
                 pileups = list(p.starmap(f, zip(regions1, regions2)))
+            uninstall_mp_handler()
         else:
             pileups = list(map(f, regions1, regions2))
         roi = (

@@ -13,7 +13,6 @@ import bioframe
 import os
 import argparse
 import logging
-from multiprocessing_logging import install_mp_handler, uninstall_mp_handler
 
 import sys
 import pdb, traceback
@@ -370,7 +369,6 @@ def main():
 
     logger = logging.getLogger("coolpuppy")
     logger.setLevel(getattr(logging, args.logLevel))
-    install_mp_handler()
 
     logger.debug(args)
 
@@ -549,5 +547,4 @@ def main():
         pups["view_file"] = args.view
     pups["features"] = args.features
     save_pileup_df(outname, pups)
-    uninstall_mp_handler()
     logger.info(f"Saved output to {outname}")
