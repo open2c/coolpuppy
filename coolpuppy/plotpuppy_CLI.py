@@ -22,8 +22,6 @@ import re
 import argparse
 import logging
 
-from natsort import natsorted
-
 import sys
 import pdb, traceback
 

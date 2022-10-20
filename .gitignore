@@ -108,3 +108,4 @@ tests/test_*.pdf
 .vscode/
 docs/Examples/*.clpy
 
+.DS_Store

@@ -15,10 +15,6 @@ import argparse
 import logging
 from multiprocessing_logging import install_mp_handler, uninstall_mp_handler
 
-try:
-    from collections.abc import Iterable
-except ImportError:
-    from collections import Iterable
 import sys
 import pdb, traceback
 

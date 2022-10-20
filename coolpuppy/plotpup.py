@@ -277,10 +277,7 @@ def add_score(score, height=1, color=None, font_scale=1):
 def sort_separation(sep_string_series, sep="Mb"):
     s = set(sep_string_series.dropna())
     s.discard("all")
-    return sorted(
-        s,
-        key=lambda x: float(x.split(sep)[0]),
-    )
+    return sorted(s, key=lambda x: float(x.split(sep)[0]),)
 
 
 def plot_stripes(
@@ -453,9 +450,7 @@ def plot_stripes(
         col_order=col_order,
         margin_titles=True,
         height=height,
-        gridspec_kws={
-            "right": right,
-        },
+        gridspec_kws={"right": right,},
         **kwargs,
     )
 
@@ -744,9 +739,7 @@ def plot(
         margin_titles=True,
         aspect=1,
         height=height,
-        gridspec_kws={
-            "right": right,
-        },
+        gridspec_kws={"right": right,},
         **kwargs,
     )
     norm = norm(vmin, vmax)
