@@ -810,10 +810,10 @@ class PileUpper:
         coverage_norm : bool or str, optional
             Whether to normalize final the final pileup by accumulated coverage as an
             alternative to balancing. Useful for single-cell Hi-C data. Can be either
-            boolean, or string: "cis" or "total" to use "cis_raw_cov" or "tot_raw_cov"
+            boolean, or string: "cis" or "total" to use "cov_cis_raw" or "cov_tot_raw"
             columns in the cooler bin table, respectively. If True, will attempt to use
-            "tot_raw_cov" if available, otherwise will compute and store coverage in the
-            cooler with default column names, and use "tot_raw_cov". Alternatively, if
+            "cov_tot_raw" if available, otherwise will compute and store coverage in the
+            cooler with default column names, and use "cov_tot_raw". Alternatively, if
             a different string is provided, will attempt to use a column with the that
             name in the cooler bin table, and will raise a ValueError if it does not exist.
             Only allowed when clr_weight_name is False.
@@ -948,18 +948,18 @@ class PileUpper:
                 raise ValueError("Trying to do trans with fewer than two chromosomes")
 
         if self.coverage_norm is True:
-            self.coverage_norm = "tot_raw_cov"
+            self.coverage_norm = "cov_tot_raw"
         elif self.coverage_norm == "cis":
-            self.coverage_norm = "cis_raw_cov"
+            self.coverage_norm = "cov_cis_raw"
         elif self.coverage_norm == "total":
-            self.coverage_norm = "tot_raw_cov"
+            self.coverage_norm = "cov_tot_raw"
         elif self.coverage_norm and self.coverage_norm not in self.clr.bins().columns:
             raise ValueError(
                 f"coverage_norm {self.coverage_norm} not found in cooler bins"
             )
 
         if (
-            self.coverage_norm in ["cis_raw_cov", "tot_raw_cov"]
+            self.coverage_norm in ["cov_cis_raw", "cov_tot_raw"]
             and self.coverage_norm not in self.clr.bins().columns
         ):
             with Pool(self.nproc) as pool:
@@ -1956,10 +1956,10 @@ def pileup(
     coverage_norm : bool or str, optional
         Whether to normalize final the final pileup by accumulated coverage as an
         alternative to balancing. Useful for single-cell Hi-C data. Can be either
-        boolean, or string: "cis" or "total" to use "cis_raw_cov" or "tot_raw_cov"
+        boolean, or string: "cis" or "total" to use "cov_cis_raw" or "cov_tot_raw"
         columns in the cooler bin table, respectively. If True, will attempt to use
-        "tot_raw_cov" if available, otherwise will compute and store coverage in the
-        cooler with default column names, and use "tot_raw_cov". Alternatively, if
+        "cov_tot_raw" if available, otherwise will compute and store coverage in the
+        cooler with default column names, and use "cov_tot_raw". Alternatively, if
         a different string is provided, will attempt to use a column with the that
         name in the cooler bin table, and will raise a ValueError if it does not exist.
         Only allowed when clr_weight_name is False.
