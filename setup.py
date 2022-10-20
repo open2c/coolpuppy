@@ -39,7 +39,7 @@ else:
 setup(
     name="coolpuppy",
     version=verstr,
-    packages=["coolpuppy"],
+    packages=["coolpuppy", "coolpuppy.lib"],
     entry_points={
         "console_scripts": [
             "coolpup.py = coolpuppy.CLI:main",
