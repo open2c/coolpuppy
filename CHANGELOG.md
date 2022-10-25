@@ -11,7 +11,7 @@ This is a major release with a lot of changes. The main ones are included below,
 
 * New “user-facing” `pileup` function in python API for convenient single-step pileups, and with interface similar to `cooltools.pileup`
 
-* Pileups can be restricted using a genomic `view` in line with cooltools/bioframe (note that the expected has to be calculated for the same view, if used)
+* Pileups can be restricted using a genomic view (`--view` in CLI and `view_df` in API) in line with cooltools/bioframe (note that the expected has to be calculated for the same view, if used)
 
 * If using expected, by default each snippet is now normalized to expected and only averaged afterwards; this is controlled by `ooe` argument in API and `--not-ooe` argument in CLI)
 
@@ -21,9 +21,9 @@ This is a major release with a lot of changes. The main ones are included below,
 
 * Added option to groupby snippets by their properties and generate multiple pileups in one run (`groupby` in API and `--groupby` in CLI)
 
-* Added option `trans=True` (API) and `–trans` (CLI)  to generate inter-chromosomal (trans) pileups
+* Added option `trans=True` (API) and `--trans` (CLI)  to generate inter-chromosomal (trans) pileups
 
-* Added option `store_stripes=True` (API) and `–store_stripes` (CLI) to store individual vertical and horizontal stripe pairs
+* Added option `store_stripes=True` (API) and `--store_stripes` (CLI) to store individual vertical and horizontal stripe pairs
 
 * Added advanced option (`modify_2Dintervals_func` of `PileUpper.pileupsWithControls`) to apply an arbitrary function to pairs of intervals before they are used for generating pileups (i.e. bedpe-style intervals generated internally from either bedpe- or bed-style input features)
 
@@ -37,8 +37,8 @@ This is a major release with a lot of changes. The main ones are included below,
 
 ### Plotting changes
 * Changed names of `plotpup.make_heatmap_grid()` to `plotpup.plot()`
-* Added option `plotpup.plot_stripes()` (API) and `–stripe` (CLI) for plotting stripes
-* Added option `–divide_pups` (CLI) to plot the ratio of two pileups
+* Added option `plotpup.plot_stripes()` (API) and `--stripe` (CLI) for plotting stripes
+* Added option `--divide_pups` (CLI) to plot the ratio of two pileups
 
 ### Documentation
 * Extensive tutorials for both python API and CLI
