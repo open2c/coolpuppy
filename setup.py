@@ -17,6 +17,13 @@ if mo:
 else:
     raise RuntimeError("Unable to find version string in %s." % (VERSIONFILE,))
 
+def _read(*parts, **kwargs):
+    filepath = os.path.join(os.path.dirname(__file__), *parts)
+    encoding = kwargs.pop("encoding", "utf-8")
+    with io.open(filepath, encoding=encoding) as fh:
+        text = fh.read()
+    return text
+    
 def get_requirements(path):
     content = _read(path)
     return [
