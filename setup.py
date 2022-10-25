@@ -1,6 +1,7 @@
 from setuptools import setup
 import os
 from os import path
+import io
 
 this_directory = path.abspath(path.dirname(__file__))
 with open(path.join(this_directory, "README.md"), encoding="utf-8") as f:
@@ -17,13 +18,15 @@ if mo:
 else:
     raise RuntimeError("Unable to find version string in %s." % (VERSIONFILE,))
 
+
 def _read(*parts, **kwargs):
     filepath = os.path.join(os.path.dirname(__file__), *parts)
     encoding = kwargs.pop("encoding", "utf-8")
     with io.open(filepath, encoding=encoding) as fh:
         text = fh.read()
     return text
-    
+
+
 def get_requirements(path):
     content = _read(path)
     return [
@@ -38,7 +41,7 @@ setup_requires = [
     "numpy",
 ]
 
-   
+
 on_rtd = os.environ.get("READTHEDOCS") == "True"
 if on_rtd:
     INSTALL_REQUIRES = []
