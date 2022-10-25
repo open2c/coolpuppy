@@ -15,7 +15,7 @@ This is a major release with a lot of changes. The main ones are included below,
 
 * If using expected, by default each snippet is now normalized to expected and only averaged afterwards; this is controlled by `ooe` argument in API and `--not-ooe` argument in CLI)
 
-* Added options to split snippets based on strands, genomic distance, or both; or based on their chromosomes
+* Added options to split snippets based on strands, genomic distance, or both
 
 * Added option `flip_negative_strand` (API) and `--flip-negative-strand` (CLI) to flip features located on the negative strand
 
