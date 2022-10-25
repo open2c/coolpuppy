@@ -17,24 +17,26 @@ if mo:
 else:
     raise RuntimeError("Unable to find version string in %s." % (VERSIONFILE,))
 
+def get_requirements(path):
+    content = _read(path)
+    return [
+        req
+        for req in content.split("\n")
+        if req != "" and not (req.startswith("#") or req.startswith("-"))
+    ]
+
+
+setup_requires = [
+    "cython",
+    "numpy",
+]
+
+   
 on_rtd = os.environ.get("READTHEDOCS") == "True"
 if on_rtd:
     INSTALL_REQUIRES = []
 else:
-    INSTALL_REQUIRES = [
-        "Cython",
-        "cooler",
-        "numpy>=1.16.5",
-        "scipy",
-        "cooltools>=0.5.1",
-        "pyyaml",
-        "more_itertools",
-        "seaborn",
-        "natsort",
-        "tables",
-        "h5sparse",
-        "multiprocessing_logging",
-    ]
+    INSTALL_REQUIRES = get_requirements("requirements.txt")
 
 setup(
     name="coolpuppy",
@@ -47,6 +49,7 @@ setup(
             "dividepups.py = coolpuppy.divide_pups_CLI:main",
         ]
     },
+    setup_requires=setup_requires,
     install_requires=INSTALL_REQUIRES,
     python_requires=">=3.6",
     description="A versatile tool to perform pile-up analysis on Hi-C data in .cool format.",
