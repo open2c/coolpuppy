@@ -317,6 +317,8 @@ def plot_stripes(
         col_order = list(set(pupsdf[cols].dropna()))
         ncols = len(col_order)
     elif col_order is not None:
+        if isinstance(col_order, str):
+            col_order = [col_order]
         ncols = len(col_order)
     else:
         ncols = 1
@@ -328,6 +330,8 @@ def plot_stripes(
         row_order = list(set(pupsdf[rows].dropna()))
         nrows = len(row_order)
     elif row_order is not None:
+        if isinstance(row_order, str):
+            row_order = [col_order]
         nrows = len(row_order)
     else:
         nrows = 1
@@ -691,6 +695,8 @@ def plot(
         col_order = list(set(pupsdf[cols].dropna()))
         ncols = len(col_order)
     elif col_order is not None:
+        if isinstance(col_order, str):
+            col_order = [col_order]
         ncols = len(col_order)
     else:
         ncols = 1
@@ -702,6 +708,8 @@ def plot(
         row_order = list(set(pupsdf[rows].dropna()))
         nrows = len(row_order)
     elif row_order is not None:
+        if isinstance(row_order, str):
+            row_order = [col_order]
         nrows = len(row_order)
     else:
         nrows = 1
