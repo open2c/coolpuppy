@@ -13,7 +13,6 @@ import bioframe
 import os
 import argparse
 import logging
-from multiprocessing_logging import install_mp_handler, uninstall_mp_handler
 
 import sys
 import pdb, traceback
@@ -214,7 +213,7 @@ def parse_args_coolpuppy():
         help="""
             Normalize the final pileup by accumulated coverage as an alternative to balancing.
             Useful for single-cell Hi-C data. Can be a string: "cis" or "total" to use 
-            "cis_raw_cov" or "tot_raw_cov" columns in the cooler bin table, respectively.
+            "cov_cis_raw" or "cov_tot_raw" columns in the cooler bin table, respectively.
             If they are not present, will calculate coverage with same ignore_diags as
             used in coolpup.py and store result in the cooler.
             Alternatively, if a different string is provided, will attempt to use a
@@ -370,7 +369,6 @@ def main():
 
     logger = logging.getLogger("coolpuppy")
     logger.setLevel(getattr(logging, args.logLevel))
-    install_mp_handler()
 
     logger.debug(args)
 
@@ -549,5 +547,4 @@ def main():
         pups["view_file"] = args.view
     pups["features"] = args.features
     save_pileup_df(outname, pups)
-    uninstall_mp_handler()
     logger.info(f"Saved output to {outname}")
