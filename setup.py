@@ -41,7 +41,6 @@ setup_requires = [
     "numpy",
 ]
 
-
 on_rtd = os.environ.get("READTHEDOCS") == "True"
 if on_rtd:
     INSTALL_REQUIRES = []
@@ -61,7 +60,7 @@ setup(
     },
     setup_requires=setup_requires,
     install_requires=INSTALL_REQUIRES,
-    python_requires=">=3.6",
+    python_requires=">=3.8",
     description="A versatile tool to perform pile-up analysis on Hi-C data in .cool format.",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -73,6 +72,10 @@ setup(
     author_email="flyamer@gmail.com",
     classifiers=[
         "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
