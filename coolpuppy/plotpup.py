@@ -331,7 +331,7 @@ def plot_stripes(
         nrows = len(row_order)
     elif row_order is not None:
         if isinstance(row_order, str):
-            row_order = [col_order]
+            row_order = [row_order]
         nrows = len(row_order)
     else:
         nrows = 1
@@ -709,7 +709,7 @@ def plot(
         nrows = len(row_order)
     elif row_order is not None:
         if isinstance(row_order, str):
-            row_order = [col_order]
+            row_order = [row_order]
         nrows = len(row_order)
     else:
         nrows = 1
