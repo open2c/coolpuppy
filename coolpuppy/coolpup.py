@@ -331,6 +331,17 @@ class CoordCreator:
 
         self.intervals = self._binnify(self.intervals)
 
+        if self.kind == "bed":
+            dups = self.intervals.duplicated(subset=["stBin", "endBin"])
+        else:
+            dups = self.intervals.duplicated(
+                subset=["stBin1", "endBin1", "stBin2", "endBin2"]
+            )
+        if dups.any():
+            logger.debug(
+                f"{'{:.2f}'.format(dups.mean()*100)}% of intervals fall within the same bin as another interval. These are all included in the pileup."
+            )
+
         if self.trans & self.local:
             raise ValueError("Cannot do local with trans=True")
 

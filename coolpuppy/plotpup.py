@@ -208,12 +208,10 @@ def add_stripe_lineplot(
     resolution = int(resolution)
     ticks_pixels = np.linspace(0, flank * 2 // resolution, 5)
     ticks_kbp = ((ticks_pixels - ticks_pixels[-1] / 2) * resolution // 1000).astype(int)
-    mean = (
-        np.nansum(data.values[0] / data.values[0].shape[1], axis=0)
-        / data.values[0].shape[0]
-    )
+    mean = np.nanmean(data.values[0], axis=0)
     if scale == "log":
-        mean = np.log(mean + 1)
+        mean = np.log(mean)
+        mean = np.where(mean == -np.inf, 0, mean)
     kbp = np.linspace(-flank, flank, int(flank / resolution * 2 + 1)) / 1000
     ax2 = plt.subplot(gs[0])
     ax2.plot(kbp, mean)
@@ -277,7 +275,10 @@ def add_score(score, height=1, color=None, font_scale=1):
 def sort_separation(sep_string_series, sep="Mb"):
     s = set(sep_string_series.dropna())
     s.discard("all")
-    return sorted(s, key=lambda x: float(x.split(sep)[0]),)
+    return sorted(
+        s,
+        key=lambda x: float(x.split(sep)[0]),
+    )
 
 
 def plot_stripes(
@@ -454,7 +455,9 @@ def plot_stripes(
         col_order=col_order,
         margin_titles=True,
         height=height,
-        gridspec_kws={"right": right,},
+        gridspec_kws={
+            "right": right,
+        },
         **kwargs,
     )
 
@@ -479,6 +482,8 @@ def plot_stripes(
                 "rescale",
                 "rescale_flank",
                 scale=scale,
+                norm=norm,
+                cmap=cmap,
                 aspect=aspect,
                 height=height,
                 plot_ticks=plot_ticks,
@@ -747,7 +752,9 @@ def plot(
         margin_titles=True,
         aspect=1,
         height=height,
-        gridspec_kws={"right": right,},
+        gridspec_kws={
+            "right": right,
+        },
         **kwargs,
     )
     norm = norm(vmin, vmax)
