@@ -272,5 +272,7 @@ def sniff_for_header(file, sep="\t", comment="#"):
         names = sample_lines[0].strip().split(sep)
     else:
         names = None
+    
+    ncols = len(sample_lines[0].strip().split(sep))
 
-    return buf, names
+    return buf, names, ncols

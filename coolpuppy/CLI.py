@@ -386,7 +386,7 @@ def main():
     if args.features != "-":
         bedname, ext = os.path.splitext(os.path.basename(args.features))
         features = args.features
-        buf, names = sniff_for_header(features)
+        buf, names, ncols = sniff_for_header(features)
         if args.features_format == "auto":
             schema = ext[1:]
         else:
@@ -394,15 +394,28 @@ def main():
         if schema == "bed":
             schema = "bed12"
             features_format = "bed"
-            dtype = {"chrom": str}
+            dtypes = {"chrom": str,
+                      "start": np.int64,
+                      "end": np.int64,}
         else:
-            dtype = {"chrom1": str, "chrom2": str}
             features_format = "bedpe"
+            dtypes = {
+                "chrom1": str,
+                "start1": np.int64,
+                "end1": np.int64,
+                "chrom2": str,
+                "start2": np.int64,
+                "end2": np.int64,
+            }
+        if (features_format == "bedpe") & (ncols < 6):
+            raise ValueError("Too few columns")
+        elif ncols < 3:
+            raise ValueError("Too few columns")
         if names is not None:
-            features = pd.read_table(buf)
+            features = pd.read_table(buf, dtype=dtypes)
         else:
             features = bioframe.read_table(
-                features, schema=schema, index_col=False, dtype=dtype
+                features, schema=schema, index_col=False, dtype=dtypes
             )
     else:
         if args.features_format == "auto":
@@ -413,14 +426,30 @@ def main():
         if schema == "bed":
             schema = "bed12"
             features_format = "bed"
+            dtypes = {"chrom": str,
+                      "start": np.int64,
+                      "end": np.int64,}
         else:
             features_format = "bedpe"
+            dtypes = {
+                "chrom1": str,
+                "start1": np.int64,
+                "end1": np.int64,
+                "chrom2": str,
+                "start2": np.int64,
+                "end2": np.int64,
+            }
         bedname = "stdin"
-        buf, names = sniff_for_header(sys.stdin)
+        buf, names, ncols = sniff_for_header(sys.stdin)
+        if (features_format == "bedpe") & (ncols < 6):
+            raise ValueError("Too few columns")
+        elif ncols < 3:
+            raise ValueError("Too few columns")
         if names is not None:
-            features = pd.read_table(buf)
+            features = pd.read_table(buf, dtype=dtypes)
         else:
-            features = bioframe.read_table(buf, schema=schema, index_col=False)
+            features = bioframe.read_table(buf, schema=schema, index_col=False, dtype=dtypes)
+        
 
     if args.view is None:
         # full chromosome case
