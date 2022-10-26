@@ -332,20 +332,15 @@ class CoordCreator:
         self.intervals = self._binnify(self.intervals)
 
         if self.kind == "bed":
-            dups = self.intervals[
-                self.intervals.duplicated(subset=["stBin", "endBin"])
-            ].shape[0]
+            dups = self.intervals.duplicated(subset=["stBin", "endBin"])
         else:
-            dups = self.intervals[
-                self.intervals.duplicated(
-                    subset=["stBin1", "endBin1", "stBin2", "endBin2"]
-                )
-            ].shape[0]
-        if dups > 0:
-            logger.debug(
-                f"There are {dups} intervals overlapping the same bins. These are not removed."
+            dups = self.intervals.duplicated(
+                subset=["stBin1", "endBin1", "stBin2", "endBin2"]
             )
-        del dups
+        if dups.any():
+            logger.debug(
+                f"{'{:.2f}'.format(dups.mean()*100)}% of intervals overlap bins. These are not removed."
+            )
 
         if self.trans & self.local:
             raise ValueError("Cannot do local with trans=True")
