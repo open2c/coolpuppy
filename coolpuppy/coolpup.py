@@ -339,7 +339,7 @@ class CoordCreator:
             )
         if dups.any():
             logger.debug(
-                f"{'{:.2f}'.format(dups.mean()*100)}% of intervals overlap bins. These are not removed."
+                f"{'{:.2f}'.format(dups.mean()*100)}% of intervals fall within the same bin as another interval. These are all included in the pileup."
             )
 
         if self.trans & self.local:
