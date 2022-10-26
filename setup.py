@@ -1,6 +1,7 @@
 from setuptools import setup
 import os
 from os import path
+import io
 
 this_directory = path.abspath(path.dirname(__file__))
 with open(path.join(this_directory, "README.md"), encoding="utf-8") as f:
@@ -17,24 +18,34 @@ if mo:
 else:
     raise RuntimeError("Unable to find version string in %s." % (VERSIONFILE,))
 
+
+def _read(*parts, **kwargs):
+    filepath = os.path.join(os.path.dirname(__file__), *parts)
+    encoding = kwargs.pop("encoding", "utf-8")
+    with io.open(filepath, encoding=encoding) as fh:
+        text = fh.read()
+    return text
+
+
+def get_requirements(path):
+    content = _read(path)
+    return [
+        req
+        for req in content.split("\n")
+        if req != "" and not (req.startswith("#") or req.startswith("-"))
+    ]
+
+
+setup_requires = [
+    "cython",
+    "numpy",
+]
+
 on_rtd = os.environ.get("READTHEDOCS") == "True"
 if on_rtd:
     INSTALL_REQUIRES = []
 else:
-    INSTALL_REQUIRES = [
-        "Cython",
-        "cooler",
-        "numpy>=1.16.5",
-        "scipy",
-        "cooltools>=0.5.0,<=0.5.1",
-        "pyyaml",
-        "more_itertools",
-        "seaborn",
-        "natsort",
-        "tables",
-        "h5sparse",
-        "multiprocessing_logging",
-    ]
+    INSTALL_REQUIRES = get_requirements("requirements.txt")
 
 setup(
     name="coolpuppy",
@@ -47,8 +58,9 @@ setup(
             "dividepups.py = coolpuppy.divide_pups_CLI:main",
         ]
     },
+    setup_requires=setup_requires,
     install_requires=INSTALL_REQUIRES,
-    python_requires=">=3.6",
+    python_requires=">=3.8",
     description="A versatile tool to perform pile-up analysis on Hi-C data in .cool format.",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -60,6 +72,10 @@ setup(
     author_email="flyamer@gmail.com",
     classifiers=[
         "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],

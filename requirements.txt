@@ -4,10 +4,10 @@ cooler
 numpy>=1.16.5
 pandas
 scipy
-cooltools>=0.5,<=0.5.1
+cooltools>=0.5.2
 pyyaml
 more_itertools
-bioframe>=0.3
+bioframe>=0.3.3
 matplotlib
 seaborn
 natsort
