@@ -24,7 +24,7 @@ A clear and concise description of what you expected to happen.
 What results you got, whether it was an error or an unexpected output.
 
 **System**
-- OS: [e.g. iOS]
+- OS: [e.g. Linux, macOS]
 - Python version
 
 **Additional context**
