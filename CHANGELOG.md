@@ -52,3 +52,4 @@ This is a major release with a lot of changes. The main ones are included below,
 
 ### Miscellaneous
 * Logging has been fixed so the --logLevel properly works
+* Removed the launch_pileups.sh script
