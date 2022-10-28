@@ -519,7 +519,8 @@ def plot_stripes(
         )
     if plot_ticks:
         fg.fig.subplots_adjust(wspace=0.2, hspace=0.05)
-        fg.set_titles(col_template="", row_template="")
+        if not lineplot:
+            fg.set_titles(col_template="", row_template="")
         if nrows > 1 and ncols > 1:
             for (row_val, col_val), ax in fg.axes_dict.items():
                 if row_val == row_order[0]:
@@ -547,7 +548,7 @@ def plot_stripes(
         if not lineplot:
             fg.map(lambda color: plt.gca().set_xticks([]))
             fg.map(lambda color: plt.gca().set_yticks([]))
-        fg.set_titles(col_template="", row_template="")
+            fg.set_titles(col_template="", row_template="")
         if nrows > 1 and ncols > 1:
             for (row_val, col_val), ax in fg.axes_dict.items():
                 if row_val == row_order[-1]:
