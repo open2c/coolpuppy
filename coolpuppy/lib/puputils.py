@@ -133,7 +133,7 @@ def divide_pups(pup1, pup2):
         "data",
         "horizontal_stripe",
         "vertical_stripe",
-        "cool_path",
+        "cooler",
         "features",
         "outname",
         "coordinates",
