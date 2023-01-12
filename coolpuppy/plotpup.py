@@ -780,9 +780,11 @@ def plot(
     )
 
     if score:
-        pupsdf["score"] = pupsdf.apply(
-            puputils.get_score, center=center, ignore_central=ignore_central, axis=1
-        )
+        if score is True:
+            score = "score"
+            pupsdf[score] = pupsdf.apply(
+                puputils.get_score, center=center, ignore_central=ignore_central, axis=1
+            )
         fg.map(add_score, "score", height=height, font_scale=font_scale)
 
     if plot_ticks:
