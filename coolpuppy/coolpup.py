@@ -1241,7 +1241,7 @@ class PileUpper:
                 snip["data"], (self.rescale_size, self.rescale_size)
             )
             nanzoom = ctutils.zoom_array(nans, (self.rescale_size, self.rescale_size))
-            snip["data"][np.floor(nanzoom).astype(bool)] = np.nan
+            snip["data"][np.ceil(nanzoom).astype(bool)] = np.nan
             snip["data"] = snip["data"] * (1 / np.isfinite(nanzoom))
         if self.coverage_norm:
             snip["cov_start"] = ctutils.zoom_array(
