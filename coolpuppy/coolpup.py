@@ -806,6 +806,8 @@ class PileUpper:
         expected : DataFrame, optional
             If using expected, pandas DataFrame with by-distance expected.
             The default is False.
+        expected_value_col : str, optional
+            Which column in the expected_df contains values to use for normalization
         view_df : DataFrame
             A dataframe with region coordinates used in expected (see bioframe
             documentation for details). Can be ommited if no expected is provided, or
@@ -925,7 +927,8 @@ class PileUpper:
                 except Exception as e:
                     raise ValueError("provided expected is not valid") from e
                 self.ExpSnipper = snipping.ExpectedSnipper(
-                    self.clr, self.expected, view_df=self.view_df
+                    self.clr, self.expected, view_df=self.view_df,
+                    expected_value_col=self.expected_value_col
                 )
                 self.expected_selections = {
                     region_name: self.ExpSnipper.select(region_name, region_name)
@@ -2131,6 +2134,7 @@ def pileup(
         view_df=view_df,
         clr_weight_name=clr_weight_name,
         expected=expected_df,
+        expected_value_col=expected_value_col,
         ooe=ooe,
         control=control,
         coverage_norm=coverage_norm,
