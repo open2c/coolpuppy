@@ -186,6 +186,14 @@ def parse_args_coolpuppy():
                 e.g. --groupby chrom1 chrom2""",
     )
     parser.add_argument(
+        "--ignore_group_order",
+        action="store_true",
+        default=False,
+        required=False,
+        help="""If using groupby, reorder so that group1-group2 and group2-group1 will be 
+                combined into one (and flipped to the correct orientation)""",
+    )
+    parser.add_argument(
         "--flip_negative_strand",
         "--flip-negative-strand",
         action="store_true",
@@ -528,6 +536,7 @@ def main():
         by_strand=args.by_strand,
         by_distance=distance_edges,
         groupby=[] if args.groupby is None else args.groupby,
+        ignore_group_order=args.ignore_group_order,
         flip_negative_strand=args.flip_negative_strand,
         local=args.local,
         coverage_norm=args.coverage_norm,

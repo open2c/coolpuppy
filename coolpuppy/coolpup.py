@@ -1073,7 +1073,7 @@ class PileUpper:
         # data = sparse.triu(data)
         return data.tocsr()
 
-    def _stream_snips(self, intervals, region1, region2=None):
+    def _stream_snips(self, intervals, region1, region2=None, groupby=None):
         mymap = self.make_outmap()
         cov_start = np.zeros(mymap.shape[0])
         cov_end = np.zeros(mymap.shape[1])
@@ -1190,6 +1190,20 @@ class PileUpper:
                 snip["data"] = np.rot90(np.flipud(snip["data"]))
                 if self.expected and not self.ooe:
                     exp_data = np.rot90(np.flipud(exp_data))
+            
+            if self.ignore_group_order:
+                groups = [g for g in groupby if g not in ["strand1", "strand2", "distance_band"]]
+                values_sorted = sorted([snip[groups[0]], snip[groups[1]]])
+                if snip[groups[0]] != snip[groups[1]] and [snip[groups[0]], snip[groups[1]]] != values_sorted:
+                    idx1 = np.where(snip["group"]==snip[groups[0]])
+                    idx2 = np.where(snip["group"]==snip[groups[1]])
+                    snip["group"][idx1] = values_sorted[0]
+                    snip["group"][idx2] = values_sorted[1]
+                    snip[groups[0]] = values_sorted[0]
+                    snip[groups[1]] = values_sorted[1]
+                    snip["data"] = np.rot90(np.flipud(snip["data"]))
+                    if self.expected and not self.ooe:
+                        exp_data = np.rot90(np.flipud(exp_data))
 
             if self.store_stripes:
                 cntr = int(np.floor(snip["data"].shape[0] / 2))
@@ -1304,6 +1318,7 @@ class PileUpper:
         region1,
         region2=None,
         groupby=[],
+        ignore_group_order=False,
         modify_2Dintervals_func=None,
         postprocess_func=None,
         extra_sum_funcs=None,
@@ -1318,6 +1333,9 @@ class PileUpper:
             Region name.
         groupby : list of str, optional
             Which attributes of each snip to assign a group to it
+        ignore_group_order : bool, optional
+            If True, when using groupby, reorder so that group1-group2 and group2-group1 will be 
+            combined into one (and flipped to the correct orientation)
         modify_2Dintervals_func : function, optional
             A function to apply to a dataframe of genomic intervals used for pileups.
             If possible, much preferable to `postprocess_func` for better speed.
@@ -1336,6 +1354,7 @@ class PileUpper:
             accumulated snips as a dict
         """
 
+        self.ignore_group_order = ignore_group_order
         region1_coords = self.view_df.loc[region1]
 
         if region2 is None:
@@ -1365,7 +1384,7 @@ class PileUpper:
         )
 
         final = self.accumulate_stream(
-            self._stream_snips(intervals=intervals, region1=region1, region2=region2),
+            self._stream_snips(intervals=intervals, region1=region1, region2=region2, groupby=groupby),
             postprocess_func=postprocess_func,
             extra_funcs=extra_sum_funcs,
         )
@@ -1378,6 +1397,7 @@ class PileUpper:
         self,
         nproc=None,
         groupby=[],
+        ignore_group_order=False,
         modify_2Dintervals_func=None,
         postprocess_func=None,
         extra_sum_funcs=None,
@@ -1437,6 +1457,7 @@ class PileUpper:
         f = partial(
             self.pileup_region,
             groupby=groupby,
+            ignore_group_order=ignore_group_order,
             modify_2Dintervals_func=modify_2Dintervals_func,
             postprocess_func=postprocess_func,
             extra_sum_funcs=extra_sum_funcs,
@@ -1558,7 +1579,8 @@ class PileUpper:
                 columns=groupby,
             )
             normalized_roi.assign(**dict(zip(groupby, zip(*normalized_roi["group"]))))
-            normalized_roi = normalized_roi.drop(columns="group")
+            if not ignore_group_order:
+                normalized_roi = normalized_roi.drop(columns="group")
             for i, val in enumerate(groupby):
                 normalized_roi.insert(0, val, normalized_roi.pop(val))
         if extra_sum_funcs:
@@ -1596,7 +1618,7 @@ class PileUpper:
                 normalized_roi[name] = attr
         return normalized_roi
 
-    def pileupsByStrandWithControl(self, nproc=None, groupby=[]):
+    def pileupsByStrandWithControl(self, nproc=None, groupby=[], ignore_group_order=False):
         """Perform by-strand pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl.
         Assumes the features in CoordCreator file has a "strand" column.
@@ -1623,6 +1645,7 @@ class PileUpper:
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc,
             groupby=["strand1", "strand2"] + groupby,
+            ignore_group_order=ignore_group_order
         )
         normalized_pileups.insert(
             0,
@@ -1690,7 +1713,7 @@ class PileUpper:
         return normalized_pileups
 
     def pileupsByDistanceWithControl(
-        self, nproc=None, distance_edges="default", groupby=[]
+        self, nproc=None, distance_edges="default", groupby=[], ignore_group_order=False
     ):
         """Perform by-distance pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl
@@ -1735,6 +1758,7 @@ class PileUpper:
             nproc=nproc,
             modify_2Dintervals_func=bin_func,
             groupby=["distance_band"] + groupby,
+            ignore_group_order=ignore_group_order,
         )
         normalized_pileups = normalized_pileups.loc[
             normalized_pileups["distance_band"] != (), :
@@ -1763,7 +1787,7 @@ class PileUpper:
         return normalized_pileups
 
     def pileupsByStrandByDistanceWithControl(
-        self, nproc=None, distance_edges="default", groupby=[]
+        self, nproc=None, distance_edges="default", groupby=[], ignore_group_order=False
     ):
         """Perform by-strand by-distance pileups across all chromosomes and applies
         required normalization. Simple wrapper around pileupsWithControl.
@@ -1808,6 +1832,7 @@ class PileUpper:
             nproc=nproc,
             modify_2Dintervals_func=bin_func,
             groupby=["strand1", "strand2", "distance_band"] + groupby,
+            ignore_group_order=ignore_group_order,
         )
         normalized_pileups.insert(
             0,
@@ -1865,6 +1890,7 @@ def pileup(
     by_strand=False,
     by_distance=False,
     groupby=[],
+    ignore_group_order=False,
     flip_negative_strand=False,
     local=False,
     coverage_norm=False,
@@ -2149,25 +2175,25 @@ def pileup(
         pups["by_distance"] = False
     elif by_strand and by_distance:
         pups = PU.pileupsByStrandByDistanceWithControl(
-            nproc=nproc, distance_edges=distance_edges, groupby=groupby
+            nproc=nproc, distance_edges=distance_edges, groupby=groupby, ignore_group_order=ignore_group_order,
         )
         pups["by_window"] = False
         pups["by_strand"] = True
         pups["by_distance"] = True
     elif by_strand:
-        pups = PU.pileupsByStrandWithControl(groupby=groupby)
+        pups = PU.pileupsByStrandWithControl(groupby=groupby, ignore_group_order=ignore_group_order,)
         pups["by_window"] = False
         pups["by_strand"] = True
         pups["by_distance"] = False
     elif by_distance:
         pups = PU.pileupsByDistanceWithControl(
-            nproc=nproc, distance_edges=distance_edges, groupby=groupby
+            nproc=nproc, distance_edges=distance_edges, groupby=groupby, ignore_group_order=ignore_group_order,
         )
         pups["by_window"] = False
         pups["by_strand"] = False
         pups["by_distance"] = True
     else:
-        pups = PU.pileupsWithControl(groupby=groupby)
+        pups = PU.pileupsWithControl(groupby=groupby, ignore_group_order=ignore_group_order,)
         pups["by_window"] = False
         pups["by_strand"] = False
         pups["by_distance"] = False
