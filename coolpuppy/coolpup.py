@@ -575,7 +575,6 @@ class CoordCreator:
         groupby=[],
         modify_2Dintervals_func=None,
     ):
-
         if intervals is None:
             intervals = self.intervals
         if not len(intervals) >= 1:
@@ -734,7 +733,6 @@ class CoordCreator:
         groupby=[],
         modify_2Dintervals_func=None,
     ):
-
         if intervals is None:
             intervals = self.intervals
         intervals = filter_func1(intervals)
@@ -927,8 +925,10 @@ class PileUpper:
                 except Exception as e:
                     raise ValueError("provided expected is not valid") from e
                 self.ExpSnipper = snipping.ExpectedSnipper(
-                    self.clr, self.expected, view_df=self.view_df,
-                    expected_value_col=self.expected_value_col
+                    self.clr,
+                    self.expected,
+                    view_df=self.view_df,
+                    expected_value_col=self.expected_value_col,
                 )
                 self.expected_selections = {
                     region_name: self.ExpSnipper.select(region_name, region_name)
@@ -2006,12 +2006,17 @@ def pileup(
     pileup_df - pandas DataFrame containing the pileups and their grouping information,
     if any, all possible annotations from the arguments of this function.
     """
-    if by_distance:
+    if by_distance is not False:
         if by_distance is True or by_distance == "default":
             distance_edges = "default"
             by_distance = True
         elif len(by_distance) > 0:
-            distance_edges = by_distance
+            try:
+                distance_edges = [int(i) for i in by_distance]
+            except Exception as e:
+                raise ValueError(
+                    "Distance bin edges have to be an iterable of integers or convertable to integers"
+                ) from e
             by_distance = True
         else:
             raise ValueError(
@@ -2021,8 +2026,6 @@ def pileup(
             raise ValueError(
                 "Can't do local pileups by distance, please specify only one of those arguments"
             )
-    else:
-        by_distance = False
 
     if not rescale:
         rescale_flank = None

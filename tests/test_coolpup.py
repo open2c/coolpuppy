@@ -7,7 +7,7 @@ Created on Fri Jul  5 13:24:55 2019
 """
 
 from matplotlib.pyplot import ioff
-from coolpuppy.coolpup import PileUpper, CoordCreator
+from coolpuppy.coolpup import PileUpper, CoordCreator, pileup
 from cooltools.lib import io, common
 import pandas as pd
 import numpy as np
@@ -101,16 +101,34 @@ def test_bystrand_bydistance_pileups_with_controls(request):
     features = bf.read_table(
         op.join(request.fspath.dirname, "data/toy_features.bed"), schema="bed"
     )
-    cc = CoordCreator(
-        features,
-        1_000_000,
+
+    pup = pileup(
+        clr=clr,
+        features=features,
         features_format="bed",
-        local=False,
-        flank=2_000_000,
+        view_df=regions,
         mindist=0,
+        flank=2_000_000,
+        nshifts=1,
+        by_strand=True,
+        by_distance=True,
     )
-    pu = PileUpper(clr, cc, expected=False, view_df=regions, control=True)
-    pup = pu.pileupsByStrandByDistanceWithControl()
+    assert np.all(
+        pup.sort_values(["orientation", "distance_band"])["n"] == [1, 2, 1, 1, 1, 6]
+    )
+
+    distance_bins = np.append([0], 50000 * 2 ** np.arange(30))
+    pup = pileup(
+        clr=clr,
+        features=features,
+        features_format="bed",
+        view_df=regions,
+        mindist=0,
+        flank=2_000_000,
+        nshifts=1,
+        by_strand=True,
+        by_distance=distance_bins,
+    )
     assert np.all(
         pup.sort_values(["orientation", "distance_band"])["n"] == [1, 2, 1, 1, 1, 6]
     )
