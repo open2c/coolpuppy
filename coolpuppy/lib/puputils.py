@@ -138,6 +138,8 @@ def divide_pups(pup1, pup2):
         "outname",
         "coordinates",
     ]
+    if pup1.shape[0] > 1 or pup2.shape[0] > 1:
+        raise ValueError("Pileups cannot contain multiple conditions")
     pup1 = pup1.reset_index(drop=True)
     pup2 = pup2.reset_index(drop=True)
     drop_columns = list(set(drop_columns) & set(pup1.columns))
