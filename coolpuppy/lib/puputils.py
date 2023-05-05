@@ -125,6 +125,7 @@ def divide_pups(pup1, pup2):
         "chroms",
         "minshift",
         "expected_file",
+        "group",
         "maxshift",
         "mindist",
         "maxdist",

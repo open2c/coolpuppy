@@ -187,11 +187,13 @@ def parse_args_coolpuppy():
     )
     parser.add_argument(
         "--ignore_group_order",
-        action="store_true",
-        default=False,
+        nargs="*",
         required=False,
-        help="""If using groupby, reorder so that group1-group2 and group2-group1 will be 
-                combined into one (and flipped to the correct orientation)""",
+        help="""When using groupby, reorder so that e.g. group1-group2 and group2-group1 will be 
+                combined into one and flipped to the correct orientation. If using multiple paired
+                groupings (e.g. group1-group2 and category1-category2), need to specify which
+                grouping should be prioritised, e.g. "group" or "group1 group2". This
+                command is superseded by flip_negative_strand""",
     )
     parser.add_argument(
         "--flip_negative_strand",
@@ -374,6 +376,19 @@ def main():
     else:
         args.by_distance = False
         distance_edges = False
+        
+    if args.ignore_group_order is not None:
+        if len(args.ignore_group_order) > 0:
+            try:
+                args.ignore_group_order = [str(item) for item in args.ignore_group_order]
+            except:
+                raise ValueError(
+                    "ignore_group_order must be one or two strings separated with spaces."
+                )
+        else:
+            args.ignore_group_order = True
+    else:
+        args.ignore_group_order = False
 
     logger = logging.getLogger("coolpuppy")
     logger.setLevel(getattr(logging, args.logLevel))
