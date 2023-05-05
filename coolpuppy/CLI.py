@@ -192,8 +192,8 @@ def parse_args_coolpuppy():
         help="""When using groupby, reorder so that e.g. group1-group2 and group2-group1 will be 
                 combined into one and flipped to the correct orientation. If using multiple paired
                 groupings (e.g. group1-group2 and category1-category2), need to specify which
-                grouping should be prioritised, e.g. "group" or "group1 group2". This
-                command is superseded by flip_negative_strand""",
+                grouping should be prioritised, e.g. "group" or "group1 group2". For flip_negative_strand,
+                +- and -+ strands will be combined""",
     )
     parser.add_argument(
         "--flip_negative_strand",

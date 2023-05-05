@@ -1048,7 +1048,7 @@ class PileUpper:
         # data = sparse.triu(data)
         return data.tocsr()
 
-    def _stream_snips(self, intervals, region1, region2=None, groupby=None):
+    def _stream_snips(self, intervals, region1, region2=None):
         mymap = self.make_outmap()
         cov_start = np.zeros(mymap.shape[0])
         cov_end = np.zeros(mymap.shape[1])
@@ -1336,7 +1336,7 @@ class PileUpper:
         )
 
         final = self.accumulate_stream(
-            self._stream_snips(intervals=intervals, region1=region1, region2=region2, groupby=groupby),
+            self._stream_snips(intervals=intervals, region1=region1, region2=region2),
             postprocess_func=postprocess_func,
             extra_funcs=extra_sum_funcs,
         )
@@ -1369,8 +1369,8 @@ class PileUpper:
             When using groupby, reorder so that e.g. group1-group2 and group2-group1 will be 
             combined into one and flipped to the correct orientation. If using multiple paired
             groupings (e.g. group1-group2 and category1-category2), need to specify which
-            grouping should be prioritised, e.g. "group" or ["group1", "group2"]. This
-            command is superseded by flip_negative_strand
+            grouping should be prioritised, e.g. "group" or ["group1", "group2"]. For flip_negative_strand,
+            +- and -+ strands will be combined
         modify_2Dintervals_func : function, optional
             Function to apply to the DataFrames of coordinates before fetching snippets
             based on them. Preferable to using the `postprocess_func`, since at the
@@ -1991,8 +1991,8 @@ def pileup(
         When using groupby, reorder so that e.g. group1-group2 and group2-group1 will be 
         combined into one and flipped to the correct orientation. If using multiple paired
         groupings (e.g. group1-group2 and category1-category2), need to specify which
-        grouping should be prioritised, e.g. "group" or ["group1", "group2"]. This
-        command is superseded by flip_negative_strand
+        grouping should be prioritised, e.g. "group" or ["group1", "group2"]. For flip_negative_strand,
+        +- and -+ strands will be combined
     flip_negative_strand : bool, optional
         Flip snippets so the positive strand always points to bottom-right.
         Requires strands to be annotated for each feature (or two strands for
