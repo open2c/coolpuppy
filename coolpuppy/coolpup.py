@@ -1132,6 +1132,7 @@ class PileUpper:
                     exp_snip = snip.copy()
                     exp_snip["kind"] = "control"
                     exp_snip["data"] = exp_data
+                    exp_snip["coordinates"] = []
 
             if not self.trans:
                 D = (
