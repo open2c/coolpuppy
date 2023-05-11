@@ -645,9 +645,9 @@ def plot_stripes(
             fontsize=font_scale * 2 * (4.94 + height),
         )
     if sym and scale == "log":
-        ticks = [vmin, 1, vmax]
+        ticks = [norm.vmin, 1, norm.vmax]
     else:
-        ticks = [vmin, vmax]
+        ticks = [norm.vmin, norm.vmax]
     cb = plt.colorbar(
         cm.ScalarMappable(norm, cmap),
         ticks=ticks,
@@ -914,9 +914,9 @@ def plot(
             fontsize=font_scale * 2 * (4.94 + height),
         )
     if sym and scale == "log":
-        ticks = [vmin, 1, vmax]
+        ticks = [norm.vmin, 1, norm.vmax]
     else:
-        ticks = [vmin, vmax]
+        ticks = [norm.vmin, norm.vmax]
 
     cb = plt.colorbar(
         cm.ScalarMappable(norm, cmap),
