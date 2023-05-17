@@ -131,7 +131,7 @@ def add_heatmap(
         )
     elif len(data) == 0:
         return
-    flank = int(flank)
+    flank = int(flank.iloc[0])
     ax = plt.gca()
     if stripe:
         extents = [-flank / max_coordinates[1], flank / max_coordinates[1], -int(n), 0]

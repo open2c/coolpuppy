@@ -1422,11 +1422,15 @@ class PileUpper:
             if self.ignore_group_order:
                 if self.local:
                     raise ValueError("ignore_group_order doesn't make sense for local pileups")
+                elif self.kind == "bedpe":
+                    raise ValueError("ignore_group_order doesn't make sense for bedpe files")
                 elif groupby:
                     warnings.warn("flip_negative_strand and ignore_group_order leads to combining strands, not other groups")
         elif self.ignore_group_order and groupby:
             if self.local:
                 raise ValueError("ignore_group_order doesn't make sense for local pileups")
+            if self.kind == "bedpe":
+                raise ValueError("ignore_group_order doesn't make sense for bedpe files")
             groups = np.array(groupby)
             filt=[f"{group}1" in groups and f"{group}2" in groups for group in [g[:-1] for g in groups]]
             groups_filtered = np.sort(groups[filt])
