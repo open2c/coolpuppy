@@ -604,7 +604,7 @@ def plot_stripes(
 
     if rownames is not None:
         if len(rownames) != nrows:
-            logger.info(f"{len(rownames)} rownames but {nrows} columns, ignoring")
+            logger.info(f"{len(rownames)} rownames but {nrows} rows, ignoring")
         else:
             i = 0
             if nrows > 1 and ncols > 1:
@@ -871,7 +871,7 @@ def plot(
 
     if rownames is not None:
         if len(rownames) != nrows:
-            logger.info(f"{len(rownames)} rownames but {nrows} columns, ignoring")
+            logger.info(f"{len(rownames)} rownames but {nrows} rows, ignoring")
         else:
             i = 0
             if nrows > 1 and ncols > 1:
