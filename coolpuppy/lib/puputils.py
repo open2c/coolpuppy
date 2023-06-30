@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from more_itertools import collapse
 import logging
+import warnings
 
 logger = logging.getLogger("coolpuppy")
 
