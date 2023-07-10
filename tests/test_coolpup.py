@@ -62,6 +62,14 @@ def test_bystrand_pileups_with_expected(request):
     )
     pup = pu.pileupsByStrandWithControl()
     assert np.all(pup.sort_values("orientation")["n"] == [1, 3, 1, 1, 6])
+    # Test ignore_group_order
+    pu = PileUpper(
+        clr, cc, expected=False, ooe=False, control=False
+    )
+    pup = pu.pileupsByStrandWithControl(ignore_group_order=True)
+    assert not pup[pup["orientation"] == "+-"].empty
+    assert pup[pup["orientation"] == "-+"].empty
+    assert np.all(pup.sort_values("orientation")["n"] == [1, 4, 1, 6])
 
 
 def test_bystrand_pileups_with_controls(request):
