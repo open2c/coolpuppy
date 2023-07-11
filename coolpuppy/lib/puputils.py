@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from more_itertools import collapse
 import logging
+import warnings
 
 logger = logging.getLogger("coolpuppy")
 
@@ -125,6 +126,7 @@ def divide_pups(pup1, pup2):
         "chroms",
         "minshift",
         "expected_file",
+        "group",
         "maxshift",
         "mindist",
         "maxdist",
@@ -138,14 +140,15 @@ def divide_pups(pup1, pup2):
         "outname",
         "coordinates",
     ]
+    if pup1.shape[0] > 1 or pup2.shape[0] > 1:
+        raise ValueError("Pileups cannot contain multiple conditions")
     pup1 = pup1.reset_index(drop=True)
     pup2 = pup2.reset_index(drop=True)
     drop_columns = list(set(drop_columns) & set(pup1.columns))
     div_pup = pup1.drop(columns=drop_columns)
     for col in div_pup.columns:
-        assert np.all(
-            np.sort(pup1[col]) == np.sort(pup2[col])
-        ), f"Cannot divide these pups, {col} is different between them"
+        if np.all(np.sort(pup1[col]) != np.sort(pup2[col])):
+            warnings.warn(f"Note that {col} is different between the two pileups")
     div_pup["data"] = pup1["data"] / pup2["data"]
     div_pup["clrs"] = str(pup1["clr"]) + "/" + str(pup2["clr"])
     div_pup["n"] = pup1["n"] + pup2["n"]

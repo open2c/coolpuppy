@@ -62,6 +62,14 @@ def test_bystrand_pileups_with_expected(request):
     )
     pup = pu.pileupsByStrandWithControl()
     assert np.all(pup.sort_values("orientation")["n"] == [1, 3, 1, 1, 6])
+    # Test ignore_group_order
+    pu = PileUpper(
+        clr, cc, expected=False, ooe=False, control=False
+    )
+    pup = pu.pileupsByStrandWithControl(ignore_group_order=True)
+    assert not pup[pup["orientation"] == "+-"].empty
+    assert pup[pup["orientation"] == "-+"].empty
+    assert np.all(pup.sort_values("orientation")["n"] == [1, 4, 1, 6])
 
 
 def test_bystrand_pileups_with_controls(request):
@@ -131,4 +139,34 @@ def test_bystrand_bydistance_pileups_with_controls(request):
     )
     assert np.all(
         pup.sort_values(["orientation", "distance_band"])["n"] == [1, 2, 1, 1, 1, 6]
+    )
+def test_pileups_with_stripes(request):
+    """
+    Test the snipping on matrix:
+    """
+    # Read cool file and create regions out of it:
+    clr = cooler.Cooler(op.join(request.fspath.dirname, "data/CN.mm9.1000kb.cool"))
+    regions = bf.read_table(
+        op.join(request.fspath.dirname, "data/CN.mm9.toy_regions.bed"), schema="bed4"
+    )
+    features = bf.read_table(
+        op.join(request.fspath.dirname, "data/toy_features.bed"), schema="bed"
+    )
+    cc = CoordCreator(
+        features,
+        1_000_000,
+        features_format="bed",
+        local=False,
+        flank=2_000_000,
+        mindist=0,
+    )
+    #Generate pileup with stripes
+    pu = PileUpper(clr, cc, expected=False, view_df=regions, control=False, 
+                   store_stripes=True, clr_weight_name=None, ignore_diags=0)
+    pup = pu.pileupsWithControl()
+    assert np.all(
+        pup["coordinates"][0][0] == ['chr1', '102000000', '102500000', 'chr1', '105000000', '105500000']
+    )
+    assert np.all(
+        pup["vertical_stripe"][0][0] == np.array([22015, 11287, 10852, 11376,  9998])
     )

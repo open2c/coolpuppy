@@ -74,6 +74,8 @@ def get_enrichment(amap, n):
 
     """
     c = amap.shape[0] // 2
+    if c < n:
+        raise ValueError(f"Central pixel value {n} is too large, can be maximum {c}")
     return np.nanmean(amap[c - n // 2 : c + n // 2 + 1, c - n // 2 : c + n // 2 + 1])
 
 

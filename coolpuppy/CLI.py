@@ -186,6 +186,16 @@ def parse_args_coolpuppy():
                 e.g. --groupby chrom1 chrom2""",
     )
     parser.add_argument(
+        "--ignore_group_order",
+        nargs="*",
+        required=False,
+        help="""When using groupby, reorder so that e.g. group1-group2 and group2-group1 will be 
+                combined into one and flipped to the correct orientation. If using multiple paired
+                groupings (e.g. group1-group2 and category1-category2), need to specify which
+                grouping should be prioritised, e.g. "group" or "group1 group2". For flip_negative_strand,
+                +- and -+ strands will be combined""",
+    )
+    parser.add_argument(
         "--flip_negative_strand",
         "--flip-negative-strand",
         action="store_true",
@@ -366,6 +376,19 @@ def main():
     else:
         args.by_distance = False
         distance_edges = False
+        
+    if args.ignore_group_order is not None:
+        if len(args.ignore_group_order) > 0:
+            try:
+                args.ignore_group_order = [str(item) for item in args.ignore_group_order]
+            except:
+                raise ValueError(
+                    "ignore_group_order must be one or two strings separated with spaces."
+                )
+        else:
+            args.ignore_group_order = True
+    else:
+        args.ignore_group_order = False
 
     logger = logging.getLogger("coolpuppy")
     logger.setLevel(getattr(logging, args.logLevel))
@@ -528,6 +551,7 @@ def main():
         by_strand=args.by_strand,
         by_distance=distance_edges,
         groupby=[] if args.groupby is None else args.groupby,
+        ignore_group_order=args.ignore_group_order,
         flip_negative_strand=args.flip_negative_strand,
         local=args.local,
         coverage_norm=args.coverage_norm,

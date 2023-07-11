@@ -114,6 +114,30 @@ def expand2D(intervals, flank, resolution, rescale_flank=None):
         )[["start2", "end2"]]
     return intervals
 
+def flip_mark_intervals_func(intervals, flipby, flip_negative_strand, extra_func=None):
+    if flip_negative_strand:
+        intervals["flip"] = np.where(intervals["strand1"] == "-", True, False)
+    else:
+        intervals["flip"] = intervals[f"{flipby}1"] > intervals[f"{flipby}2"]
+    if extra_func is not None:
+        intervals = extra_func(intervals)
+    return intervals
+
+def flip_snip_func(snip, groupby, ignore_group_order, extra_func=None):
+    if snip["flip"]:
+        snip["data"] = np.rot90(np.flipud(snip["data"]))
+        if ignore_group_order:
+            keys = np.array([*snip])
+            filt = [f"{group}1" in keys and f"{group}2" in keys for group in [k[:-1] for k in keys]]
+            paired_groups = list(set([group[:-1] for group in keys[filt]]))
+            for group in paired_groups:
+                snip[f"{group}1"], snip[f"{group}2"] = snip[f"{group}2"], snip[f"{group}1"]
+            if groupby:
+                snip["group"] = np.array([snip[col] for col in groupby], dtype=object)
+    if extra_func is not None:
+        snip = extra_func(snip)
+    return snip
+
 
 class CoordCreator:
     def __init__(
@@ -595,14 +619,6 @@ class CoordCreator:
                 right_index=True,
                 suffixes=["1", "2"],
             )
-            merged["coordinates"] = merged.apply(
-                lambda x: ".".join(
-                    x[["chrom1", "start1", "end1", "chrom2", "start2", "end2"]].astype(
-                        str
-                    )
-                ),
-                axis=1,
-            )
             merged = self._control_regions(merged, self.nshifts * control)
             if modify_2Dintervals_func is not None:
                 merged = modify_2Dintervals_func(merged)
@@ -642,22 +658,6 @@ class CoordCreator:
                     combinations = self._control_regions(
                         combinations, self.nshifts * control
                     )
-                    if not combinations.empty:
-                        combinations["coordinates"] = combinations.apply(
-                            lambda x: ".".join(
-                                x[
-                                    [
-                                        "chrom1",
-                                        "start1",
-                                        "end1",
-                                        "chrom2",
-                                        "start2",
-                                        "end2",
-                                    ]
-                                ].astype(str)
-                            ),
-                            axis=1,
-                        )
                     if modify_2Dintervals_func is not None:
                         combinations = modify_2Dintervals_func(combinations)
                     combinations = assign_groups(combinations, groupby=groupby)
@@ -692,22 +692,6 @@ class CoordCreator:
                     combinations = self._control_regions(
                         combinations, self.nshifts * control
                     )
-                    if not combinations.empty:
-                        combinations["coordinates"] = combinations.apply(
-                            lambda x: ".".join(
-                                x[
-                                    [
-                                        "chrom1",
-                                        "start1",
-                                        "end1",
-                                        "chrom2",
-                                        "start2",
-                                        "end2",
-                                    ]
-                                ].astype(str)
-                            ),
-                            axis=1,
-                        )
                     if modify_2Dintervals_func is not None:
                         combinations = modify_2Dintervals_func(combinations)
                     combinations = assign_groups(combinations, groupby=groupby)
@@ -737,15 +721,6 @@ class CoordCreator:
             intervals = self.intervals
         intervals = filter_func1(intervals)
         intervals = self._control_regions(intervals, self.nshifts * control)
-        if not intervals.empty:
-            intervals["coordinates"] = intervals.apply(
-                lambda x: ".".join(
-                    x[["chrom1", "start1", "end1", "chrom2", "start2", "end2"]].astype(
-                        str
-                    )
-                ),
-                axis=1,
-            )
         if modify_2Dintervals_func is not None:
             intervals = modify_2Dintervals_func(intervals)
         intervals = assign_groups(intervals, groupby)
@@ -1160,6 +1135,7 @@ class PileUpper:
                     exp_snip = snip.copy()
                     exp_snip["kind"] = "control"
                     exp_snip["data"] = exp_data
+                    exp_snip["coordinates"] = []
 
             if not self.trans:
                 D = (
@@ -1184,22 +1160,18 @@ class PileUpper:
                 if self.expected and not self.ooe:
                     exp_snip = self._rescale_snip(exp_snip)
 
-            if (
-                self.flip_negative_strand
-                and "strand1" in snip
-                and "strand2" in snip
-                and snip["strand1"] == "-"
-            ):
-                snip["data"] = np.rot90(np.flipud(snip["data"]))
-                if self.expected and not self.ooe:
-                    exp_data = np.rot90(np.flipud(exp_data))
-
             if self.store_stripes:
                 cntr = int(np.floor(snip["data"].shape[0] / 2))
                 snip["horizontal_stripe"] = np.array(snip["data"][cntr, :], dtype=float)
                 snip["vertical_stripe"] = np.array(
                     snip["data"][:, cntr][::-1], dtype=float
                 )
+                snip["coordinates"] = ".".join([str(snip[col]) for col in ["chrom1", 
+                                                                           "start1", 
+                                                                           "end1", 
+                                                                           "chrom2", 
+                                                                           "start2", 
+                                                                           "end2"]])
             else:
                 snip["horizontal_stripe"] = []
                 snip["vertical_stripe"] = []
@@ -1381,6 +1353,7 @@ class PileUpper:
         self,
         nproc=None,
         groupby=[],
+        ignore_group_order=False,
         modify_2Dintervals_func=None,
         postprocess_func=None,
         extra_sum_funcs=None,
@@ -1396,6 +1369,12 @@ class PileUpper:
             the object.
         groupby : list of str, optional
             Which attributes of each snip to assign a group to it
+        ignore_group_order : bool or str or list, optional
+            When using groupby, reorder so that e.g. group1-group2 and group2-group1 will be 
+            combined into one and flipped to the correct orientation. If using multiple paired
+            groupings (e.g. group1-group2 and category1-category2), need to specify which
+            grouping should be prioritised, e.g. "group" or ["group1", "group2"]. For flip_negative_strand,
+            +- and -+ strands will be combined
         modify_2Dintervals_func : function, optional
             Function to apply to the DataFrames of coordinates before fetching snippets
             based on them. Preferable to using the `postprocess_func`, since at the
@@ -1418,6 +1397,8 @@ class PileUpper:
 
         """
 
+        self.ignore_group_order = ignore_group_order
+
         if nproc is None:
             nproc = self.nproc
         if len(self.chroms) == 0:
@@ -1426,6 +1407,7 @@ class PileUpper:
         # Generate all combinations of chromosomes
         regions1 = []
         regions2 = []
+
         if self.trans:
             for region1, region2 in itertools.combinations(self.view_df.index, 2):
                 if (
@@ -1437,11 +1419,57 @@ class PileUpper:
         else:
             regions1 = self.view_df.index
             regions2 = regions1
+
+        if self.flip_negative_strand:
+            flipby = "strand"
+            if self.ignore_group_order:
+                if self.local:
+                    raise ValueError("ignore_group_order doesn't make sense for local pileups")
+                elif self.kind == "bedpe":
+                    raise ValueError("ignore_group_order doesn't make sense for bedpe files")
+                elif groupby:
+                    warnings.warn("flip_negative_strand and ignore_group_order leads to combining strands, not other groups")
+        elif self.ignore_group_order and groupby:
+            if self.local:
+                raise ValueError("ignore_group_order doesn't make sense for local pileups")
+            if self.kind == "bedpe":
+                raise ValueError("ignore_group_order doesn't make sense for bedpe files")
+            groups = np.array(groupby)
+            filt=[f"{group}1" in groups and f"{group}2" in groups for group in [g[:-1] for g in groups]]
+            groups_filtered = np.sort(groups[filt])
+            if self.ignore_group_order is True:
+                flipby = list(set([g[:-1] for g in groups_filtered]))
+            elif isinstance(self.ignore_group_order, str):
+                flipby=[self.ignore_group_order]
+            elif len(self.ignore_group_order) == 1:
+                flipby=self.ignore_group_order
+            elif len(self.ignore_group_order) > 1:
+                flipby = list(set([g[:-1] for g in self.ignore_group_order]))
+            if len(flipby) == 1 and f"{flipby[0]}1" in groups_filtered:
+                flipby=flipby[0]
+            else:
+                raise ValueError("Ambiguous ignore_group_order, please provide str or list of two strings which are in groupby")
+        elif self.ignore_group_order and not groupby:
+            warnings.warn("Need to specify groupby for ignore_group_order")
+
+        if self.flip_negative_strand or (self.ignore_group_order and groupby):
+            modify_2Dintervals_func_final = partial(flip_mark_intervals_func,
+                                                    flipby=flipby,
+                                                    flip_negative_strand=self.flip_negative_strand,
+                                                    extra_func=modify_2Dintervals_func)
+            postprocess_func_final = partial(flip_snip_func,
+                                             groupby=groupby,
+                                             ignore_group_order=self.ignore_group_order,
+                                             extra_func=postprocess_func)
+        else:
+            modify_2Dintervals_func_final = modify_2Dintervals_func
+            postprocess_func_final = postprocess_func
+
         f = partial(
             self.pileup_region,
             groupby=groupby,
-            modify_2Dintervals_func=modify_2Dintervals_func,
-            postprocess_func=postprocess_func,
+            modify_2Dintervals_func=modify_2Dintervals_func_final,
+            postprocess_func=postprocess_func_final,
             extra_sum_funcs=extra_sum_funcs,
         )
         if nproc > 1:
@@ -1561,7 +1589,6 @@ class PileUpper:
                 columns=groupby,
             )
             normalized_roi.assign(**dict(zip(groupby, zip(*normalized_roi["group"]))))
-            normalized_roi = normalized_roi.drop(columns="group")
             for i, val in enumerate(groupby):
                 normalized_roi.insert(0, val, normalized_roi.pop(val))
         if extra_sum_funcs:
@@ -1599,7 +1626,7 @@ class PileUpper:
                 normalized_roi[name] = attr
         return normalized_roi
 
-    def pileupsByStrandWithControl(self, nproc=None, groupby=[]):
+    def pileupsByStrandWithControl(self, nproc=None, groupby=[], ignore_group_order=False):
         """Perform by-strand pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl.
         Assumes the features in CoordCreator file has a "strand" column.
@@ -1626,6 +1653,7 @@ class PileUpper:
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc,
             groupby=["strand1", "strand2"] + groupby,
+            ignore_group_order=ignore_group_order,
         )
         normalized_pileups.insert(
             0,
@@ -1668,17 +1696,20 @@ class PileUpper:
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc, postprocess_func=group_by_region
         )
+        normalized_pileups["group2"] = np.where(normalized_pileups["group"] == "all", 
+                                                normalized_pileups["group"].str.split("l"), 
+                                                normalized_pileups["group"])
         normalized_pileups = pd.concat(
             [
                 pd.DataFrame(
-                    normalized_pileups["group"].to_list(),
+                    normalized_pileups["group2"].to_list(),
                     index=normalized_pileups.index,
                     columns=["chrom", "start", "end"],
                 ),
                 normalized_pileups,
             ],
             axis=1,
-        )
+        ).drop(columns=["group2"])
         normalized_pileups.loc[
             normalized_pileups["group"] == "all", ["chrom", "start", "end"]
         ] = ["all", -1, -1]
@@ -1693,7 +1724,7 @@ class PileUpper:
         return normalized_pileups
 
     def pileupsByDistanceWithControl(
-        self, nproc=None, distance_edges="default", groupby=[]
+        self, nproc=None, distance_edges="default", groupby=[], ignore_group_order=False
     ):
         """Perform by-distance pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl
@@ -1738,6 +1769,7 @@ class PileUpper:
             nproc=nproc,
             modify_2Dintervals_func=bin_func,
             groupby=["distance_band"] + groupby,
+            ignore_group_order=ignore_group_order,
         )
         normalized_pileups = normalized_pileups.loc[
             normalized_pileups["distance_band"] != (), :
@@ -1766,7 +1798,7 @@ class PileUpper:
         return normalized_pileups
 
     def pileupsByStrandByDistanceWithControl(
-        self, nproc=None, distance_edges="default", groupby=[]
+        self, nproc=None, distance_edges="default", groupby=[], ignore_group_order=False
     ):
         """Perform by-strand by-distance pileups across all chromosomes and applies
         required normalization. Simple wrapper around pileupsWithControl.
@@ -1811,6 +1843,7 @@ class PileUpper:
             nproc=nproc,
             modify_2Dintervals_func=bin_func,
             groupby=["strand1", "strand2", "distance_band"] + groupby,
+            ignore_group_order=ignore_group_order,
         )
         normalized_pileups.insert(
             0,
@@ -1868,6 +1901,7 @@ def pileup(
     by_strand=False,
     by_distance=False,
     groupby=[],
+    ignore_group_order=False,
     flip_negative_strand=False,
     local=False,
     coverage_norm=False,
@@ -1961,6 +1995,12 @@ def pileup(
         each columns should be specified twice with suffixes "1" and "2", i.e. if
         features have a column "group", specify ["group1", "group2"].
         The default is [].
+    ignore_group_order : bool or str or list, optional
+        When using groupby, reorder so that e.g. group1-group2 and group2-group1 will be 
+        combined into one and flipped to the correct orientation. If using multiple paired
+        groupings (e.g. group1-group2 and category1-category2), need to specify which
+        grouping should be prioritised, e.g. "group" or ["group1", "group2"]. For flip_negative_strand,
+        +- and -+ strands will be combined
     flip_negative_strand : bool, optional
         Flip snippets so the positive strand always points to bottom-right.
         Requires strands to be annotated for each feature (or two strands for
@@ -2154,27 +2194,29 @@ def pileup(
         pups["by_window"] = True
         pups["by_strand"] = False
         pups["by_distance"] = False
+        if groupby:
+            warnings.warn("by-window not compatible with additional groupby")
     elif by_strand and by_distance:
         pups = PU.pileupsByStrandByDistanceWithControl(
-            nproc=nproc, distance_edges=distance_edges, groupby=groupby
+            nproc=nproc, distance_edges=distance_edges, groupby=groupby, ignore_group_order=ignore_group_order,
         )
         pups["by_window"] = False
         pups["by_strand"] = True
         pups["by_distance"] = True
     elif by_strand:
-        pups = PU.pileupsByStrandWithControl(groupby=groupby)
+        pups = PU.pileupsByStrandWithControl(groupby=groupby, ignore_group_order=ignore_group_order,)
         pups["by_window"] = False
         pups["by_strand"] = True
         pups["by_distance"] = False
     elif by_distance:
         pups = PU.pileupsByDistanceWithControl(
-            nproc=nproc, distance_edges=distance_edges, groupby=groupby
+            nproc=nproc, distance_edges=distance_edges, groupby=groupby, ignore_group_order=ignore_group_order,
         )
         pups["by_window"] = False
         pups["by_strand"] = False
         pups["by_distance"] = True
     else:
-        pups = PU.pileupsWithControl(groupby=groupby)
+        pups = PU.pileupsWithControl(groupby=groupby, ignore_group_order=ignore_group_order,)
         pups["by_window"] = False
         pups["by_strand"] = False
         pups["by_distance"] = False

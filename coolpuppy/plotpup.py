@@ -131,7 +131,7 @@ def add_heatmap(
         )
     elif len(data) == 0:
         return
-    flank = int(flank)
+    flank = int(flank.iloc[0])
     ax = plt.gca()
     if stripe:
         extents = [-flank / max_coordinates[1], flank / max_coordinates[1], -int(n), 0]
@@ -604,7 +604,7 @@ def plot_stripes(
 
     if rownames is not None:
         if len(rownames) != nrows:
-            logger.info(f"{len(rownames)} rownames but {nrows} columns, ignoring")
+            logger.info(f"{len(rownames)} rownames but {nrows} rows, ignoring")
         else:
             i = 0
             if nrows > 1 and ncols > 1:
@@ -645,9 +645,9 @@ def plot_stripes(
             fontsize=font_scale * 2 * (4.94 + height),
         )
     if sym and scale == "log":
-        ticks = [vmin, 1, vmax]
+        ticks = [norm.vmin, 1, norm.vmax]
     else:
-        ticks = [vmin, vmax]
+        ticks = [norm.vmin, norm.vmax]
     cb = plt.colorbar(
         cm.ScalarMappable(norm, cmap),
         ticks=ticks,
@@ -873,7 +873,7 @@ def plot(
 
     if rownames is not None:
         if len(rownames) != nrows:
-            logger.info(f"{len(rownames)} rownames but {nrows} columns, ignoring")
+            logger.info(f"{len(rownames)} rownames but {nrows} rows, ignoring")
         else:
             i = 0
             if nrows > 1 and ncols > 1:
@@ -916,9 +916,9 @@ def plot(
             fontsize=font_scale * 2 * (4.94 + height),
         )
     if sym and scale == "log":
-        ticks = [vmin, 1, vmax]
+        ticks = [norm.vmin, 1, norm.vmax]
     else:
-        ticks = [vmin, vmax]
+        ticks = [norm.vmin, norm.vmax]
 
     cb = plt.colorbar(
         cm.ScalarMappable(norm, cmap),
