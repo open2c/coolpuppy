@@ -50,7 +50,7 @@ Once you've configured your environment, you can just `cd` to the root of your r
 $ pytest
 ```
 
-Unit tests are automatically run on Travis CI for pull requests.
+Unit tests are automatically run on GitHub Actions for pull requests.
 
 
 ## Coverage
