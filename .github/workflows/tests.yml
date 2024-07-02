@@ -40,4 +40,4 @@ jobs:
         pytest
     - name: Test CLI notebook
       run: |
-        pytest --nbsmoke-run docs/source/Examples/Walkthrough_CLI.ipynb
+        pytest --nbval-lax docs/source/Examples/Walkthrough_CLI.ipynb

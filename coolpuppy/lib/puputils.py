@@ -1,3 +1,5 @@
+from .numutils import get_enrichment, get_domain_score, get_insulation_strength
+
 import numpy as np
 import pandas as pd
 from more_itertools import collapse
@@ -5,8 +7,6 @@ import logging
 import warnings
 
 logger = logging.getLogger("coolpuppy")
-
-from .numutils import get_enrichment, get_domain_score, get_insulation_strength
 
 
 def _add_snip(outdict, key, snip, extra_funcs=None):
@@ -75,12 +75,12 @@ def get_score(pup, center=3, ignore_central=3):
     else:
         if pup["rescale"]:
             logger.debug(
-                f"Calculating domain enrichment for the central rescaled domain versus surrounding"
+                "Calculating domain enrichment for the central rescaled domain versus surrounding"
             )
             return get_domain_score(pup["data"], pup["rescale_flank"])
         else:
             logger.debug(
-                f"Calculating insulation score, i.e., upper left and lower right corners over upper right and lower left corners"
+                "Calculating insulation score, i.e., upper left and lower right corners over upper right and lower left corners"
             )
             return get_insulation_strength(pup["data"], ignore_central)
 

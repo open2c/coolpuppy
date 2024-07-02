@@ -114,6 +114,7 @@ def expand2D(intervals, flank, resolution, rescale_flank=None):
         )[["start2", "end2"]]
     return intervals
 
+
 def flip_mark_intervals_func(intervals, flipby, flip_negative_strand, extra_func=None):
     if flip_negative_strand:
         intervals["flip"] = np.where(intervals["strand1"] == "-", True, False)
@@ -123,15 +124,22 @@ def flip_mark_intervals_func(intervals, flipby, flip_negative_strand, extra_func
         intervals = extra_func(intervals)
     return intervals
 
+
 def flip_snip_func(snip, groupby, ignore_group_order, extra_func=None):
     if snip["flip"]:
         snip["data"] = np.rot90(np.flipud(snip["data"]))
         if ignore_group_order:
             keys = np.array([*snip])
-            filt = [f"{group}1" in keys and f"{group}2" in keys for group in [k[:-1] for k in keys]]
+            filt = [
+                f"{group}1" in keys and f"{group}2" in keys
+                for group in [k[:-1] for k in keys]
+            ]
             paired_groups = list(set([group[:-1] for group in keys[filt]]))
             for group in paired_groups:
-                snip[f"{group}1"], snip[f"{group}2"] = snip[f"{group}2"], snip[f"{group}1"]
+                snip[f"{group}1"], snip[f"{group}2"] = (
+                    snip[f"{group}2"],
+                    snip[f"{group}1"],
+                )
             if groupby:
                 snip["group"] = np.array([snip[col] for col in groupby], dtype=object)
     if extra_func is not None:
@@ -599,7 +607,6 @@ class CoordCreator:
         groupby=[],
         modify_2Dintervals_func=None,
     ):
-
         if intervals is None:
             intervals = self.intervals
         if not len(intervals) >= 1:
@@ -718,7 +725,6 @@ class CoordCreator:
         groupby=[],
         modify_2Dintervals_func=None,
     ):
-
         if intervals is None:
             intervals = self.intervals
         intervals = filter_func1(intervals)
@@ -781,6 +787,8 @@ class PileUpper:
         expected : DataFrame, optional
             If using expected, pandas DataFrame with by-distance expected.
             The default is False.
+        expected_value_col : str, optional
+            Which column in the expected_df contains values to use for normalization
         view_df : DataFrame
             A dataframe with region coordinates used in expected (see bioframe
             documentation for details). Can be ommited if no expected is provided, or
@@ -900,7 +908,10 @@ class PileUpper:
                 except Exception as e:
                     raise ValueError("provided expected is not valid") from e
                 self.ExpSnipper = snipping.ExpectedSnipper(
-                    self.clr, self.expected, view_df=self.view_df
+                    self.clr,
+                    self.expected,
+                    view_df=self.view_df,
+                    expected_value_col=self.expected_value_col,
                 )
                 self.expected_selections = {
                     region_name: self.ExpSnipper.select(region_name, region_name)
@@ -1049,10 +1060,6 @@ class PileUpper:
         return data.tocsr()
 
     def _stream_snips(self, intervals, region1, region2=None):
-        mymap = self.make_outmap()
-        cov_start = np.zeros(mymap.shape[0])
-        cov_end = np.zeros(mymap.shape[1])
-
         try:
             row1 = next(intervals)
         except StopIteration:
@@ -1082,10 +1089,10 @@ class PileUpper:
                 self.clr.bins()[self.clr_weight_name].fetch(region2_coords).values
             )
         else:
-            isnan1 = isnan = np.zeros_like(
+            isnan1 = np.zeros_like(
                 self.clr.bins()["start"].fetch(region1_coords).values
             ).astype(bool)
-            isnan2 = isnan = np.zeros_like(
+            isnan2 = np.zeros_like(
                 self.clr.bins()["start"].fetch(region2_coords).values
             ).astype(bool)
 
@@ -1163,12 +1170,19 @@ class PileUpper:
                 snip["vertical_stripe"] = np.array(
                     snip["data"][:, cntr][::-1], dtype=float
                 )
-                snip["coordinates"] = ".".join([str(snip[col]) for col in ["chrom1", 
-                                                                           "start1", 
-                                                                           "end1", 
-                                                                           "chrom2", 
-                                                                           "start2", 
-                                                                           "end2"]])
+                snip["coordinates"] = ".".join(
+                    [
+                        str(snip[col])
+                        for col in [
+                            "chrom1",
+                            "start1",
+                            "end1",
+                            "chrom2",
+                            "start2",
+                            "end2",
+                        ]
+                    ]
+                )
             else:
                 snip["horizontal_stripe"] = []
                 snip["vertical_stripe"] = []
@@ -1367,7 +1381,7 @@ class PileUpper:
         groupby : list of str, optional
             Which attributes of each snip to assign a group to it
         ignore_group_order : bool or str or list, optional
-            When using groupby, reorder so that e.g. group1-group2 and group2-group1 will be 
+            When using groupby, reorder so that e.g. group1-group2 and group2-group1 will be
             combined into one and flipped to the correct orientation. If using multiple paired
             groupings (e.g. group1-group2 and category1-category2), need to specify which
             grouping should be prioritised, e.g. "group" or ["group1", "group2"]. For flip_negative_strand,
@@ -1421,43 +1435,62 @@ class PileUpper:
             flipby = "strand"
             if self.ignore_group_order:
                 if self.local:
-                    raise ValueError("ignore_group_order doesn't make sense for local pileups")
+                    raise ValueError(
+                        "ignore_group_order doesn't make sense for local pileups"
+                    )
                 elif self.kind == "bedpe":
-                    raise ValueError("ignore_group_order doesn't make sense for bedpe files")
+                    raise ValueError(
+                        "ignore_group_order doesn't make sense for bedpe files"
+                    )
                 elif groupby:
-                    warnings.warn("flip_negative_strand and ignore_group_order leads to combining strands, not other groups")
+                    warnings.warn(
+                        "flip_negative_strand and ignore_group_order leads to combining strands, not other groups"
+                    )
         elif self.ignore_group_order and groupby:
             if self.local:
-                raise ValueError("ignore_group_order doesn't make sense for local pileups")
+                raise ValueError(
+                    "ignore_group_order doesn't make sense for local pileups"
+                )
             if self.kind == "bedpe":
-                raise ValueError("ignore_group_order doesn't make sense for bedpe files")
+                raise ValueError(
+                    "ignore_group_order doesn't make sense for bedpe files"
+                )
             groups = np.array(groupby)
-            filt=[f"{group}1" in groups and f"{group}2" in groups for group in [g[:-1] for g in groups]]
+            filt = [
+                f"{group}1" in groups and f"{group}2" in groups
+                for group in [g[:-1] for g in groups]
+            ]
             groups_filtered = np.sort(groups[filt])
             if self.ignore_group_order is True:
                 flipby = list(set([g[:-1] for g in groups_filtered]))
             elif isinstance(self.ignore_group_order, str):
-                flipby=[self.ignore_group_order]
+                flipby = [self.ignore_group_order]
             elif len(self.ignore_group_order) == 1:
-                flipby=self.ignore_group_order
+                flipby = self.ignore_group_order
             elif len(self.ignore_group_order) > 1:
                 flipby = list(set([g[:-1] for g in self.ignore_group_order]))
             if len(flipby) == 1 and f"{flipby[0]}1" in groups_filtered:
-                flipby=flipby[0]
+                flipby = flipby[0]
             else:
-                raise ValueError("Ambiguous ignore_group_order, please provide str or list of two strings which are in groupby")
+                raise ValueError(
+                    "Ambiguous ignore_group_order, please provide str or list of two strings which are in groupby"
+                )
         elif self.ignore_group_order and not groupby:
             warnings.warn("Need to specify groupby for ignore_group_order")
 
         if self.flip_negative_strand or (self.ignore_group_order and groupby):
-            modify_2Dintervals_func_final = partial(flip_mark_intervals_func,
-                                                    flipby=flipby,
-                                                    flip_negative_strand=self.flip_negative_strand,
-                                                    extra_func=modify_2Dintervals_func)
-            postprocess_func_final = partial(flip_snip_func,
-                                             groupby=groupby,
-                                             ignore_group_order=self.ignore_group_order,
-                                             extra_func=postprocess_func)
+            modify_2Dintervals_func_final = partial(
+                flip_mark_intervals_func,
+                flipby=flipby,
+                flip_negative_strand=self.flip_negative_strand,
+                extra_func=modify_2Dintervals_func,
+            )
+            postprocess_func_final = partial(
+                flip_snip_func,
+                groupby=groupby,
+                ignore_group_order=self.ignore_group_order,
+                extra_func=postprocess_func,
+            )
         else:
             modify_2Dintervals_func_final = modify_2Dintervals_func
             postprocess_func_final = postprocess_func
@@ -1616,14 +1649,16 @@ class PileUpper:
 
         for name, attr in self.__dict__.items():
             if name not in exclude_attributes:
-                if type(attr) == list:
+                if isinstance(attr, list):
                     attr = str(attr)
-                if type(attr) == cooler.api.Cooler:
+                if isinstance(attr, cooler.api.Cooler):
                     attr = os.path.abspath(attr.filename)
                 normalized_roi[name] = attr
         return normalized_roi
 
-    def pileupsByStrandWithControl(self, nproc=None, groupby=[], ignore_group_order=False):
+    def pileupsByStrandWithControl(
+        self, nproc=None, groupby=[], ignore_group_order=False
+    ):
         """Perform by-strand pileups across all chromosomes and applies required
         normalization. Simple wrapper around pileupsWithControl.
         Assumes the features in CoordCreator file has a "strand" column.
@@ -1693,9 +1728,11 @@ class PileUpper:
         normalized_pileups = self.pileupsWithControl(
             nproc=nproc, postprocess_func=group_by_region
         )
-        normalized_pileups["group2"] = np.where(normalized_pileups["group"] == "all", 
-                                                normalized_pileups["group"].str.split("l"), 
-                                                normalized_pileups["group"])
+        normalized_pileups["group2"] = np.where(
+            normalized_pileups["group"] == "all",
+            normalized_pileups["group"].str.split("l"),
+            normalized_pileups["group"],
+        )
         normalized_pileups = pd.concat(
             [
                 pd.DataFrame(
@@ -1993,7 +2030,7 @@ def pileup(
         features have a column "group", specify ["group1", "group2"].
         The default is [].
     ignore_group_order : bool or str or list, optional
-        When using groupby, reorder so that e.g. group1-group2 and group2-group1 will be 
+        When using groupby, reorder so that e.g. group1-group2 and group2-group1 will be
         combined into one and flipped to the correct orientation. If using multiple paired
         groupings (e.g. group1-group2 and category1-category2), need to specify which
         grouping should be prioritised, e.g. "group" or ["group1", "group2"]. For flip_negative_strand,
@@ -2043,23 +2080,27 @@ def pileup(
     pileup_df - pandas DataFrame containing the pileups and their grouping information,
     if any, all possible annotations from the arguments of this function.
     """
-    if by_distance:
-        if by_distance is True or by_distance == "default":
-            distance_edges = "default"
-            by_distance = True
-        elif len(by_distance) > 0:
-            distance_edges = by_distance
-            by_distance = True
-        else:
-            raise ValueError(
-                "Invalid by_distance value, should be either 'default' or a list of integers"
-            )
+    if by_distance is not False:
         if local:
             raise ValueError(
                 "Can't do local pileups by distance, please specify only one of those arguments"
             )
-    else:
-        by_distance = False
+
+        if isinstance(by_distance, np.ndarray):
+            try:
+                distance_edges = [int(i) for i in by_distance]
+            except Exception as e:
+                raise ValueError(
+                    "Distance bin edges have to be an iterable of integers or convertable to integers"
+                ) from e
+            by_distance = True
+        elif by_distance is True or by_distance == "default":
+            distance_edges = "default"
+            by_distance = True
+        else:
+            raise ValueError(
+                "Invalid by_distance value, should be either True, 'default' or a list of integers"
+            )
 
     if not rescale:
         rescale_flank = None
@@ -2171,6 +2212,7 @@ def pileup(
         view_df=view_df,
         clr_weight_name=clr_weight_name,
         expected=expected_df,
+        expected_value_col=expected_value_col,
         ooe=ooe,
         control=control,
         coverage_norm=coverage_norm,
@@ -2191,25 +2233,37 @@ def pileup(
             warnings.warn("by-window not compatible with additional groupby")
     elif by_strand and by_distance:
         pups = PU.pileupsByStrandByDistanceWithControl(
-            nproc=nproc, distance_edges=distance_edges, groupby=groupby, ignore_group_order=ignore_group_order,
+            nproc=nproc,
+            distance_edges=distance_edges,
+            groupby=groupby,
+            ignore_group_order=ignore_group_order,
         )
         pups["by_window"] = False
         pups["by_strand"] = True
         pups["by_distance"] = True
     elif by_strand:
-        pups = PU.pileupsByStrandWithControl(groupby=groupby, ignore_group_order=ignore_group_order,)
+        pups = PU.pileupsByStrandWithControl(
+            groupby=groupby,
+            ignore_group_order=ignore_group_order,
+        )
         pups["by_window"] = False
         pups["by_strand"] = True
         pups["by_distance"] = False
     elif by_distance:
         pups = PU.pileupsByDistanceWithControl(
-            nproc=nproc, distance_edges=distance_edges, groupby=groupby, ignore_group_order=ignore_group_order,
+            nproc=nproc,
+            distance_edges=distance_edges,
+            groupby=groupby,
+            ignore_group_order=ignore_group_order,
         )
         pups["by_window"] = False
         pups["by_strand"] = False
         pups["by_distance"] = True
     else:
-        pups = PU.pileupsWithControl(groupby=groupby, ignore_group_order=ignore_group_order,)
+        pups = PU.pileupsWithControl(
+            groupby=groupby,
+            ignore_group_order=ignore_group_order,
+        )
         pups["by_window"] = False
         pups["by_strand"] = False
         pups["by_distance"] = False

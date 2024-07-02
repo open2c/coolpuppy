@@ -1,8 +1,24 @@
 # Release notes
 
-## [Upcoming release](https://github.com/open2c/coolpuppy/compare/v1.0.0...HEAD)
+## [Upcoming release](https://github.com/open2c/coolpuppy/compare/v1.1.0...HEAD)
 
-## [v1.0.0](https://github.com/open2c/coolpuppy/compare/v0.9.5...v1.0.0)
+## [v1.1.0] (https://github.com/open2c/coolpuppy/compare/v1.0.0...v1.1.0)
+
+* Added `ignore_group_order` and `--ignore_group_order` argument to flip and combine groups when using groupby, i.e. combining e.g. group1-group2 and group2-group1
+
+* Changed how flipping and group reassignment is implemented
+
+* Fixed zooming near diagonal
+
+* `divide_pups` now allows dividing even if columns are different, gives warning instead
+
+* Added additional tests
+
+* Bug fixes and logs/warnings added
+
+* Changes to walkthroughs
+
+## [v1.0.0](https://github.com/open2c/coolpuppy/compare/0.9.5...v1.0.0)
 
 This is a major release with a lot of changes. The main ones are included below, but probably there are a lot of smaller ones too.
 
