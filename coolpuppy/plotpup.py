@@ -492,6 +492,11 @@ def plot_stripes(
                 colnames=colnames,
             )
             logger.debug(f"Plotting lineplot on top of stripes")
+            try:
+                for ax in fg.axes[0]:
+                    ax.remove()
+            except:
+                pass
         else:
             fg.map(
                 add_heatmap,

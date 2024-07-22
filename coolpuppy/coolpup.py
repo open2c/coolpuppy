@@ -924,7 +924,7 @@ class PileUpper:
 
         for region_name, region in self.view_df.iterrows():
             lo, hi = self.clr.extent(region)
-            chroffset = self.clr.offset(region[0])
+            chroffset = self.clr.offset(region.iloc[0])
             self.view_df_extents[region_name] = lo - chroffset, hi - chroffset
 
         self.chroms = natsorted(
