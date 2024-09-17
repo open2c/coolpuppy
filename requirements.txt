@@ -13,3 +13,4 @@ seaborn
 natsort
 h5sparse
 multiprocessing_logging
+tables
