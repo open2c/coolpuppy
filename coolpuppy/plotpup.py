@@ -96,7 +96,7 @@ def get_min_max(pups, vmin=None, vmax=None, sym=True, scale="log"):
             )
             pass
         else:
-            vmax = np.max(np.abs([vmin, vmax]))
+            vmax = 2 ** (np.max(np.abs(np.log2([vmin, vmax]))))
             if vmax >= 1:
                 vmin = 2 ** -np.log2(vmax)
             else:
