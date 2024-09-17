@@ -169,6 +169,7 @@ def parse_args_plotpuppy():
     parser.add_argument(
         "--query",
         type=str,
+        default="",
         required=False,
         action="append",
         help="""Pandas query to select pups to plot from concatenated input files.
@@ -302,7 +303,7 @@ def main():
             skipstripes=not args.stripe,
         )
 
-    if args.query is not None:
+    if args.query:
         for q in args.query:
             pups = pups.query(q)
 
