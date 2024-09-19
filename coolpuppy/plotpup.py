@@ -85,9 +85,15 @@ def get_min_max(pups, vmin=None, vmax=None, sym=True, scale="log"):
         vmax = np.nanmax(comb)
         vmin = np.nanmin(comb)
     elif vmin is not None:
-        vmax = np.nanmax(comb)
+        if sym and scale == "log":
+            vmax = 1
+        else:
+            vmax = np.nanmax(comb)
     elif vmax is not None:
-        vmin = np.nanmin(comb)
+        if sym and scale == "log":
+            vmin = 1
+        else:
+            vmin = np.nanmin(comb)
     if sym:
 
         if scale == "linear":
