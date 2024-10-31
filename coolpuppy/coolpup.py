@@ -243,12 +243,14 @@ class CoordCreator:
             self.mindist = mindist
             if self.trans:
                 warnings.warn("Ignoring mindist when using trans", stacklevel=2)
+                self.mindist = 0
         if maxdist is None:
             self.maxdist = np.inf
         else:
             self.maxdist = maxdist
             if self.trans:
                 warnings.warn("Ignoring maxdist when using trans", stacklevel=2)
+                self.maxdist = np.inf
         self.local = local
         self.subset = subset
         self.seed = seed
@@ -437,14 +439,9 @@ class CoordCreator:
                     ]
                     + shift[:, np.newaxis]
                 )
-            control_intervals[
-                ["stBin1", "endBin1", "stBin2", "endBin2"]
-            ] = control_intervals[
-                ["stBin1", "endBin1", "stBin2", "endBin2"]
-            ] + np.round(
-                shift[:, np.newaxis] / self.resolution
-            ).astype(
-                int
+            control_intervals[["stBin1", "endBin1", "stBin2", "endBin2"]] = (
+                control_intervals[["stBin1", "endBin1", "stBin2", "endBin2"]]
+                + np.round(shift[:, np.newaxis] / self.resolution).astype(int)
             )
             intervals2d["kind"] = "ROI"
             control_intervals["kind"] = "control"
@@ -1813,11 +1810,15 @@ class PileUpper:
             0,
             "separation",
             normalized_pileups["distance_band"].apply(
-                lambda x: x
-                if x == "all"
-                else f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
-                if len(x) == 2
-                else f"{x[0]/1000000}Mb+"
+                lambda x: (
+                    x
+                    if x == "all"
+                    else (
+                        f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
+                        if len(x) == 2
+                        else f"{x[0]/1000000}Mb+"
+                    )
+                )
             ),
         )
         # Move "all" to the bottom while sorting the distances
@@ -1893,11 +1894,15 @@ class PileUpper:
             0,
             "separation",
             normalized_pileups["distance_band"].apply(
-                lambda x: x
-                if x == "all"
-                else f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
-                if len(x) == 2
-                else f"{x[0]/1000000}Mb+"
+                lambda x: (
+                    x
+                    if x == "all"
+                    else (
+                        f"{x[0]/1000000}Mb-\n{x[1]/1000000}Mb"
+                        if len(x) == 2
+                        else f"{x[0]/1000000}Mb+"
+                    )
+                )
             ),
         )
         # Move "all" to the bottom while sorting the distances
