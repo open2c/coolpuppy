@@ -115,7 +115,9 @@ def sum_pups(pup1, pup2, extra_funcs={}):
 
 def divide_pups(pup1, pup2):
     """
-    Divide two pups and get the resulting pup. Requires that the pups have identical shapes, resolutions, flanks, etc. If pups contain stripes, these will only be divided if stripes have identical coordinates.
+    Divide two pups and get the resulting pup. Requires that the pups have identical shapes, resolutions, flanks, etc. 
+    If pups contain stripes, these will only be divided if stripes have identical coordinates.
+    Supports multiple conditions - will match conditions between pups and divide them pairwise.
     """
     drop_columns = [
         "control_n",
@@ -140,8 +142,107 @@ def divide_pups(pup1, pup2):
         "outname",
         "coordinates",
     ]
+    
+    # Handle multiple conditions
     if pup1.shape[0] > 1 or pup2.shape[0] > 1:
-        raise ValueError("Pileups cannot contain multiple conditions")
+        # Find columns that could be used to match conditions
+        # Exclude data columns and columns that might differ between pups
+        match_columns = []
+        for col in pup1.columns:
+            if col not in drop_columns and col in pup2.columns:
+                try:
+                    # Check if column values are hashable and can be used for matching
+                    if hasattr(pup1[col].iloc[0], '__hash__'):
+                        pup1[col].unique()
+                        pup2[col].unique()
+                        match_columns.append(col)
+                except (TypeError, AttributeError):
+                    continue
+        
+        # Try to find the best column(s) for matching conditions
+        # Prefer columns like 'separation', 'distance_band', etc.
+        preferred_match_cols = ['separation', 'distance_band', 'group']
+        match_cols_to_use = []
+        for col in preferred_match_cols:
+            if col in match_columns:
+                match_cols_to_use.append(col)
+                break
+        
+        if not match_cols_to_use:
+            # Use any available match columns
+            match_cols_to_use = match_columns[:1] if match_columns else []
+        
+        if not match_cols_to_use:
+            raise ValueError("Cannot find matching columns to align conditions between pileups")
+        
+        # Check if conditions match
+        pup1_conditions = pup1[match_cols_to_use].drop_duplicates().sort_values(match_cols_to_use)
+        pup2_conditions = pup2[match_cols_to_use].drop_duplicates().sort_values(match_cols_to_use)
+        
+        if not pup1_conditions.equals(pup2_conditions):
+            raise ValueError(f"Conditions do not match between the two pileups. "
+                           f"Pup1 has {len(pup1_conditions)} unique conditions, "
+                           f"Pup2 has {len(pup2_conditions)} unique conditions based on {match_cols_to_use}")
+        
+        # Merge pups on matching columns to align conditions
+        pup1_indexed = pup1.copy()
+        pup2_indexed = pup2.copy()
+        
+        # Create temporary index for merging
+        for col in match_cols_to_use:
+            pup1_indexed[f'_match_{col}'] = pup1_indexed[col]
+            pup2_indexed[f'_match_{col}'] = pup2_indexed[col]
+        
+        # Process each condition
+        div_pup_list = []
+        for _, condition in pup1_conditions.iterrows():
+            # Get matching rows from both pups
+            mask1 = True
+            mask2 = True
+            for col in match_cols_to_use:
+                mask1 = mask1 & (pup1[col] == condition[col])
+                mask2 = mask2 & (pup2[col] == condition[col])
+            
+            pup1_cond = pup1[mask1].reset_index(drop=True)
+            pup2_cond = pup2[mask2].reset_index(drop=True)
+            
+            if len(pup1_cond) != 1 or len(pup2_cond) != 1:
+                raise ValueError(f"Expected exactly one row per condition, but got {len(pup1_cond)} and {len(pup2_cond)}")
+            
+            # Divide this condition pair
+            drop_columns_cond = list(set(drop_columns) & set(pup1_cond.columns))
+            div_pup_cond = pup1_cond.drop(columns=drop_columns_cond)
+            
+            for col in div_pup_cond.columns:
+                if col not in match_cols_to_use:
+                    try:
+                        if np.all(np.sort(pup1_cond[col]) != np.sort(pup2_cond[col])):
+                            warnings.warn(f"Note that {col} is different between the two pileups for condition {condition}")
+                    except:
+                        pass
+            
+            div_pup_cond["data"] = pup1_cond["data"] / pup2_cond["data"]
+            div_pup_cond["clrs"] = str(pup1_cond["clr"].iloc[0]) + "/" + str(pup2_cond["clr"].iloc[0])
+            div_pup_cond["n"] = pup1_cond["n"] + pup2_cond["n"]
+            
+            if set(["vertical_stripe", "horizontal_stripe"]).issubset(pup1_cond.columns):
+                if np.all(np.sort(pup1_cond["coordinates"].iloc[0]) == np.sort(pup2_cond["coordinates"].iloc[0])):
+                    div_pup_cond["coordinates"] = pup1_cond["coordinates"]
+                    for stripe in ["vertical_stripe", "horizontal_stripe"]:
+                        div_pup_cond[stripe] = pup1_cond[stripe] / pup2_cond[stripe]
+                        div_pup_cond[stripe] = div_pup_cond[stripe].apply(
+                            lambda x: np.where(np.isin(x, [np.inf, np.nan]), 0, x)
+                        )
+                else:
+                    logging.info(f"Stripes cannot be divided for condition {condition}, coordinates differ between pups")
+            
+            div_pup_list.append(div_pup_cond)
+        
+        # Combine all divided conditions
+        div_pup = pd.concat(div_pup_list, ignore_index=True)
+        return div_pup
+    
+    # Original single condition logic
     pup1 = pup1.reset_index(drop=True)
     pup2 = pup2.reset_index(drop=True)
     drop_columns = list(set(drop_columns) & set(pup1.columns))
