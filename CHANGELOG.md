@@ -2,6 +2,70 @@
 
 ## [Upcoming release](https://github.com/open2c/coolpuppy/compare/v1.1.0...HEAD)
 
+### Performance
+* Pairwise combinations of bed features are now generated with a vectorised search
+  instead of a Python loop over all offsets genome-wide. With `maxdist` this is
+  10-100x faster (e.g. 182 s -> 2 s for loop anchors on the Scc1 test cooler); results
+  are unchanged. Pairs are produced in bounded chunks, so memory stays bounded
+  without `maxdist`. Trans combinations are also vectorised.
+* Faster accumulation of snippets (in-place sums; stripes appended instead of copied)
+
+### Bug fixes
+* `extra_sum_funcs` (e.g. per-snippet TAD scores): summing pileups across regions
+  discarded all but one region's data; regions without valid snippets raised
+  `AssertionError: ... not in dict2` (#146)
+* Domain score / local enrichment were wrong or raised `AssertionError` for
+  `rescale_flank != 1` (#161). Results for `rescale_flank=1` are unchanged
+* `divide_pups`/`dividepups.py`/`plotpup.py --divide_pups` can now divide pileups
+  with multiple groups, matching rows by group, distance band or orientation,
+  whichever matches (e.g. ++ over -- pileups split by distance) (#163); dividing
+  pileups with stripes no longer crashes; fixed the `clrs` annotation and the
+  default output name
+* Shifted controls are now reproducible with `seed` regardless of `nproc`
+  (each region gets its own random stream). Note: seeded controls differ from v1.1.0
+* Trans shifted controls now fetch the snippet at the shifted coordinates of both anchors
+* `nproc=0` / `-p 0` now uses all cores (it ran serially, or crashed with `coverage_norm`)
+* `nproc > 1` no longer crashes on macOS/Windows with multiprocessing_logging >= 0.4
+* `coverage_norm` works with cooltools >= 0.6 (coverage computation crashed)
+* With expected and `ooe=False`, expected values are only accumulated over pixels
+  where the observed data is valid (not bad bins or ignored diagonals)
+* `by_distance` accepts a list of edges, as documented
+* `CoordCreator.bedpe2bed(ends=False, how="center")` crashed
+* Pileup files: saving is atomic, so an interrupted save no longer leaves a file that
+  fails with `object 'attrs' doesn't exist` (#166); such files load with a warning.
+  Chromosome names in stored coordinates are no longer truncated to 13 characters
+* `plotpup.py --query` always crashed; `--col_order`/`--row_order` accept commas;
+  `--input_pups` is required
+* `plot()` with default arguments raised `KeyError: 'score'`; a custom score column
+  name is now used
+* `coolpup.py` detects bed/bedpe correctly for `.gz` and other extensions; INFO-level
+  logging (`-l INFO`) is now printed
+* One warning per pileup reports how many regions of interest were skipped for
+  extending beyond the chromosome/region boundaries (per-region counts at DEBUG level)
+* `plot_stripes` no longer triggers pandas' "Calling int on a single element Series"
+  FutureWarning
+* Removed the unused top-level `__init__.py`: with pytest it made the repository root
+  importable as `coolpuppy`, so tests with `nproc > 1` hung on macOS/Windows (spawn)
+
+### Documentation
+* The API and CLI walkthroughs show how to divide pileups with several groups
+  (CTCF pileups by orientation, for sites 0.1-1 Mb apart over sites >1 Mb apart)
+  with `divide_pups` / `dividepups.py`. All example notebooks were rerun;
+  the TAD pileup in `TAD_score.ipynb` now averages all 938 TADs instead of only the
+  238 in the first chromosome arm (#146)
+
+### Compatibility
+* Requires Python >= 3.10 (CI now tests 3.10-3.12) and numpy >= 1.17. Cython is no
+  longer needed to install coolpuppy
+* Removed the dependency on the unmaintained `h5sparse` (it imports `pkg_resources`);
+  the file format is unchanged and files remain readable by older versions
+* Compatible with pandas 3 and numpy 2, and with matplotlib >= 3.9 (`cm.get_cmap`
+  removed; `plotpup` also works around cooltools <= 0.7.1 importing the removed
+  `cm.register_cmap`) and pandas Copy-on-Write (stripe plots silently ignored
+  assignments). Pileups with expected no longer use cooltools' `ExpectedSnipper`,
+  which fails with pandas 3. Removed the pandas/matplotlib upper pins. Distance band
+  labels are plain numbers with numpy 2 (not `np.int64(...)`)
+
 ## [v1.1.0] (https://github.com/open2c/coolpuppy/compare/v1.0.0...v1.1.0)
 
 * Added `ignore_group_order` and `--ignore_group_order` argument to flip and combine groups when using groupby, i.e. combining e.g. group1-group2 and group2-group1

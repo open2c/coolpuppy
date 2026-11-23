@@ -142,15 +142,15 @@ def parse_args_plotpuppy():
     )
     parser.add_argument(
         "--col_order",
-        type=lambda s: re.split(" |, ", s),
+        type=lambda s: re.split(r"[,\s]+", s.strip()),
         required=False,
-        help="""Order of columns to use, space separated inside quotes""",
+        help="""Order of columns to use, space or comma separated inside quotes""",
     )
     parser.add_argument(
         "--row_order",
-        type=lambda s: re.split(" |, ", s),
+        type=lambda s: re.split(r"[,\s]+", s.strip()),
         required=False,
-        help="""Order of rows to use, space separated inside quotes""",
+        help="""Order of rows to use, space or comma separated inside quotes""",
     )
     parser.add_argument(
         "--colnames",
@@ -169,7 +169,7 @@ def parse_args_plotpuppy():
     parser.add_argument(
         "--query",
         type=str,
-        default="",
+        default=None,
         required=False,
         action="append",
         help="""Pandas query to select pups to plot from concatenated input files.
@@ -262,7 +262,11 @@ def parse_args_plotpuppy():
         help="""Enter debugger if there is an error""",
     )
     parser.add_argument(
-        "--input_pups", type=str, nargs="+", help="""All files to plot"""
+        "--input_pups",
+        type=str,
+        nargs="+",
+        required=True,
+        help="""All files to plot""",
     )
     parser.add_argument("-v", "--version", action="version", version=__version__)
     return parser
@@ -272,6 +276,7 @@ def main():
     parser = parse_args_plotpuppy()
     args = parser.parse_args()
 
+    logging.basicConfig(format="%(levelname)s:%(name)s: %(message)s")
     logger = logging.getLogger("coolpuppy")
     logger.setLevel(getattr(logging, args.logLevel))
 

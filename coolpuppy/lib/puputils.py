@@ -10,32 +10,28 @@ logger = logging.getLogger("coolpuppy")
 
 
 def _add_snip(outdict, key, snip, extra_funcs=None):
+    data = snip["data"]
+    isnan = np.isnan(data)
     if key not in outdict:
-        outdict[key] = {key: snip[key] for key in ["data", "cov_start", "cov_end"]}
+        outdict[key] = {k: snip[k] for k in ["cov_start", "cov_end"]}
+        # Own copy with NaNs as 0, so it can be accumulated in place
+        outdict[key]["data"] = np.where(isnan, 0.0, data)
         outdict[key]["coordinates"] = [snip["coordinates"]]
         outdict[key]["horizontal_stripe"] = [snip["horizontal_stripe"]]
         outdict[key]["vertical_stripe"] = [snip["vertical_stripe"]]
-        outdict[key]["num"] = np.isfinite(snip["data"]).astype(int)
+        outdict[key]["num"] = np.isfinite(data).astype(int)
         outdict[key]["n"] = 1
     else:
-        outdict[key]["data"] = np.nansum([outdict[key]["data"], snip["data"]], axis=0)
-        outdict[key]["num"] += np.isfinite(snip["data"]).astype(int)
-        outdict[key]["cov_start"] = np.nansum(
-            [outdict[key]["cov_start"], snip["cov_start"]], axis=0
-        )
-        outdict[key]["cov_end"] = np.nansum(
-            [outdict[key]["cov_end"], snip["cov_end"]], axis=0
-        )
-        outdict[key]["n"] += 1
-        outdict[key]["horizontal_stripe"] = outdict[key]["horizontal_stripe"] + [
-            snip["horizontal_stripe"]
-        ]
-        outdict[key]["vertical_stripe"] = outdict[key]["vertical_stripe"] + [
-            snip["vertical_stripe"]
-        ]
-        outdict[key]["coordinates"] = outdict[key]["coordinates"] + [
-            snip["coordinates"]
-        ]
+        acc = outdict[key]
+        # Same result as np.nansum([acc, data], axis=0), without stacking arrays
+        acc["data"] += np.where(isnan, 0.0, data)
+        acc["num"] += np.isfinite(data)
+        acc["cov_start"] = np.nansum([acc["cov_start"], snip["cov_start"]], axis=0)
+        acc["cov_end"] = np.nansum([acc["cov_end"], snip["cov_end"]], axis=0)
+        acc["n"] += 1
+        acc["horizontal_stripe"].append(snip["horizontal_stripe"])
+        acc["vertical_stripe"].append(snip["vertical_stripe"])
+        acc["coordinates"].append(snip["coordinates"])
     if extra_funcs is not None:
         for key2, func in extra_funcs.items():
             outdict[key] = func(outdict[key], snip)
@@ -92,77 +88,166 @@ def sum_pups(pup1, pup2, extra_funcs={}):
     If store_stripes is set to False, stripes and coordinates will be empty
 
     extra_funcs allows to give arbitrary functions to accumulate extra information
-    from the two pups.
+    from the two pups. Each function is called as ``func(pup1_copy, pup2)`` and
+    should return the updated first argument (see `accumulate_values`); only the
+    function's own key is taken from its result. The inputs are not modified.
     """
-    pup1["data"] = np.nan_to_num(pup1["data"])
-    pup2["data"] = np.nan_to_num(pup2["data"])
+    data1 = np.nan_to_num(pup1["data"])
+    data2 = np.nan_to_num(pup2["data"])
     pup = {
-        "data": pup1["data"] + pup2["data"],
+        "data": data1 + data2,
         "cov_start": pup1["cov_start"] + pup2["cov_start"],
         "cov_end": pup1["cov_end"] + pup2["cov_end"],
         "n": pup1.get("n", 1) + pup2.get("n", 1),
         "num": pup1.get("num", np.isfinite(pup1["data"]).astype(int))
         + pup2.get("num", np.isfinite(pup2["data"]).astype(int)),
-        "horizontal_stripe": pup1["horizontal_stripe"] + pup2["horizontal_stripe"],
-        "vertical_stripe": pup1["vertical_stripe"] + pup2["vertical_stripe"],
-        "coordinates": pup1["coordinates"] + pup2["coordinates"],
+        "horizontal_stripe": list(pup1["horizontal_stripe"])
+        + list(pup2["horizontal_stripe"]),
+        "vertical_stripe": list(pup1["vertical_stripe"]) + list(pup2["vertical_stripe"]),
+        "coordinates": list(pup1["coordinates"]) + list(pup2["coordinates"]),
     }
     if extra_funcs:
         for key, func in extra_funcs.items():
-            pup = func(pup1, pup2)
+            merged = func(dict(pup1), pup2)
+            if key in merged:
+                pup[key] = merged[key]
     return pd.Series(pup)
+
+
+_DIVIDE_DROP_COLUMNS = [
+    "control_n",
+    "control_num",
+    "n",
+    "num",
+    "clr",
+    "chroms",
+    "minshift",
+    "expected_file",
+    "group",
+    "maxshift",
+    "mindist",
+    "maxdist",
+    "subset",
+    "seed",
+    "data",
+    "horizontal_stripe",
+    "vertical_stripe",
+    "cooler",
+    "features",
+    "outname",
+    "coordinates",
+]
+
+# Columns that identify a row of a pileup dataframe, in order of preference
+_DIVIDE_KEY_COLUMNS = [["group"], ["chrom", "start", "end"], ["separation"], ["orientation"]]
+
+
+def _values_equal(a, b):
+    try:
+        if np.all(pd.isna(a)) and np.all(pd.isna(b)):
+            return True
+    except (TypeError, ValueError):
+        pass
+    try:
+        return bool(np.all(np.asarray(a == b)))
+    except Exception:
+        return False
+
+
+def _divide_pup_rows(row1, row2):
+    """Divide one pileup (a row of a pileup dataframe, as a Series) by another."""
+    drop = [c for c in _DIVIDE_DROP_COLUMNS if c in row1.index]
+    out = row1.drop(labels=drop)
+    for col in out.index:
+        if col in row2.index and not _values_equal(row1[col], row2[col]):
+            warnings.warn(f"Note that {col} is different between the two pileups")
+    with np.errstate(divide="ignore", invalid="ignore"):
+        out["data"] = row1["data"] / row2["data"]
+    out["clrs"] = f"{row1.get('clr', '')}/{row2.get('clr', '')}"
+    out["n"] = row1["n"] + row2["n"]
+    if "group" in row1.index:
+        out["group"] = row1["group"]
+    stripes = ["vertical_stripe", "horizontal_stripe"]
+    if all(s in row1.index for s in stripes) and all(s in row2.index for s in stripes):
+        coords1 = np.asarray(row1["coordinates"])
+        coords2 = np.asarray(row2["coordinates"])
+        if coords1.shape == coords2.shape and np.array_equal(coords1, coords2):
+            out["coordinates"] = row1["coordinates"]
+            for stripe in stripes:
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    ratio = np.asarray(row1[stripe], dtype=float) / np.asarray(
+                        row2[stripe], dtype=float
+                    )
+                out[stripe] = np.where(np.isfinite(ratio), ratio, 0)
+        else:
+            logger.info("Stripes cannot be divided, coordinates differ between pups")
+            if "store_stripes" in out.index:
+                out["store_stripes"] = False
+    elif "store_stripes" in out.index:
+        out["store_stripes"] = False
+    return out
+
+
+def _row_keys(pup, cols):
+    return [
+        tuple(str(v) for v in row) for row in pup[cols].itertuples(index=False, name=None)
+    ]
 
 
 def divide_pups(pup1, pup2):
     """
-    Divide two pups and get the resulting pup. Requires that the pups have identical shapes, resolutions, flanks, etc. If pups contain stripes, these will only be divided if stripes have identical coordinates.
+    Divide two pups and get the resulting pup. Requires that the pups have identical
+    shapes, resolutions, flanks, etc. If pups contain stripes, these will only be
+    divided if stripes have identical coordinates.
+
+    Pileup dataframes with multiple rows (e.g. from `groupby`, `by_distance`,
+    `by_strand` or `by_window`) are divided row by row, matching rows by their
+    "group", "chrom"/"start"/"end" (by-window pileups), "separation" or
+    "orientation" - whichever matches the most rows between the two pileups.
     """
-    drop_columns = [
-        "control_n",
-        "control_num",
-        "n",
-        "num",
-        "clr",
-        "chroms",
-        "minshift",
-        "expected_file",
-        "group",
-        "maxshift",
-        "mindist",
-        "maxdist",
-        "subset",
-        "seed",
-        "data",
-        "horizontal_stripe",
-        "vertical_stripe",
-        "cooler",
-        "features",
-        "outname",
-        "coordinates",
-    ]
-    if pup1.shape[0] > 1 or pup2.shape[0] > 1:
-        raise ValueError("Pileups cannot contain multiple conditions")
     pup1 = pup1.reset_index(drop=True)
     pup2 = pup2.reset_index(drop=True)
-    drop_columns = list(set(drop_columns) & set(pup1.columns))
-    div_pup = pup1.drop(columns=drop_columns)
-    for col in div_pup.columns:
-        if np.all(np.sort(pup1[col]) != np.sort(pup2[col])):
-            warnings.warn(f"Note that {col} is different between the two pileups")
-    div_pup["data"] = pup1["data"] / pup2["data"]
-    div_pup["clrs"] = str(pup1["clr"]) + "/" + str(pup2["clr"])
-    div_pup["n"] = pup1["n"] + pup2["n"]
-    if set(["vertical_stripe", "horizontal_stripe"]).issubset(pup1.columns):
-        if np.all(np.sort(pup1["coordinates"]) == np.sort(pup2["coordinates"])):
-            div_pup["coordinates"] = pup1["coordinates"]
-            for stripe in ["vertical_stripe", "horizontal_stripe"]:
-                div_pup[stripe] = pup1[stripe] / pup2[stripe]
-                div_pup[stripe] = div_pup[stripe].apply(
-                    lambda x: np.where(np.isin(x, [np.inf, np.nan]), 0, x)
-                )
-        else:
-            logging.info("Stripes cannot be divided, coordinates differ between pups")
-    return div_pup
+    if pup1.shape[0] == 1 and pup2.shape[0] == 1:
+        return pd.DataFrame([_divide_pup_rows(pup1.iloc[0], pup2.iloc[0])]).reset_index(
+            drop=True
+        )
+
+    # Use the key columns that match the most rows between the two pileups (the
+    # first candidate wins ties). E.g. ++ and -- pileups split by distance have
+    # different "group" values but matching "separation" values.
+    key_cols, best = None, 0
+    for cols in _DIVIDE_KEY_COLUMNS:
+        if not all(c in pup1.columns and c in pup2.columns for c in cols):
+            continue
+        overlap = len(set(_row_keys(pup1, cols)) & set(_row_keys(pup2, cols)))
+        if key_cols is None or overlap > best:
+            key_cols, best = cols, overlap
+    if key_cols is None:
+        raise ValueError(
+            "Pileups with multiple rows can only be divided if they have matching "
+            "'group' columns"
+        )
+    keys1 = _row_keys(pup1, key_cols)
+    keys2 = _row_keys(pup2, key_cols)
+    if len(set(keys1)) != len(keys1) or len(set(keys2)) != len(keys2):
+        raise ValueError(
+            f"Cannot match rows between pileups: {key_cols} values are not unique"
+        )
+    index2 = {key: i for i, key in enumerate(keys2)}
+    unmatched = set(keys1) ^ set(keys2)
+    if unmatched:
+        warnings.warn(
+            f"{len(unmatched)} groups are only present in one of the pileups and "
+            "will be skipped"
+        )
+    rows = [
+        _divide_pup_rows(pup1.iloc[i], pup2.iloc[index2[key]])
+        for i, key in enumerate(keys1)
+        if key in index2
+    ]
+    if not rows:
+        raise ValueError("No matching groups between the two pileups")
+    return pd.DataFrame(rows).reset_index(drop=True)
 
 
 def norm_coverage(snip):
@@ -208,8 +293,9 @@ def bin_distance(snip, band_edges="default"):
         The same snip with added ['distance_band'] annotation.
 
     """
-    if band_edges == "default":
+    if isinstance(band_edges, str) and band_edges == "default":
         band_edges = np.append([0], 50000 * 2 ** np.arange(30))
+    band_edges = np.asarray(band_edges).tolist()
     i = np.searchsorted(band_edges, snip["distance"])
     snip["distance_band"] = tuple(band_edges[i - 1 : i + 1])
     return snip
@@ -245,9 +331,11 @@ def accumulate_values(dict1, dict2, key):
     """
     Useful as an extra_sum_func
     """
-    assert key in dict2, f"{key} not in dict2"
+    if key not in dict2:
+        # e.g. an empty pileup from a region without any valid snippets
+        return dict1
     if key in dict1:
         dict1[key] = list(collapse([dict1[key], dict2[key]]))
     else:
-        dict1[key] = [dict2[key]]
+        dict1[key] = list(collapse([dict2[key]]))
     return dict1

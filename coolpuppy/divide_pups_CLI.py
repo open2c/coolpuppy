@@ -5,6 +5,9 @@ from .lib.puputils import divide_pups
 from ._version import __version__
 import argparse
 import logging
+import os
+
+logger = logging.getLogger("coolpuppy")
 
 
 def parse_args_divide_pups():
@@ -34,7 +37,9 @@ def main():
     parser = parse_args_divide_pups()
     args = parser.parse_args()
 
-    logging.info(args)
+    logging.basicConfig(format="%(levelname)s:%(name)s: %(message)s")
+    logger.setLevel(logging.INFO)
+    logger.debug(args)
 
     if len(args.input_pups) != 2:
         raise ValueError("Need exactly two input pups")
@@ -44,9 +49,13 @@ def main():
         pups = divide_pups(pup1, pup2)
 
     if args.outname == "auto":
-        outname = f"{str(args.input_pups[0])}_over_{str(args.input_pups[1])}.clpy"
+        # Saved in the current directory, named after the two inputs
+        name1, name2 = (
+            os.path.splitext(os.path.basename(p))[0] for p in args.input_pups
+        )
+        outname = f"{name1}_over_{name2}.clpy"
     else:
         outname = args.outname
 
     save_pileup_df(outname, pups)
-    logging.info(f"Saved output to {outname}")
+    logger.info(f"Saved output to {outname}")

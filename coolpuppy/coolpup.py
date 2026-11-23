@@ -2,6 +2,7 @@
 import warnings
 
 import os
+import inspect
 from multiprocessing import Pool
 from functools import partial, reduce
 import logging
@@ -17,12 +18,62 @@ import bioframe
 import cooler
 from cooltools import numutils as ctutils
 from cooltools.lib import common, checks
-from cooltools.api import snipping, coverage
+from cooltools.api import coverage
 
 from .lib import numutils
 from .lib.puputils import _add_snip, group_by_region, norm_coverage, sum_pups
 
 logger = logging.getLogger("coolpuppy")
+
+
+def _resolve_nproc(nproc):
+    """None -> 1; 0 or negative -> all available cores."""
+    if nproc is None:
+        return 1
+    nproc = int(nproc)
+    if nproc <= 0:
+        return os.cpu_count() or 1
+    return nproc
+
+
+def _install_mp_logging():
+    """Forward log records from worker processes, if possible.
+
+    multiprocessing_logging only supports the 'fork' start method (it raises
+    AssertionError otherwise, e.g. on macOS where 'spawn' is the default), so this
+    is best-effort and never prevents running in parallel.
+    """
+    import multiprocessing
+
+    if multiprocessing.get_start_method(allow_none=False) != "fork":
+        return None
+    try:
+        import multiprocessing_logging
+
+        multiprocessing_logging.install_mp_handler()
+        return multiprocessing_logging
+    except Exception:  # ImportError, or the start method assertion
+        return None
+
+
+def _parse_distance_edges(distance_edges):
+    """Return "default" or a list of ints from a list/tuple/array of edges."""
+    if isinstance(distance_edges, str):
+        if distance_edges != "default":
+            raise ValueError(
+                "Distance edges must be 'default' or a list of integers, "
+                f"got {distance_edges!r}"
+            )
+        return distance_edges
+    try:
+        edges = [int(i) for i in distance_edges]
+    except Exception as e:
+        raise ValueError(
+            "Distance bin edges have to be an iterable of integers or convertable to integers"
+        ) from e
+    if any(int(i) != i for i in distance_edges):
+        raise ValueError("Distance edges must be integers")
+    return edges
 
 
 def bin_distance_intervals(intervals, band_edges="default"):
@@ -43,8 +94,10 @@ def bin_distance_intervals(intervals, band_edges="default"):
         The same dataframe with added ['distance_band'] annotation.
 
     """
-    if band_edges == "default":
+    if isinstance(band_edges, str) and band_edges == "default":
         band_edges = np.append([0], 50000 * 2 ** np.arange(30))
+    # Plain Python numbers, so labels print the same with numpy 1 and 2
+    band_edges = np.asarray(band_edges).tolist()
     edge_ids = np.searchsorted(band_edges, intervals["distance"], side="right")
     bands = [tuple(band_edges[i - 1 : i + 1]) for i in edge_ids]
     intervals["distance_band"] = bands
@@ -248,7 +301,8 @@ class CoordCreator:
             self.maxdist = np.inf
         else:
             self.maxdist = maxdist
-            if self.trans:
+            # pileup() passes np.inf when maxdist isn't set
+            if self.trans and np.isfinite(maxdist):
                 warnings.warn("Ignoring maxdist when using trans", stacklevel=2)
                 self.maxdist = np.inf
         self.local = local
@@ -384,65 +438,35 @@ class CoordCreator:
         else:
             self.pos_stream = self.get_intervals_stream
 
-    def _control_regions(self, intervals2d, nshifts=0):
+    def _control_regions(self, intervals2d, nshifts=0, rng=None):
         if nshifts > 0:
+            if rng is None:
+                rng = np.random.default_rng()
             control_intervals = pd.concat([intervals2d] * nshifts).reset_index(
                 drop=True
             )
-            shift = np.random.randint(
-                self.minshift, self.maxshift, control_intervals.shape[0]
+            n = control_intervals.shape[0]
+            shift = rng.integers(self.minshift, self.maxshift, n) * rng.choice(
+                [-1, 1], n
             )
-            sign = np.random.choice([-1, 1], control_intervals.shape[0])
-            shift *= sign
-            if (
-                self.trans
-            ):  # The two trans coordinates can shift in different directions
-                shift2 = np.random.randint(
-                    self.minshift, self.maxshift, control_intervals.shape[0]
-                )
-                sign2 = np.random.choice([-1, 1], control_intervals.shape[0])
-                shift2 = shift2 * sign2
-                control_intervals[["exp_start1", "exp_end1", "center1"]] = (
-                    control_intervals[
-                        [
-                            "exp_start1",
-                            "exp_end1",
-                            "center1",
-                        ]
-                    ]
-                    + shift[:, np.newaxis]
-                )
-                control_intervals[["exp_start2", "exp_end2", "center2"]] = (
-                    control_intervals[["exp_start2", "exp_end2", "center2"]]
-                    + shift2[:, np.newaxis]
+            if self.trans:
+                # The two trans coordinates can shift in different directions
+                shift2 = rng.integers(self.minshift, self.maxshift, n) * rng.choice(
+                    [-1, 1], n
                 )
             else:
-                control_intervals[
-                    [
-                        "exp_start1",
-                        "exp_end1",
-                        "center1",
-                        "exp_start2",
-                        "exp_end2",
-                        "center2",
-                    ]
-                ] = (
-                    control_intervals[
-                        [
-                            "exp_start1",
-                            "exp_end1",
-                            "center1",
-                            "exp_start2",
-                            "exp_end2",
-                            "center2",
-                        ]
-                    ]
-                    + shift[:, np.newaxis]
-                )
-            control_intervals[["stBin1", "endBin1", "stBin2", "endBin2"]] = (
-                control_intervals[["stBin1", "endBin1", "stBin2", "endBin2"]]
-                + np.round(shift[:, np.newaxis] / self.resolution).astype(int)
-            )
+                shift2 = shift
+            cols1 = ["exp_start1", "exp_end1", "center1"]
+            cols2 = ["exp_start2", "exp_end2", "center2"]
+            control_intervals[cols1] = control_intervals[cols1] + shift[:, np.newaxis]
+            control_intervals[cols2] = control_intervals[cols2] + shift2[:, np.newaxis]
+            # Shift the bins by the same amount as the coordinates on each side
+            control_intervals[["stBin1", "endBin1"]] = control_intervals[
+                ["stBin1", "endBin1"]
+            ] + np.round(shift[:, np.newaxis] / self.resolution).astype(int)
+            control_intervals[["stBin2", "endBin2"]] = control_intervals[
+                ["stBin2", "endBin2"]
+            ] + np.round(shift2[:, np.newaxis] / self.resolution).astype(int)
             intervals2d["kind"] = "ROI"
             control_intervals["kind"] = "control"
             intervals2d = pd.concat([intervals2d, control_intervals]).reset_index(
@@ -453,10 +477,9 @@ class CoordCreator:
         return intervals2d
 
     def _subset(self, df):
-        if self.seed is not None:
-            np.random.seed(self.seed)
         if self.subset > 0 and self.subset < len(df):
-            return df.sample(self.subset)
+            # random_state=None falls back to the global numpy RNG, as before
+            return df.sample(self.subset, random_state=self.seed)
         else:
             return df
 
@@ -476,14 +499,19 @@ class CoordCreator:
             )
 
         if how == "center":
-            df["start"] = np.mean(df["start1"], df["end1"], axis=0)
-            df["end"] = np.mean(df["start2"], df["end2"], axis=0)
+            df = df.copy()
+            df["chrom"] = df["chrom1"]
+            df["start"] = ((df["start1"] + df["end1"]) / 2).astype(int)
+            df["end"] = ((df["start2"] + df["end2"]) / 2).astype(int)
+            df = df[["chrom", "start", "end"]]
         elif how == "outer":
-            df = df[["chrom1", "start1", "end2"]]
+            df = df[["chrom1", "start1", "end2"]].copy()
             df.columns = ["chrom", "start", "end"]
         elif how == "inner":
-            df = df[["chrom1", "end1", "start2"]]
+            df = df[["chrom1", "end1", "start2"]].copy()
             df.columns = ["chrom", "start", "end"]
+        else:
+            raise ValueError(f"how must be 'center', 'outer' or 'inner', got {how!r}")
         return df
 
     def _binnify(self, intervals):
@@ -603,12 +631,19 @@ class CoordCreator:
         control=False,
         groupby=[],
         modify_2Dintervals_func=None,
+        rng=None,
+        chunksize=100_000,
     ):
+        """Yield pairs of features (as dicts) to be piled up.
+
+        Pairs are generated in vectorised blocks of at most ~`chunksize` pairs, so
+        memory stays bounded even without `maxdist`.
+        """
         if intervals is None:
             intervals = self.intervals
         if not len(intervals) >= 1:
             logger.debug("Empty selection")
-            yield None
+            return
 
         intervals_left = filter_func1(intervals)
         if filter_func2 is None:
@@ -617,101 +652,113 @@ class CoordCreator:
             intervals_right = filter_func2(intervals)
 
         if self.local:
-            merged = pd.merge(
-                intervals_left,
-                intervals_left,
-                left_index=True,
-                right_index=True,
-                suffixes=["1", "2"],
+            blocks = [
+                pd.merge(
+                    intervals_left,
+                    intervals_left,
+                    left_index=True,
+                    right_index=True,
+                    suffixes=["1", "2"],
+                )
+            ]
+        else:
+            intervals_left = intervals_left.reset_index(drop=True)
+            intervals_right = intervals_right.reset_index(drop=True)
+            if self.trans:
+                blocks = self._trans_pair_blocks(
+                    intervals_left, intervals_right, chunksize
+                )
+            else:
+                blocks = self._cis_pair_blocks(
+                    intervals_left, intervals_right, chunksize
+                )
+
+        for combinations in blocks:
+            if combinations.shape[0] == 0:
+                continue
+            combinations = self._control_regions(
+                combinations, self.nshifts * control, rng=rng
             )
-            merged = self._control_regions(merged, self.nshifts * control)
             if modify_2Dintervals_func is not None:
-                merged = modify_2Dintervals_func(merged)
-            merged = assign_groups(merged, groupby=groupby)
-            merged = merged.reindex(
-                columns=list(merged.columns)
+                combinations = modify_2Dintervals_func(combinations)
+            combinations = assign_groups(combinations, groupby=groupby)
+            combinations = combinations.reindex(
+                columns=list(combinations.columns)
                 + [
                     "data",
-                    "cov_start",
-                    "cov_end",
                     "horizontal_stripe",
                     "vertical_stripe",
+                    "cov_start",
+                    "cov_end",
                 ]
             )
-            for row in merged.to_dict(orient="records"):
-                yield row
+            yield from combinations.to_dict(orient="records")
 
-        else:
-            intervals_left = intervals_left.rename(
-                columns=lambda x: x + "1"
-            ).reset_index(drop=True)
-            intervals_right = intervals_right.rename(
-                columns=lambda x: x + "2"
-            ).reset_index(drop=True)
+    @staticmethod
+    def _row_blocks(counts, chunksize):
+        """Split rows into consecutive blocks with at most ~chunksize total counts
+        (at least one row per block)."""
+        cum = np.cumsum(counts)
+        start, n = 0, len(counts)
+        while start < n:
+            base = cum[start - 1] if start > 0 else 0
+            end = int(np.searchsorted(cum, base + chunksize, side="right"))
+            end = max(end, start + 1)
+            yield start, end
+            start = end
 
-            if self.trans:
-                for x, y in itertools.product(
-                    intervals_left.index, intervals_right.index
-                ):
-                    combinations = pd.concat(
-                        [
-                            intervals_left.iloc[[x]].reset_index(drop=True),
-                            intervals_right.iloc[[y]].reset_index(drop=True),
-                        ],
-                        axis=1,
-                    )
-                    combinations = self._control_regions(
-                        combinations, self.nshifts * control
-                    )
-                    if modify_2Dintervals_func is not None:
-                        combinations = modify_2Dintervals_func(combinations)
-                    combinations = assign_groups(combinations, groupby=groupby)
-                    combinations = combinations.reindex(
-                        columns=list(combinations.columns)
-                        + [
-                            "data",
-                            "horizontal_stripe",
-                            "vertical_stripe",
-                            "cov_start",
-                            "cov_end",
-                        ]
-                    )
-                    for row in combinations.to_dict(orient="records"):
-                        yield row
-            else:
-                for i in range(1, intervals.shape[0]):
-                    combinations = pd.concat(
-                        [
-                            intervals_left.iloc[:-i].reset_index(drop=True),
-                            intervals_right.iloc[i:].reset_index(drop=True),
-                        ],
-                        axis=1,
-                    )
-                    combinations["distance"] = (
-                        combinations["center2"] - combinations["center1"]
-                    )
-                    combinations = combinations[
-                        (self.mindist <= combinations["distance"].abs())
-                        & (combinations["distance"].abs() <= self.maxdist)
-                    ]
-                    combinations = self._control_regions(
-                        combinations, self.nshifts * control
-                    )
-                    if modify_2Dintervals_func is not None:
-                        combinations = modify_2Dintervals_func(combinations)
-                    combinations = assign_groups(combinations, groupby=groupby)
-                    combinations = combinations.reindex(
-                        columns=list(combinations.columns)
-                        + [
-                            "data",
-                            "horizontal_stripe",
-                            "vertical_stripe",
-                            "cov_start",
-                            "cov_end",
-                        ]
-                    )
-                    for row in combinations.to_dict(orient="records"):
-                        yield row
+    def _trans_pair_blocks(self, left, right, chunksize):
+        """All left x right pairs, in the order of itertools.product(left, right)."""
+        if left.shape[0] == 0 or right.shape[0] == 0:
+            return
+        left = left.add_suffix("1")
+        right = right.add_suffix("2")
+        counts = np.full(left.shape[0], right.shape[0])
+        for start, end in self._row_blocks(counts, chunksize):
+            yield pd.merge(left.iloc[start:end], right, how="cross")
+
+    def _cis_pair_blocks(self, left, right, chunksize):
+        """Pairs of features (left[k], right[j]) with j > k whose centres are
+        between mindist and maxdist apart.
+
+        Equivalent to pairing ``left.iloc[:-i]`` with ``right.iloc[i:]`` for every
+        offset ``i >= 1`` and filtering by distance (the previous implementation),
+        but vectorised: candidate partners for each left feature are found with a
+        binary search on sorted centres, so the work scales with the number of
+        pairs within maxdist instead of with (number of features genome-wide)^2.
+        """
+        cl = left["center"].to_numpy(dtype=float)
+        cr = right["center"].to_numpy(dtype=float)
+        if cl.shape[0] == 0 or cr.shape[0] < 2:
+            return
+        order = np.argsort(cr, kind="stable")
+        cr_sorted = cr[order]
+        lo = np.searchsorted(cr_sorted, cl - self.maxdist, side="left")
+        hi = np.searchsorted(cr_sorted, cl + self.maxdist, side="right")
+        counts = hi - lo
+        left1 = left.add_suffix("1")
+        right2 = right.add_suffix("2")
+        for start, end in self._row_blocks(counts, chunksize):
+            cnt = counts[start:end]
+            k = np.repeat(np.arange(start, end), cnt)
+            within = np.arange(cnt.sum()) - np.repeat(np.cumsum(cnt) - cnt, cnt)
+            j = order[np.repeat(lo[start:end], cnt) + within]
+            keep = j > k
+            k, j = k[keep], j[keep]
+            dist = np.abs(cr[j] - cl[k])
+            keep = (dist >= self.mindist) & (dist <= self.maxdist)
+            k, j = k[keep], j[keep]
+            if k.shape[0] == 0:
+                continue
+            block = pd.concat(
+                [
+                    left1.iloc[k].reset_index(drop=True),
+                    right2.iloc[j].reset_index(drop=True),
+                ],
+                axis=1,
+            )
+            block["distance"] = block["center2"] - block["center1"]
+            yield block
 
     def get_intervals_stream(
         self,
@@ -721,11 +768,15 @@ class CoordCreator:
         control=False,
         groupby=[],
         modify_2Dintervals_func=None,
+        rng=None,
     ):
         if intervals is None:
             intervals = self.intervals
         intervals = filter_func1(intervals)
-        intervals = self._control_regions(intervals, self.nshifts * control)
+        if not len(intervals) >= 1:
+            logger.debug("Empty selection")
+            return
+        intervals = self._control_regions(intervals, self.nshifts * control, rng=rng)
         if modify_2Dintervals_func is not None:
             intervals = modify_2Dintervals_func(intervals)
         intervals = assign_groups(intervals, groupby)
@@ -739,11 +790,7 @@ class CoordCreator:
                 "vertical_stripe",
             ]
         )
-        if not len(intervals) >= 1:
-            logger.debug("Empty selection")
-            yield None
-        for interval in intervals.to_dict(orient="records"):
-            yield interval
+        yield from intervals.to_dict(orient="records")
 
     def empty_stream(self, *args, **kwargs):
         yield from ()
@@ -851,7 +898,7 @@ class PileUpper:
         self.flip_negative_strand = flip_negative_strand
         self.ignore_diags = ignore_diags
         self.store_stripes = store_stripes
-        self.nproc = nproc
+        self.nproc = _resolve_nproc(nproc)
 
         if view_df is None:
             # Generate viewframe from clr.chromsizes:
@@ -904,14 +951,16 @@ class PileUpper:
                     )
                 except Exception as e:
                     raise ValueError("provided expected is not valid") from e
-                self.ExpSnipper = snipping.ExpectedSnipper(
-                    self.clr,
-                    self.expected,
-                    view_df=self.view_df,
-                    expected_value_col=self.expected_value_col,
-                )
+                # Expected values for each region as a lazy Toeplitz matrix (what
+                # cooltools' ExpectedSnipper.select returns, but that fails with
+                # pandas >= 3 in cooltools <= 0.7.1)
+                expected_by_region = self.expected.groupby(["region1", "region2"])
                 self.expected_selections = {
-                    region_name: self.ExpSnipper.select(region_name, region_name)
+                    region_name: ctutils.LazyToeplitz(
+                        expected_by_region.get_group((region_name, region_name))[
+                            self.expected_value_col
+                        ].values
+                    )
                     for region_name in self.view_df["name"]
                 }
                 self.expected_df = self.expected
@@ -952,20 +1001,32 @@ class PileUpper:
                 f"coverage_norm {self.coverage_norm} not found in cooler bins"
             )
 
-        if (
-            self.coverage_norm in ["cov_cis_raw", "cov_tot_raw"]
-            and self.coverage_norm not in self.clr.bins().columns
-        ):
-            with Pool(self.nproc) as pool:
-                _ = coverage.coverage(
-                    self.clr, map=pool.map, store=True, ignore_diags=self.ignore_diags
-                )
-                del _
-
         if self.coverage_norm and self.clr_weight_name:
             raise ValueError(
                 "Can't do coverage normalization when clr_weight_name is provided"
             )
+
+        if (
+            self.coverage_norm in ["cov_cis_raw", "cov_tot_raw"]
+            and self.coverage_norm not in self.clr.bins().columns
+        ):
+            # cooltools >= 0.6 takes `nproc` (and manages its own pool); older
+            # versions take a `map` function
+            if "nproc" in inspect.signature(coverage.coverage).parameters:
+                coverage.coverage(
+                    self.clr,
+                    store=True,
+                    ignore_diags=self.ignore_diags,
+                    nproc=self.nproc,
+                )
+            else:
+                with Pool(self.nproc) as pool:
+                    coverage.coverage(
+                        self.clr,
+                        store=True,
+                        ignore_diags=self.ignore_diags,
+                        map=pool.map,
+                    )
 
         if self.rescale:
             if self.rescale_flank is None:
@@ -1056,7 +1117,7 @@ class PileUpper:
         # data = sparse.triu(data)
         return data.tocsr()
 
-    def _stream_snips(self, intervals, region1, region2=None):
+    def _stream_snips(self, intervals, region1, region2=None, skipped=None):
         try:
             row1 = next(intervals)
         except StopIteration:
@@ -1100,7 +1161,10 @@ class PileUpper:
         ar = np.arange(max_right1 - min_left1, dtype=np.int32)
 
         diag_indicator = ctutils.LazyToeplitz(-ar, ar)
+        if self.expected and self.trans:
+            exp_value_trans = self.get_expected_trans(region1, region2)
 
+        n_skipped = 0
         for snip in intervals:
             snip["stBin1"], snip["endBin1"], snip["stBin2"], snip["endBin2"] = (
                 snip["stBin1"] - min_left1,
@@ -1111,32 +1175,16 @@ class PileUpper:
             if (snip["stBin1"] < 0 or snip["endBin1"] > (max_right1 - min_left1)) or (
                 snip["stBin2"] < 0 or snip["endBin2"] > (max_right2 - min_left2)
             ):
+                if snip["kind"] == "ROI":
+                    n_skipped += 1
                 continue
-            data = (
-                bigdata[
-                    snip["stBin1"] : snip["endBin1"], snip["stBin2"] : snip["endBin2"]
-                ]
-                .toarray()
-                .astype(float)
-            )
+            data = bigdata[
+                snip["stBin1"] : snip["endBin1"], snip["stBin2"] : snip["endBin2"]
+            ].toarray()
+            if data.dtype != np.float64:
+                data = data.astype(np.float64)
             data[isnan1[snip["stBin1"] : snip["endBin1"]], :] = np.nan
             data[:, isnan2[snip["stBin2"] : snip["endBin2"]]] = np.nan
-
-            if self.expected:
-                if self.trans:
-                    exp_value = self.get_expected_trans(region1, region2)
-                    exp_data = np.full((data.shape), exp_value)
-                else:
-                    exp_data = self.expected_selections[region1][
-                        snip["stBin1"] : snip["endBin1"],
-                        snip["stBin2"] : snip["endBin2"],
-                    ]
-
-                if not self.ooe:
-                    exp_snip = snip.copy()
-                    exp_snip["kind"] = "control"
-                    exp_snip["data"] = exp_data
-                    exp_snip["coordinates"] = []
 
             if not self.trans:
                 D = (
@@ -1147,6 +1195,24 @@ class PileUpper:
                     < self.ignore_diags
                 )
                 data[D] = np.nan
+
+            if self.expected:
+                if self.trans:
+                    exp_data = np.full((data.shape), exp_value_trans)
+                else:
+                    exp_data = self.expected_selections[region1][
+                        snip["stBin1"] : snip["endBin1"],
+                        snip["stBin2"] : snip["endBin2"],
+                    ]
+
+                if not self.ooe:
+                    exp_snip = snip.copy()
+                    exp_snip["kind"] = "control"
+                    # Only accumulate expected where the observed data is valid
+                    # (not a bad bin or an ignored diagonal), so that observed and
+                    # expected are averaged over the same pixels
+                    exp_snip["data"] = np.where(np.isnan(data), np.nan, exp_data)
+                    exp_snip["coordinates"] = []
 
             if self.coverage_norm:
                 snip["cov_start"] = coverage1[snip["stBin1"] : snip["endBin1"]]
@@ -1189,6 +1255,15 @@ class PileUpper:
 
             if self.expected and not self.ooe:
                 yield exp_snip
+
+        if n_skipped > 0:
+            logger.debug(
+                f"{n_skipped} regions of interest in {region1}"
+                + (f" x {region2}" if region2 != region1 else "")
+                + " extend beyond the region boundaries and were skipped"
+            )
+        if skipped is not None:
+            skipped[0] += n_skipped
 
     def _rescale_snip(self, snip):
         """
@@ -1290,6 +1365,8 @@ class PileUpper:
         modify_2Dintervals_func=None,
         postprocess_func=None,
         extra_sum_funcs=None,
+        seed=None,
+        _skipped=None,
     ):
         """
 
@@ -1299,6 +1376,8 @@ class PileUpper:
             Region name.
         region2 : str, optional
             Region name.
+        seed : int, np.random.SeedSequence or None, optional
+            Seed for the random generator used for shifted controls in this region.
         groupby : list of str, optional
             Which attributes of each snip to assign a group to it
         modify_2Dintervals_func : function, optional
@@ -1345,10 +1424,13 @@ class PileUpper:
             control=self.control,
             groupby=groupby,
             modify_2Dintervals_func=modify_2Dintervals_func,
+            rng=np.random.default_rng(seed),
         )
 
         final = self.accumulate_stream(
-            self._stream_snips(intervals=intervals, region1=region1, region2=region2),
+            self._stream_snips(
+                intervals=intervals, region1=region1, region2=region2, skipped=_skipped
+            ),
             postprocess_func=postprocess_func,
             extra_funcs=extra_sum_funcs,
         )
@@ -1356,6 +1438,16 @@ class PileUpper:
             logger.info(f"{region1, region2}: {final['ROI']['all']['n']}")
 
         return final
+
+    def _pileup_region_seeded(self, region1, region2, seed, kwargs):
+        # Positional wrapper for map/starmap; also returns the number of regions of
+        # interest skipped for extending beyond the region boundaries, so that
+        # pileupsWithControl can report one total
+        skipped = [0]
+        pileup = self.pileup_region(
+            region1, region2, seed=seed, _skipped=skipped, **kwargs
+        )
+        return pileup, skipped[0]
 
     def pileupsWithControl(
         self,
@@ -1409,6 +1501,7 @@ class PileUpper:
 
         if nproc is None:
             nproc = self.nproc
+        nproc = _resolve_nproc(nproc)
         if len(self.chroms) == 0:
             return self.make_outmap(), 0
         sum_func = partial(sum_pups, extra_funcs=extra_sum_funcs)
@@ -1493,21 +1586,37 @@ class PileUpper:
             postprocess_func_final = postprocess_func
 
         f = partial(
-            self.pileup_region,
-            groupby=groupby,
-            modify_2Dintervals_func=modify_2Dintervals_func_final,
-            postprocess_func=postprocess_func_final,
-            extra_sum_funcs=extra_sum_funcs,
+            self._pileup_region_seeded,
+            kwargs=dict(
+                groupby=groupby,
+                modify_2Dintervals_func=modify_2Dintervals_func_final,
+                postprocess_func=postprocess_func_final,
+                extra_sum_funcs=extra_sum_funcs,
+            ),
         )
-        if nproc > 1:
-            from multiprocessing_logging import install_mp_handler, uninstall_mp_handler
-
-            install_mp_handler()
-            with Pool(nproc) as p:
-                pileups = list(p.starmap(f, zip(regions1, regions2)))
-            uninstall_mp_handler()
+        # Independent, reproducible random streams for each pair of regions, so that
+        # shifted controls don't depend on nproc or on how work is scheduled.
+        # Without a seed, entropy is drawn from the global numpy RNG, so
+        # np.random.seed() still makes results reproducible.
+        if self.seed is not None:
+            seedseq = np.random.SeedSequence(self.seed)
         else:
-            pileups = list(map(f, regions1, regions2))
+            seedseq = np.random.SeedSequence(
+                np.random.randint(0, 2**31 - 1, size=4).tolist()
+            )
+        seeds = seedseq.spawn(len(regions1))
+        if nproc > 1:
+            mp_logging = _install_mp_logging()
+            try:
+                with Pool(nproc) as p:
+                    results = list(p.starmap(f, zip(regions1, regions2, seeds)))
+            finally:
+                if mp_logging is not None:
+                    mp_logging.uninstall_mp_handler()
+        else:
+            results = list(map(f, regions1, regions2, seeds))
+        pileups = [pileup for pileup, _ in results]
+        n_skipped = sum(n for _, n in results)
         roi = (
             pd.DataFrame(
                 [
@@ -1538,12 +1647,10 @@ class PileUpper:
                 warnings.warn(
                     "Expected can not be normalized to coverage", stacklevel=2
                 )
-        normalized_roi = pd.DataFrame(roi["data"] / roi["num"], columns=["data"])
+        normalized_roi = (roi["data"] / roi["num"]).to_frame("data")
         if self.control or (self.expected and not self.ooe):
-            normalized_control = pd.DataFrame(
-                ctrl["data"] / ctrl["num"], columns=["data"]
-            )
-            normalized_roi = normalized_roi / normalized_control
+            normalized_control = (ctrl["data"] / ctrl["num"]).to_frame("data")
+            normalized_roi["data"] = normalized_roi["data"] / normalized_control["data"]
             normalized_roi["control_n"] = ctrl["n"]
             normalized_roi["control_num"] = ctrl["num"]
 
@@ -1624,6 +1731,16 @@ class PileUpper:
                 if self.control:
                     normalized_roi[f"control_{key}"] = ctrl[key]
         logger.info(f"Total number of piled up windows: {int(n)}")
+        if n_skipped > 0:
+            # A few features close to chromosome/arm ends are always skipped; only
+            # warn when it's a noticeable fraction of the data
+            frac = n_skipped / (n_skipped + n)
+            logger.log(
+                logging.WARNING if frac >= 0.05 else logging.INFO,
+                f"{n_skipped} regions of interest ({frac:.1%}) extend beyond the "
+                "chromosome or view region boundaries and were skipped (use logging "
+                "level DEBUG for per-region counts)",
+            )
 
         # Store attributes
         exclude_attributes = [
@@ -1635,7 +1752,6 @@ class PileUpper:
             "final_chroms",
             "pos_stream",
             "view_df",
-            "ExpSnipper",
             "expected_selections",
             "expected_df",
             "view_df_extents",
@@ -1786,10 +1902,9 @@ class PileUpper:
             raise ValueError("Cannot do by-distance pileups for trans")
         elif self.local:
             raise ValueError("Cannot do by-distance pileups for local")
-        if distance_edges != "default":
-            if not all(isinstance(n, int) for n in distance_edges):
-                raise ValueError("Distance edges must be integers")
-            distance_edges = list(np.sort(distance_edges))
+        distance_edges = _parse_distance_edges(distance_edges)
+        if not isinstance(distance_edges, str):
+            distance_edges = sorted(distance_edges)
             for n in range(len(distance_edges)):
                 if np.min(distance_edges) < self.mindist:
                     distance_edges[np.argmin(distance_edges)] = self.mindist
@@ -1864,10 +1979,9 @@ class PileUpper:
             nproc = self.nproc
         if self.trans:
             raise ValueError("Cannot do by-distance pileups for trans")
-        if distance_edges != "default":
-            if not all(isinstance(n, int) for n in distance_edges):
-                raise ValueError("Distance edges must be integers")
-            distance_edges = list(np.sort(distance_edges))
+        distance_edges = _parse_distance_edges(distance_edges)
+        if not isinstance(distance_edges, str):
+            distance_edges = sorted(distance_edges)
             for n in range(len(distance_edges)):
                 if np.min(distance_edges) < self.mindist:
                     distance_edges[np.argmin(distance_edges)] = self.mindist
@@ -2085,27 +2199,25 @@ def pileup(
     pileup_df - pandas DataFrame containing the pileups and their grouping information,
     if any, all possible annotations from the arguments of this function.
     """
-    if by_distance is not False:
+    if by_distance is not False and by_distance is not None:
         if local:
             raise ValueError(
                 "Can't do local pileups by distance, please specify only one of those arguments"
             )
 
-        if isinstance(by_distance, np.ndarray):
-            try:
-                distance_edges = [int(i) for i in by_distance]
-            except Exception as e:
-                raise ValueError(
-                    "Distance bin edges have to be an iterable of integers or convertable to integers"
-                ) from e
-            by_distance = True
-        elif by_distance is True or by_distance == "default":
+        if by_distance is True or (
+            isinstance(by_distance, str) and by_distance == "default"
+        ):
             distance_edges = "default"
-            by_distance = True
+        elif isinstance(by_distance, (list, tuple, np.ndarray, pd.Series)):
+            distance_edges = _parse_distance_edges(by_distance)
         else:
             raise ValueError(
                 "Invalid by_distance value, should be either True, 'default' or a list of integers"
             )
+        by_distance = True
+    else:
+        by_distance = False
 
     if not rescale:
         rescale_flank = None
@@ -2113,10 +2225,7 @@ def pileup(
     if seed is not None:
         np.random.seed(seed)
 
-    if nproc == 0:
-        nproc = -1
-    else:
-        nproc = nproc
+    nproc = _resolve_nproc(nproc)
 
     if view_df is None:
         # full chromosome case
@@ -2273,7 +2382,10 @@ def pileup(
         pups["by_strand"] = False
         pups["by_distance"] = False
     pups["groupby"] = [groupby] * pups.shape[0]
-    pups["expected"] = pups["expected"].fillna(False)
+    # self.expected is True, False or None; avoid pandas' fillna downcasting warning
+    pups["expected"] = pups["expected"].map(
+        lambda x: bool(x) if isinstance(x, (bool, np.bool_)) else False
+    )
     coolname = os.path.splitext(os.path.basename(clr.filename))[0]
     pups["cooler"] = coolname
     return pups
