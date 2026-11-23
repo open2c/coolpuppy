@@ -4,14 +4,13 @@ from coolpuppy.lib import numutils, puputils
 import numpy as np
 import pandas as pd
 
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as grd
 from matplotlib.colors import LogNorm, Normalize
 from matplotlib import ticker
 from matplotlib import cm
 import seaborn as sns
-
-from cooltools.lib import plotting
 
 import logging
 import warnings
@@ -20,9 +19,60 @@ logger = logging.getLogger("coolpuppy")
 
 warnings.filterwarnings(action="ignore", message=".*tight_layout.*")
 warnings.filterwarnings(action="ignore", message=".*Tight layout.*")
-pd.options.mode.chained_assignment = None
 import natsort
 import copy
+
+
+def _import_cooltools_plotting():
+    """Import cooltools.lib.plotting, which registers colormaps such as "fall".
+
+    cooltools <= 0.7.1 imports matplotlib.cm.register_cmap, which was removed in
+    matplotlib 3.9, so provide it if it's missing.
+    """
+    import matplotlib.cm
+
+    if not hasattr(matplotlib.cm, "register_cmap"):
+
+        def register_cmap(name=None, cmap=None, **kwargs):
+            matplotlib.colormaps.register(cmap, name=name, force=True)
+
+        matplotlib.cm.register_cmap = register_cmap
+    from cooltools.lib import plotting
+
+    return plotting
+
+
+plotting = _import_cooltools_plotting()
+
+
+def _not_all_rows(pupsdf):
+    """Boolean mask of rows that are not the combined "all" group (or all rows if
+    there is nothing else)."""
+    if "group" in pupsdf.columns:
+        mask = pupsdf["group"].astype(str) != "all"
+        if mask.any():
+            return mask
+    return pd.Series(True, index=pupsdf.index)
+
+
+def _as_int(x):
+    """int() of a scalar, or of the first element of a Series/array (pandas
+    deprecated calling int() on a single-element Series)"""
+    if hasattr(x, "iloc"):
+        x = x.iloc[0]
+    elif np.ndim(x) > 0:
+        x = np.ravel(x)[0]
+    return int(x)
+
+
+def _get_cmap(cmap):
+    """Copy of a colormap by name (matplotlib.cm.get_cmap was removed in 3.9)."""
+    if isinstance(cmap, str):
+        try:
+            return matplotlib.colormaps[cmap].copy()
+        except AttributeError:  # matplotlib < 3.5
+            return copy.copy(cm.get_cmap(cmap))
+    return copy.copy(cmap)
 
 
 def auto_rows_cols(n):
@@ -140,7 +190,12 @@ def add_heatmap(
     flank = int(flank.iloc[0])
     ax = plt.gca()
     if stripe:
-        extents = [-flank / max_coordinates[1], flank / max_coordinates[1], -int(n), 0]
+        extents = [
+            -flank / max_coordinates[1],
+            flank / max_coordinates[1],
+            -_as_int(n),
+            0,
+        ]
         ax.set_ylim(-max_coordinates[2], 0)
     else:
         extents = [
@@ -210,8 +265,8 @@ def add_stripe_lineplot(
     gs = grd.GridSpec(
         2, 2, height_ratios=[1, 5], width_ratios=[8.25, 1], wspace=0.05, hspace=0.05
     )
-    flank = int(flank)
-    resolution = int(resolution)
+    flank = _as_int(flank)
+    resolution = _as_int(resolution)
     ticks_pixels = np.linspace(0, flank * 2 // resolution, 5)
     ticks_kbp = ((ticks_pixels - ticks_pixels[-1] / 2) * resolution // 1000).astype(int)
     mean = np.nanmean(data.values[0], axis=0)
@@ -372,45 +427,24 @@ def plot_stripes(
     pupsdf = pupsdf.reset_index()
 
     # Generate corner stripes
+    # (built as lists and assigned whole columns: chained assignment like
+    # pupsdf[col][i] = ... silently does nothing under pandas Copy-on-Write)
+    stripe_cols = ["coordinates", "corner_stripe", "vertical_stripe", "horizontal_stripe"]
     cntr = int(np.floor(pupsdf["data"][0].shape[0] / 2))
-    pupsdf["corner_stripe"] = pupsdf["horizontal_stripe"]
-    for i in range(len(pupsdf)):
-        pupsdf["corner_stripe"][i] = np.concatenate(
-            (
-                pupsdf["horizontal_stripe"][i][:, :(cntr)],
-                pupsdf["vertical_stripe"][i][:, cntr:],
-            ),
-            axis=1,
-        )
+    pupsdf["corner_stripe"] = [
+        np.concatenate((h[:, :(cntr)], v[:, cntr:]), axis=1)
+        for h, v in zip(pupsdf["horizontal_stripe"], pupsdf["vertical_stripe"])
+    ]
 
     # Sorting stripes
-    if not stripe_sort == None:
+    if stripe_sort is not None:
         different = False
-        for i in range(len(pupsdf)):
-            pupsdf["coordinates"][i] = np.array(pupsdf["coordinates"][i], dtype=object)
-            pupsdf["corner_stripe"][i] = np.array(pupsdf["corner_stripe"][i])
-            pupsdf["vertical_stripe"][i] = np.array(pupsdf["vertical_stripe"][i])
-            pupsdf["horizontal_stripe"][i] = np.array(pupsdf["horizontal_stripe"][i])
-            ind_regions = natsort.index_natsorted(pupsdf["coordinates"][i])
-            pupsdf.loc[
-                i,
-                [
-                    "coordinates",
-                    "corner_stripe",
-                    "vertical_stripe",
-                    "horizontal_stripe",
-                ],
-            ] = pupsdf.loc[
-                i,
-                [
-                    "coordinates",
-                    "corner_stripe",
-                    "vertical_stripe",
-                    "horizontal_stripe",
-                ],
-            ].apply(
-                lambda x: x[ind_regions]
-            )
+        pupsdf["coordinates"] = [np.array(x, dtype=object) for x in pupsdf["coordinates"]]
+        for col in stripe_cols[1:]:
+            pupsdf[col] = [np.array(x) for x in pupsdf[col]]
+        orders = [natsort.index_natsorted(x) for x in pupsdf["coordinates"]]
+        for col in stripe_cols:
+            pupsdf[col] = [x[o] for x, o in zip(pupsdf[col], orders)]
         for i in range(len(pupsdf)):
             if not np.array_equal(pupsdf["coordinates"][0], pupsdf["coordinates"][i]):
                 different = True
@@ -426,26 +460,8 @@ def plot_stripes(
                 ind_sort = np.argsort(-pupsdf[stripe][0][:, cntr])
             else:
                 raise ValueError("stripe_sort can only be None, sum, or center_pixel")
-            for i in range(len(pupsdf)):
-                pupsdf.loc[
-                    i,
-                    [
-                        "coordinates",
-                        "corner_stripe",
-                        "vertical_stripe",
-                        "horizontal_stripe",
-                    ],
-                ] = pupsdf.loc[
-                    i,
-                    [
-                        "coordinates",
-                        "corner_stripe",
-                        "vertical_stripe",
-                        "horizontal_stripe",
-                    ],
-                ].apply(
-                    lambda x: x[ind_sort]
-                )
+            for col in stripe_cols:
+                pupsdf[col] = [x[ind_sort] for x in pupsdf[col]]
             if isinstance(out_sorted_bedpe, str):
                 pd.DataFrame(pupsdf.loc[0, "coordinates"]).to_csv(
                     out_sorted_bedpe, sep="\t", header=None, index=False
@@ -469,13 +485,13 @@ def plot_stripes(
 
     norm = norm(vmin, vmax)
 
-    cmap = copy.copy(cm.get_cmap(cmap))
+    cmap = _get_cmap(cmap)
     cmap.set_bad(cmap_emptypixel)
 
     max_coordinates = [
         pupsdf.loc[pd.to_numeric(pupsdf["flank"]).idxmax(), "flank"],
         pupsdf.loc[pd.to_numeric(pupsdf["flank"]).idxmax(), "resolution"],
-        max(pupsdf.loc[pupsdf.drop(columns="index").iloc[:, 1] != "all", "n"]),
+        max(pupsdf.loc[_not_all_rows(pupsdf), "n"]),
     ]
 
     if stripe in ["horizontal_stripe", "vertical_stripe", "corner_stripe"]:
@@ -697,7 +713,7 @@ def plot(
     pupsdf = pupsdf.copy()
     if np.any(pupsdf.index.duplicated()):
         pupsdf = pupsdf.reset_index(drop=True)
-    cmap = copy.copy(cm.get_cmap(cmap))
+    cmap = _get_cmap(cmap)
     cmap.set_bad(cmap_emptypixel)
 
     sns.set(font=font, font_scale=font_scale, style="ticks")
@@ -791,12 +807,17 @@ def plot(
     )
 
     if score:
+        # score=True or a column name; the default "score" column is computed if it
+        # isn't already present
         if score is True:
             score = "score"
+        if score not in pupsdf.columns:
+            if score != "score":
+                raise ValueError(f"Score column {score!r} not found in the pileups")
             pupsdf[score] = pupsdf.apply(
                 puputils.get_score, center=center, ignore_central=ignore_central, axis=1
             )
-        fg.map(add_score, "score", height=height, font_scale=font_scale)
+        fg.map(add_score, score, height=height, font_scale=font_scale)
 
     if plot_ticks:
         fg.fig.subplots_adjust(wspace=0.2, hspace=0.05)

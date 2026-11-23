@@ -8,7 +8,7 @@
 
 .**cool** file **p**ile-**up**s with **py**thon.
 
-A versatile tool to perform pile-up analysis on Hi-C data in .cool format (https://github.com/mirnylab/cooler). And who doesn't like cool pupppies?
+A versatile tool to perform pile-up analysis on Hi-C data in .cool format (https://github.com/open2c/cooler). And who doesn't like cool pupppies?
 
 # Introduction
 
@@ -43,9 +43,7 @@ Abdennur, N., and Mirny, L. (2019). Cooler: scalable storage for Hi-C data and o
 # Getting started
 
 ## Installation
-All requirements apart are available from PyPI or conda. 
-
-Before installing everything you need to obtain `Cython` using either pip or conda. Then for coolpuppy (and other dependencies) simply do:
+coolpup.py requires Python 3.10 or newer. All requirements are available from PyPI or conda. To install coolpuppy and its dependencies, simply do:
 
 `pip install coolpuppy`
 

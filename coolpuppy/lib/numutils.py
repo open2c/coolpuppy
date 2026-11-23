@@ -79,6 +79,19 @@ def get_enrichment(amap, n):
     return np.nanmean(amap[c - n // 2 : c + n // 2 + 1, c - n // 2 : c + n // 2 + 1])
 
 
+def _flank_pixels(size, flank):
+    """Number of pixels on each side of a rescaled pileup of `size` pixels that
+    correspond to the padding, when the ROI was padded by `flank` x its own length
+    on each side (i.e. the ROI is 1 / (2 * flank + 1) of the total width)."""
+    fp = int(round(size * flank / (2 * flank + 1)))
+    if fp < 1 or 2 * fp >= size:
+        raise ValueError(
+            f"Can't separate the central domain from its flanks with rescale_flank={flank}"
+            f" and a {size}x{size} pileup"
+        )
+    return fp
+
+
 def get_local_enrichment(amap, flank=1):
     """Get values for a square from the central part of a pileup, ignoring padding
 
@@ -86,9 +99,9 @@ def get_local_enrichment(amap, flank=1):
     ----------
     amap : 2D array
         Pileup.
-    flank : int
-        Relative padding used, i.e. if 1 the central third is used, if 2 the central
-        fifth is used.
+    flank : float
+        Relative padding used (rescale_flank), i.e. if 1 the central third is used,
+        if 2 the central fifth is used, if 0.5 the central half.
         The default is 1.
 
     Returns
@@ -97,9 +110,7 @@ def get_local_enrichment(amap, flank=1):
         Mean of the pixels in the central square.
 
     """
-    c = amap.shape[0] / (flank * 2 + 1)
-    assert int(c) == c
-    c = int(c)
+    c = _flank_pixels(amap.shape[0], flank)
     return np.nanmean(amap[c:-c, c:-c])
 
 
@@ -112,9 +123,9 @@ def get_domain_score(amap, flank=1):
     ----------
     amap : 2D array
         Pileup.
-    flank : int
-        Relative padding used, i.e. if 1 the central third is used, if 2 the central
-        fifth is used.
+    flank : float
+        Relative padding used (rescale_flank), i.e. if 1 the central third is used,
+        if 2 the central fifth is used, if 0.5 the central half.
         The default is 1.
 
     Returns
@@ -123,13 +134,16 @@ def get_domain_score(amap, flank=1):
         Domain score.
 
     """
-    c = amap.shape[0] / (flank * 2 + 1)
-    assert int(c) == c
-    c = int(c)
+    c = _flank_pixels(amap.shape[0], flank)
+    inner = amap.shape[0] - 2 * c
     central = np.nansum(amap[c:-c, c:-c])
     top = np.nansum(amap[:c, c:-c])
     right = np.nansum(amap[c:-c, -c:])
-    return central / (top + right) * 2
+    # Normalise by area: with flank=1 the central square and the two flanking
+    # rectangles have the same area, so this equals central / (top + right) * 2
+    central_area = inner * inner
+    flank_area = c * inner
+    return (central / central_area) / ((top + right) / (2 * flank_area))
 
 
 def get_insulation_strength(amap, ignore_central=0, ignore_diags=2):

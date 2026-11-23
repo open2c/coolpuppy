@@ -2,7 +2,7 @@
 import numpy as np
 from scipy import sparse
 import pandas as pd
-import h5sparse
+import h5py
 import re
 import os
 import yaml
@@ -44,39 +44,56 @@ def save_pileup_df(filename, df, metadata=None, mode="w", compression="lzf"):
     """
     if metadata is None:
         metadata = {}
+    if mode == "a" and os.path.exists(filename):
+        # Appending to an existing file can't be made atomic
+        _write_pileup_df(filename, df, metadata, mode, compression)
+        return
+    # Write to a temporary file next to the target and move it into place only once
+    # it's complete, so an interrupted save never leaves a partial .clpy file
+    # (which later fails to load with "object 'attrs' doesn't exist")
+    tmp = f"{filename}.tmp{os.getpid()}"
+    try:
+        _write_pileup_df(tmp, df, metadata, "w", compression)
+        os.replace(tmp, filename)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    return
+
+
+def _write_pileup_df(filename, df, metadata, mode, compression):
     df[
         df.columns[
             ~df.columns.isin(
                 ["data", "vertical_stripe", "horizontal_stripe", "coordinates"]
             )
         ]
-    ].to_hdf(filename, "annotation", mode=mode)
+    ].to_hdf(filename, key="annotation", mode=mode)
 
-    with h5sparse.File(filename, "a") as f:
+    with h5py.File(filename, "a") as f:
         width = df["data"].iloc[0].shape[0]
         height = width * df["data"].shape[0]
         ds = f.create_dataset(
             "data",
+            dtype="f4",  # h5py's former implicit default, kept for compatibility
             compression=compression,
             chunks=(width, width),
             shape=(height, width),
         )
         for i, arr in df["data"].reset_index(drop=True).items():
             ds[i * width : (i + 1) * width, :] = arr
-        if df["store_stripes"].any():
+        has_stripes = all(
+            col in df.columns
+            for col in ["vertical_stripe", "horizontal_stripe", "coordinates"]
+        )
+        if has_stripes and "store_stripes" in df.columns and df["store_stripes"].any():
             for i, arr in df["vertical_stripe"].reset_index(drop=True).items():
-                f.create_dataset(
-                    "vertical_stripe_" + str(i),
-                    compression=compression,
-                    shape=(len(arr), width),
-                    data=sparse.csr_matrix(arr),
+                _write_sparse(
+                    f, "vertical_stripe_" + str(i), sparse.csr_matrix(arr), compression
                 )
             for i, arr in df["horizontal_stripe"].reset_index(drop=True).items():
-                f.create_dataset(
-                    "horizontal_stripe_" + str(i),
-                    compression=compression,
-                    shape=(len(arr), width),
-                    data=sparse.csr_matrix(arr),
+                _write_sparse(
+                    f, "horizontal_stripe_" + str(i), sparse.csr_matrix(arr), compression
                 )
             for i, arr in df["coordinates"].reset_index(drop=True).items():
                 f.create_dataset(
@@ -93,6 +110,47 @@ def save_pileup_df(filename, df, metadata=None, mode="w", compression="lzf"):
                 group.attrs[key] = val
         group.attrs["version"] = __version__
     return
+
+
+# Sparse matrices are stored in the layout used by the (unmaintained) h5sparse
+# package, so files stay readable by older coolpuppy versions and vice versa:
+# a group with attributes h5sparse_format/h5sparse_shape and datasets
+# data/indices/indptr.
+_SPARSE_FORMATS = {"csr": sparse.csr_matrix, "csc": sparse.csc_matrix}
+
+
+def _write_sparse(parent, name, mat, compression=None):
+    group = parent.create_group(name)
+    group.attrs["h5sparse_format"] = "csr"
+    group.attrs["h5sparse_shape"] = mat.shape
+    group.create_dataset("data", data=mat.data, compression=compression)
+    group.create_dataset(
+        "indices", data=mat.indices.astype(np.int32), compression=compression
+    )
+    group.create_dataset(
+        "indptr", data=mat.indptr.astype(np.int64), compression=compression
+    )
+    return group
+
+
+def _read_sparse(group):
+    fmt = group.attrs["h5sparse_format"]
+    if isinstance(fmt, bytes):
+        fmt = fmt.decode()
+    return _SPARSE_FORMATS[fmt](
+        (group["data"][()], group["indices"][()], group["indptr"][()]),
+        shape=tuple(group.attrs["h5sparse_shape"]),
+    )
+
+
+def _decode_strings(arr):
+    """Decode an array of bytes/str objects to unicode without truncation."""
+    arr = np.asarray(arr)
+    if arr.dtype.kind in ("S", "O"):
+        return np.vectorize(
+            lambda x: x.decode() if isinstance(x, bytes) else str(x), otypes=[str]
+        )(arr) if arr.size else arr.astype(str)
+    return arr.astype(str)
 
 
 def load_pileup_df(filename, quaich=False, skipstripes=False):
@@ -113,8 +171,20 @@ def load_pileup_df(filename, quaich=False, skipstripes=False):
         Pileups are in the "data" column, all metadata in other columns
 
     """
-    with h5sparse.File(filename, "r", libver="latest") as f:
-        metadata = dict(zip(f["attrs"].attrs.keys(), f["attrs"].attrs.values()))
+    with h5py.File(filename, "r", libver="latest") as f:
+        if "data" not in f or "annotation" not in f:
+            raise ValueError(
+                f"{filename} is incomplete (missing 'data' or 'annotation'), probably "
+                "because writing it was interrupted. Please regenerate it."
+            )
+        if "attrs" in f:
+            metadata = dict(zip(f["attrs"].attrs.keys(), f["attrs"].attrs.values()))
+        else:
+            logger.warning(
+                f"{filename} has no metadata ('attrs'), probably because writing it was "
+                "interrupted; consider regenerating it"
+            )
+            metadata = {}
         dstore = f["data"]
         data = []
         for chunk in dstore.iter_chunks():
@@ -131,9 +201,9 @@ def load_pileup_df(filename, quaich=False, skipstripes=False):
                     vstripe = "vertical_stripe_" + str(i)
                     hstripe = "horizontal_stripe_" + str(i)
                     coords = "coordinates_" + str(i)
-                    vertical_stripe.append(f[vstripe][:].toarray())
-                    horizontal_stripe.append(f[hstripe][:].toarray())
-                    coordinates.append(f[coords][:].astype("U13"))
+                    vertical_stripe.append(_read_sparse(f[vstripe]).toarray())
+                    horizontal_stripe.append(_read_sparse(f[hstripe]).toarray())
+                    coordinates.append(_decode_strings(f[coords][:]))
                 annotation["vertical_stripe"] = vertical_stripe
                 annotation["horizontal_stripe"] = horizontal_stripe
                 annotation["coordinates"] = coordinates
@@ -149,7 +219,7 @@ def load_pileup_df(filename, quaich=False, skipstripes=False):
     if quaich:
         basename = os.path.basename(filename)
         sample, bedname = re.search(
-            "^(.*)-(?:[0-9]+)_over_(.*)_(?:[0-9]+-shifts|expected).*\.clpy", basename
+            r"^(.*)-(?:[0-9]+)_over_(.*)_(?:[0-9]+-shifts|expected).*\.clpy", basename
         ).groups()
         annotation["sample"] = sample
         annotation["bedname"] = bedname

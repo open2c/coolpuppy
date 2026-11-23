@@ -350,6 +350,30 @@ def parse_args_coolpuppy():
     return parser
 
 
+
+def _guess_features_format(ext, buf, names, ncols):
+    """Guess bed/bedpe from the file extension, falling back to the content."""
+    ext = ext.lstrip(".").lower()
+    if ext in ("bed", "bedpe"):
+        return ext
+    if names is not None:
+        return "bedpe" if {"chrom1", "start1", "chrom2", "start2"} <= set(names) else "bed"
+    if ncols >= 6:
+        # bedpe: chrom1 start1 end1 chrom2 start2 end2
+        pos = buf.tell()
+        line = ""
+        for line in buf:
+            if line.strip() and not line.startswith("#"):
+                break
+        buf.seek(pos)
+        fields = line.rstrip("\n").split("\t")
+        if len(fields) >= 6 and all(
+            fields[i].strip().lstrip("-").isdigit() for i in (1, 2, 4, 5)
+        ) and not fields[3].strip().lstrip("-").isdigit():
+            return "bedpe"
+    return "bed"
+
+
 def main():
     parser = parse_args_coolpuppy()
     args = parser.parse_args()
@@ -390,6 +414,7 @@ def main():
     else:
         args.ignore_group_order = False
 
+    logging.basicConfig(format="%(levelname)s:%(name)s: %(message)s")
     logger = logging.getLogger("coolpuppy")
     logger.setLevel(getattr(logging, args.logLevel))
 
@@ -398,20 +423,21 @@ def main():
     if args.seed is not None:
         np.random.seed(args.seed)
 
-    if args.n_proc == 0:
-        nproc = -1
-    else:
-        nproc = args.n_proc
+    # 0 means all available cores
+    nproc = args.n_proc if args.n_proc > 0 else (os.cpu_count() or 1)
 
     clr = cooler.Cooler(args.cool_path)
 
     coolname = os.path.basename(clr.filename)
     if args.features != "-":
-        bedname, ext = os.path.splitext(os.path.basename(args.features))
+        basename = os.path.basename(args.features)
+        if basename.endswith(".gz"):
+            basename = basename[:-3]
+        bedname, ext = os.path.splitext(basename)
         features = args.features
         buf, names, ncols = sniff_for_header(features)
         if args.features_format == "auto":
-            schema = ext[1:]
+            schema = _guess_features_format(ext, buf, names, ncols)
         else:
             schema = args.features_format
         if schema == "bed":
