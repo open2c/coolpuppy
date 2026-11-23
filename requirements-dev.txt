@@ -1,6 +1,5 @@
 -r requirements.txt
 pytest
 flake8
-pytest-flake8
 pytest-cov
 nbval
